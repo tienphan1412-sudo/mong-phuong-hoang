@@ -191,6 +191,7 @@ renderer.setAnimationLoop(() => {
 addEventListener('pointerdown', () => music.start(), { once: true });
 addEventListener('keydown', () => music.start(), { once: true });
 function musicBtn() {
+  const g = document.createElement('button'); g.id = 'guidebtn'; g.textContent = '📖 Hướng dẫn'; g.onclick = () => startTour(true); document.body.appendChild(g);
   const b = document.createElement('button'); b.id = 'musicbtn';
   const paint = () => b.textContent = music.isOn() ? '🎵 Nhạc: bật' : '🔇 Nhạc: tắt';
   b.onclick = () => { music.toggle(); paint(); }; paint(); document.body.appendChild(b);
@@ -229,7 +230,7 @@ socket.on('me', async m => {
   if (selfC) { const r = selfC.label.element.querySelector('.r'); if (r) { const t = rankTier(me.rankName); r.className = 'r ' + t; r.textContent = (t === 't3' ? '★ ' : '') + me.rankName; } }
   if (caseOpenId) socket.emit('caseDetail', caseOpenId);
 });
-socket.on('scene', async d => { pendingScene = d; if (!stage) { await enterScene(d.loc, d.players); pendingScene = null; } });
+socket.on('scene', async d => { pendingScene = d; if (!stage) { await enterScene(d.loc, d.players); pendingScene = null; setTimeout(() => startTour(), 1200); } });
 let pendingScene = null;
 socket.on('pjoin', p => addOther(p));
 socket.on('pleave', id => removeOther(id));
@@ -425,7 +426,7 @@ async function nextCut() {
 }
 let cutDone = () => {};
 async function playCut(d) {
-  if (d.type === 'tiencung') showScroll('Tiến cung', `Tú nữ <b>${esc(d.name)}</b> đã vào cung với lối sống <b>${esc(d.path)}</b>.<br><br>Mỗi ngày: thỉnh an Thái hậu ở <b>Từ Ninh cung</b>, luyện tài nghệ và dò tin ở <b>Ngự hoa viên</b>, dâng canh ở <b>Dưỡng Tâm điện</b>. Đủ công trạng sẽ được tấn phong. Tối nào Hoàng thượng cũng lật thẻ bài.<br><br>Bấm xuống đất để đi, kéo để xoay góc nhìn, bấm tên NPC để nói chuyện.`, [['Vào cung', hideCut]]);
+  if (d.type === 'tiencung') showScroll('Tiến cung', `Tú nữ <b>${esc(d.name)}</b> đã vào cung với lối sống <b>${esc(d.path)}</b>.<br><br>Mỗi ngày: thỉnh an Thái hậu ở <b>Từ Ninh cung</b>, luyện tài nghệ và dò tin ở <b>Ngự hoa viên</b>, dâng canh ở <b>Dưỡng Tâm điện</b>. Đủ công trạng sẽ được tấn phong. Tối nào Hoàng thượng cũng lật thẻ bài.<br><br>Bấm xuống đất để đi, kéo để xoay góc nhìn, bấm tên NPC để nói chuyện.`, [['Vào cung', () => { hideCut(); setTimeout(() => startTour(), 600); }]]);
   else if (d.type === 'sacphong' || d.type === 'phucvi') runSacPhong(d);
   else if (d.type === 'phatgiac') showScroll('Phát giác', `Quế ma ma khám phòng và tìm thấy <b>${esc(d.methodName)}</b>. Bổn cung bị nghi <b>${esc(d.crime)}</b>.<br><br>Có <b>${d.hours} giờ</b> trước phiên xử ở Từ Ninh cung. Hỏi cung nữ, dò sổ quà, lục tro, nhờ thái y, hoặc nhờ người làm chứng để tìm ra kẻ hãm hại.`, [['Để sau', hideCut], ['Xem vụ án', () => { hideCut(); openCase(d.caseId); }]]);
   else if (d.type === 'lanhcung') { await fade(true); showScroll('Lãnh cung', `Bổn cung bị đày vào lãnh cung vì <b>${esc(d.reason)}</b>.<br><br>Ở đây vẫn có đường về: làm việc lãnh cung 3 ngày để được phục vị, hoặc tiếp tục điều tra và kêu oan.<br><i>“Được, chờ bổn cung quay về.”</i>`, [['Bước vào lãnh cung', async () => { hideCut(); socket.emit('goto', 'lanhcung'); await fade(false); }]]); }
@@ -498,4 +499,52 @@ function holdEdict(c, m) {
   _f.set(Math.sin(c.root.rotation.y), 0, Math.cos(c.root.rotation.y));
   m.position.addScaledVector(_f, .03); m.position.y += .05;
   m.rotation.set(-.35, c.root.rotation.y + Math.PI, 0, 'YXZ');
+}
+
+// ---------------- hướng dẫn người chơi mới ----------------
+const TOUR = [
+  { el: '#who', title: 'Thân phận của bổn cung', text: 'Tên, chức vị và lối sống. Thanh vàng là <b>công trạng</b>: đầy thanh sẽ được Hoàng thượng tấn phong lên bậc tiếp theo, từ Tú nữ cho tới Hoàng quý phi.' },
+  { el: '#stats', title: 'Bạc, lượt và nhiệm vụ', text: '<b>Bạc</b> để tặng quà, dâng canh, điều tra. <b>Lượt</b>: mỗi ngày 5 lượt, làm việc sẽ tốn lượt, sang ngày mới được hồi lại. <b>Sủng ái</b> càng cao càng dễ được lật thẻ bài. <b>Thái hậu</b> là độ hài lòng của Thái hậu.<br>Làm đủ 3 <b>nhiệm vụ</b> thỉnh an, luyện, dò tin mỗi ngày được thưởng thêm công trạng.' },
+  { el: '#map', title: 'Đi lại trong cung', text: 'Bấm để đến <b>Ngự hoa viên</b>, <b>Từ Ninh cung</b> (Thái hậu), <b>Dưỡng Tâm điện</b> (Hoàng thượng) và <b>phòng riêng</b>. Đêm nào được lật thẻ bài sẽ hiện thêm <b>Tẩm cung</b>.' },
+  { el: '#acts', title: 'Việc làm ở nơi đang đứng', text: 'Mỗi nơi có việc riêng: thỉnh an ở Từ Ninh cung, dâng canh ở Dưỡng Tâm điện, luyện tài nghệ và dò tin ở Ngự hoa viên, thay đồ và bài trí ở phòng riêng.' },
+  { el: 'center', title: 'Di chuyển và nói chuyện', text: '<b>Bấm xuống đất</b> để đi tới đó. <b>Kéo chuột</b> để xoay góc nhìn, <b>lăn chuột</b> để phóng to thu nhỏ. Bấm vào <b>tên NPC</b> màu vàng để nói chuyện, cung nữ và thái y còn giúp điều tra vụ án.' },
+  { el: () => [...document.querySelectorAll('#acts button')].find(b => b.textContent.includes('Danh sách')), title: 'Tranh sủng', text: 'Xem các phi tần đang ở trong cung. <b>Tặng quà</b> để kết thân. Từ <b>Quý nhân</b> trở lên được <b>ra tay</b> hãm hại người khác.<br>Bị hại sẽ có 24 giờ <b>điều tra lật án</b>: tìm manh mối, nhờ nhân chứng, chỉ đích danh thủ phạm. Thua thì vào lãnh cung, nhưng vẫn có đường phục vị.' },
+  { el: '#chat', title: 'Trò chuyện', text: 'Gõ rồi nhấn Enter để nói với mọi người cùng chỗ. Xưng "tui", gọi "bà" sẽ tự đổi thành <b>thần thiếp</b>, <b>bổn cung</b>, <b>tỷ tỷ</b>.' },
+  { el: '#newsbtn', title: 'Bảng tin hậu cung', text: 'Tin mới trong cung: ai vừa được tấn phong, đêm nay ai được lật thẻ, vụ án nào bị lật.' },
+  { el: '#musicbtn', title: 'Nhạc nền', text: 'Bật hoặc tắt nhạc. Mỗi nơi có nhạc riêng.' },
+  { el: '#guidebtn', title: 'Xem lại hướng dẫn', text: 'Quên cách chơi thì bấm vào đây bất cứ lúc nào.<br><br>Chúc chủ tử sớm bước lên ngôi Hoàng hậu!' },
+];
+let tourOn = false;
+function startTour(force) {
+  if (tourOn || !me || !world) return;
+  const key = 'mph_tour_' + me.id;
+  try { if (!force && localStorage.getItem(key)) return; } catch {}
+  if (cutActive || stage || !$('modal').classList.contains('hidden')) { if (!force) setTimeout(() => startTour(), 1500); return; }
+  tourOn = true; let i = 0;
+  const wrap = document.createElement('div'); wrap.id = 'tour';
+  wrap.innerHTML = '<div class="hole"></div><div class="tip"><div class="step"></div><h4></h4><div class="txt"></div><div class="btns"><button class="skip">Bỏ qua</button><button class="gold next">Tiếp tục</button></div></div>';
+  document.body.appendChild(wrap);
+  const hole = wrap.querySelector('.hole'), tip = wrap.querySelector('.tip');
+  const finish = () => { tourOn = false; wrap.remove(); removeEventListener('resize', show); try { localStorage.setItem(key, '1'); } catch {} };
+  wrap.querySelector('.skip').onclick = finish;
+  wrap.querySelector('.next').onclick = () => { if (i >= TOUR.length - 1) return finish(); i++; show(); };
+  function show() {
+    const st = TOUR[i]; let r;
+    if (st.el === 'center') { const w = Math.min(320, innerWidth * .5), h = Math.min(380, innerHeight * .5); r = { left: innerWidth / 2 - w / 2, top: innerHeight / 2 - h / 2, width: w, height: h }; }
+    else { const el = typeof st.el === 'function' ? st.el() : document.querySelector(st.el); if (!el || !el.getClientRects().length) { if (i < TOUR.length - 1) { i++; return show(); } return finish(); } r = el.getBoundingClientRect(); }
+    const pad = 6; Object.assign(hole.style, { left: r.left - pad + 'px', top: r.top - pad + 'px', width: r.width + pad * 2 + 'px', height: r.height + pad * 2 + 'px' });
+    wrap.querySelector('.step').textContent = `${i + 1} / ${TOUR.length}`;
+    tip.querySelector('h4').textContent = st.title; tip.querySelector('.txt').innerHTML = st.text;
+    wrap.querySelector('.next').textContent = i === TOUR.length - 1 ? 'Xong' : 'Tiếp tục';
+    // đặt khung chú thích bên cạnh chỗ được làm sáng
+    const tw = Math.min(330, innerWidth - 24); tip.style.width = tw + 'px';
+    const th = tip.offsetHeight, gap = 14; let x, y;
+    if (r.left + r.width + gap + tw < innerWidth - 8) { x = r.left + r.width + gap; y = r.top; }
+    else if (r.left - gap - tw > 8) { x = r.left - gap - tw; y = r.top; }
+    else { x = r.left + r.width / 2 - tw / 2; y = r.top + r.height + gap; if (y + th > innerHeight - 8) y = r.top - gap - th; }
+    x = Math.max(8, Math.min(innerWidth - tw - 8, x)); y = Math.max(8, Math.min(innerHeight - th - 8, y));
+    tip.style.left = x + 'px'; tip.style.top = y + 'px';
+  }
+  addEventListener('resize', show);
+  show();
 }
