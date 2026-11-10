@@ -36,9 +36,16 @@ function applyLights(L) {
   renderer.toneMappingExposure = L.exposure;
   fill.intensity = L.exposure > 1.15 ? 1.0 : 0.15;
 }
+function rankTier(r) {
+  if (/Hoàng hậu|Hoàng quý phi/.test(r)) return 't3';
+  if (/Phi|phi/.test(r) && !/Phế/.test(r)) return 't2';
+  if (/Quý nhân|Tần/.test(r)) return 't1';
+  if (/Phế|lãnh/.test(r)) return 'tx';
+  return 't0';
+}
 function makeLabel(name, rank, npc, onClick) {
   const d = document.createElement('div'); d.className = 'label' + (npc ? ' npc' : '');
-  d.innerHTML = `<div class="bbl"></div>${esc(name)}${rank ? `<span class="r">${esc(rank)}</span>` : ''}`;
+  d.innerHTML = `<div class="bbl"></div>${esc(name)}${rank ? `<br><span class="r ${rankTier(rank)}">${rankTier(rank) === 't3' ? '★ ' : ''}${esc(rank)}</span>` : ''}`;
   if (onClick) { d.style.pointerEvents = 'auto'; d.style.cursor = 'pointer'; d.title = 'Bấm để nói chuyện'; d.onclick = e => { e.stopPropagation(); onClick(); }; }
   const o = new CSS2DObject(d); o.position.set(0, 1.12, 0); return o;
 }
@@ -99,7 +106,7 @@ async function respawnSelf(x, z, ry) {
   const tok = loadToken;
   const c = await spawn(me.outfit);
   if (tok !== loadToken) return c.dispose();
-  if (selfC) selfC.dispose();
+  if (selfC) { selfC.label?.element.remove(); selfC.root.parent?.remove(selfC.root); selfC.dispose(); }
   selfC = c; c.root.position.set(x, 0, z); c.root.rotation.y = ry; world.group.add(c.root);
   c.label = makeLabel(me.name, me.rankName); c.root.add(c.label);
   c.target = null; c.outfit = me.outfit;
@@ -219,7 +226,7 @@ socket.on('me', async m => {
   }
   renderHud(); renderMap(); renderActs();
   if (selfC && world && oldOutfit && oldOutfit !== me.outfit && !stage) { const r = selfC.root; await respawnSelf(r.position.x, r.position.z, r.rotation.y); }
-  if (selfC) { selfC.label.element.querySelector('.r') && (selfC.label.element.querySelector('.r').textContent = me.rankName); }
+  if (selfC) { const r = selfC.label.element.querySelector('.r'); if (r) { const t = rankTier(me.rankName); r.className = 'r ' + t; r.textContent = (t === 't3' ? '★ ' : '') + me.rankName; } }
   if (caseOpenId) socket.emit('caseDetail', caseOpenId);
 });
 socket.on('scene', async d => { pendingScene = d; if (!stage) { await enterScene(d.loc, d.players); pendingScene = null; } });
@@ -232,7 +239,7 @@ socket.on('chat', m => {
   const log = $('chatlog'); const div = document.createElement('div'); div.innerHTML = `<b>${esc(m.name)}:</b> ${esc(m.text)}`; log.appendChild(div); log.scrollTop = 1e6;
   const who = m.id === me?.id ? selfC : others.get(m.id)?.c; if (who?.label) bubble(who.label, m.text);
 });
-$('chatin').addEventListener('keydown', e => { if (e.key === 'Enter' && e.target.value.trim()) { socket.emit('chat', e.target.value); e.target.value = ''; } e.stopPropagation(); });
+$('chatin').addEventListener('keydown', e => { if (e.isComposing || e.keyCode === 229) return; if (e.key === 'Enter' && e.target.value.trim()) { socket.emit('chat', e.target.value); e.target.value = ''; } e.stopPropagation(); });
 socket.on('newsAll', list => { $('newslist').innerHTML = ''; list.slice().reverse().forEach(addNews); });
 socket.on('news', n => { addNews(n); if (['phong', 'latthe', 'an', 'latan', 'phat'].includes(n.kind)) toast('📜 ' + n.text); });
 function addNews(n) { const d = document.createElement('div'); d.className = 'n'; d.innerHTML = `<time>${new Date(n.t).toLocaleString('vi-VN', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit' })}</time>${esc(n.text)}`; $('newslist').prepend(d); }
