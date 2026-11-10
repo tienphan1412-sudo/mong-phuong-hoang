@@ -26,7 +26,7 @@ export function loadModel(name) {
 }
 export async function ready() { await Promise.all([loadModel('thuongtai'), loadModel('hoangthuong')]); }
 
-const MAPB = { Hips: 'hips', Spine: 'spine', Spine1: 'spine1', Spine2: 'spine2', Head: 'head', LeftArm: 'lArm', LeftForeArm: 'lFore', LeftHand: 'lHand', RightArm: 'rArm', RightForeArm: 'rFore', RightHand: 'rHand', LeftLeg: 'kneeL', RightLeg: 'kneeR' };
+const MAPB = { Hips: 'hips', Spine: 'spine', Spine1: 'spine1', Spine2: 'spine2', Head: 'head', LeftArm: 'lArm', LeftForeArm: 'lFore', LeftHand: 'lHand', RightArm: 'rArm', RightForeArm: 'rFore', RightHand: 'rHand', LeftLeg: 'kneeL', RightLeg: 'kneeR', LeftShoulder: 'lSh', RightShoulder: 'rSh', Neck: 'neck', LeftUpLeg: 'hipL', RightUpLeg: 'hipR', LeftFoot: 'footL', RightFoot: 'footR' };
 const v3 = a => new THREE.Vector3(...a).normalize();
 const _a = new THREE.Vector3(), _b = new THREE.Vector3(), _d = new THREE.Vector3(), _q = new THREE.Quaternion(), _pq = new THREE.Quaternion(), _wq = new THREE.Quaternion();
 function aim(root, bone, child, dir) {
@@ -42,6 +42,18 @@ const POSES = {
   che_mieng: (c, t) => { const sh = Math.sin(t * 14) * .04; aim(c.root, c.B.rArm, c.B.rFore, v3([-.25, -.55, .8])); aim(c.root, c.B.rFore, c.B.rHand, v3([.35, .88 + sh, .3])); aim(c.root, c.B.lArm, c.B.lFore, v3([.12, -.92, .3])); aim(c.root, c.B.lFore, c.B.lHand, v3([-.45, -.35, .8])); },
   doc_chi: (c) => { aim(c.root, c.B.lArm, c.B.lFore, v3([.35, -.45, .8])); aim(c.root, c.B.lFore, c.B.lHand, v3([-.2, .15, 1])); aim(c.root, c.B.rArm, c.B.rFore, v3([-.35, -.45, .8])); aim(c.root, c.B.rFore, c.B.rHand, v3([.2, .15, 1])); },
 };
+
+// dáng đứng nam: vai mở rộng, ngực thẳng, hai chân dang nhẹ
+function maleStance(c) {
+  const B = c.B, r = c.root;
+  aim(r, B.spine, B.spine1, v3([0, 1, -.02])); aim(r, B.spine2, B.neck, v3([0, 1, .04])); aim(r, B.neck, B.head, v3([0, 1, .06]));
+  aim(r, B.lSh, B.lArm, v3([1, -.06, -.04])); aim(r, B.rSh, B.rArm, v3([-1, -.06, -.04]));
+  aim(r, B.lArm, B.lFore, v3([.2, -.97, -.02])); aim(r, B.rArm, B.rFore, v3([-.2, -.97, -.02]));
+  aim(r, B.lFore, B.lHand, v3([.06, -.97, .2])); aim(r, B.rFore, B.rHand, v3([-.06, -.97, .2]));
+  aim(r, B.hipL, B.kneeL, v3([.09, -1, 0])); aim(r, B.hipR, B.kneeR, v3([-.09, -1, 0]));
+  aim(r, B.kneeL, B.footL, v3([.06, -1, -.02])); aim(r, B.kneeR, B.footR, v3([-.06, -1, -.02]));
+}
+export { aim, v3 };
 
 export async function spawn(modelName) {
   const g = await loadModel(modelName);
@@ -87,7 +99,9 @@ export async function spawn(modelName) {
       aim(root, B.lArm, B.lFore, v3([.18, -.9, .38])); aim(root, B.lFore, B.lHand, v3([-.35, -.25, .9]));
       aim(root, B.rArm, B.rFore, v3([-.18, -.9, .38])); aim(root, B.rFore, B.rHand, v3([.35, -.25, .9]));
     }
+    if (male && c.curName === 'dung_cho' && !c.pose) { root.updateMatrixWorld(true); maleStance(c); }
     if (c.pose) { root.updateMatrixWorld(true); POSES[c.pose](c, c.t); }
+    if (c.post) { root.updateMatrixWorld(true); c.post(c, c.t); }
   };
   c.dispose = () => { mixer.stopAllAction(); root.parent && root.parent.remove(root); };
   c.play('dung_cho');

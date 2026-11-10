@@ -287,7 +287,7 @@ function checkDeadlines() {
 
 // ---------------- lật thẻ ----------------
 function latThe() {
-  const pool = Object.values(DB.players).filter(p => !p.lanh && p.rank >= 1 && now() - (p.lastSeen || 0) < 3 * 864e5);
+  const pool = Object.values(DB.players).filter(p => !p.lanh && p.rank >= 1 && (online.has(p.id) || now() - (p.lastSeen || p.created || 0) < 3 * 864e5));
   if (!pool.length) return null;
   const w = pool.map(p => {
     let m = 1;

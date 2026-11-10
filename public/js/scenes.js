@@ -232,7 +232,7 @@ function bedroom(o) {
   const fl = new THREE.Mesh(new THREE.PlaneGeometry(W, D), m.floor); fl.rotation.x = -Math.PI / 2; fl.receiveShadow = true; fl.name = 'ground'; g.add(fl);
   for (const s of [-1, 1]) box(g, .08, H, D, m.wall, s * (W / 2 + .04), H / 2, 0);
   box(g, W, H, .1, m.wall, 0, H / 2, -D / 2 - .05); box(g, W, H, .1, m.wall, 0, H / 2, D / 2 + .05);
-  const bed = DECOR.giuong.make(); bed.scale.setScalar(1.8); bed.position.set(0, 0, -D / 2 + .9); g.add(bed);
+  const bed = DECOR.giuong.make(); bed.scale.setScalar(1.8); bed.position.set(0, 0, -D / 2 + .9); g.add(bed); o.bed = bed; bed.children.filter(m => m.isMesh && m.geometry.type === 'PlaneGeometry' && m.position.z > .3).forEach(m => m.visible = false); // vén rèm trước o.bedFront = -D / 2 + .9 + .75 * 1.8 / 2;
   const tham = DECOR.tham.make(); tham.position.set(0, 0, .5); g.add(tham);
   const candles = [];
   for (const [x, z] of [[-1.6, -1.6], [1.6, -1.6], [-2.2, .8], [2.2, .8], [-.9, 1.6], [.9, 1.6]]) {

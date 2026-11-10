@@ -2,7 +2,7 @@
 import * as THREE from 'three';
 import { CSS2DRenderer, CSS2DObject } from 'three/addons/renderers/CSS2DRenderer.js';
 import { buildLocation, DECOR } from './scenes.js';
-import { spawn, seatPlacement, ready, loadModel } from './chars.js';
+import { spawn, seatPlacement, ready, loadModel, aim, v3 } from './chars.js';
 import * as music from './music.js';
 
 const $ = id => document.getElementById(id);
@@ -67,7 +67,7 @@ function clearWorld() {
 }
 async function enterScene(loc, players) {
   const tok = ++loadToken;
-  closeDecor();
+  closeDecor(); seated = null;
   music.setMode(loc);
   // dựng cảnh mới ở hậu trường, cảnh cũ vẫn hiện cho tới khi xong
   const o = buildLocation(loc, { palace: me?.hasPalace, palaceName: me ? (me.name.split(' ').pop() + ' cung') : '' });
@@ -90,6 +90,10 @@ async function enterScene(loc, players) {
     const lb = makeLabel(n.name, '', true, n.talk ? () => talk(n) : null); c.root.add(lb); n.label = lb;
   }
   if (tok !== loadToken) return;
+  if (o.bed) { // chỉnh chiều cao giường cho vừa tư thế ngồi
+    const ht = o.npcs.find(n => n.model === 'hoangthuong_dem');
+    if (ht?.c) { const r = ht.c.root, px = r.position.x, pz = r.position.z, ry = r.rotation.y; r.position.set(0, 0, 0); r.rotation.y = 0; const sp = seatPlacement(ht.c); o.bedTop = sp.y; o.bed.scale.y = Math.max(.6, sp.y / .38); r.position.set(px, 0, pz); r.rotation.y = ry; ht.c.play('dung_cho'); ht.home = { x: px, z: pz, ry }; }
+  }
   clearWorld();
   world = o; scene.add(o.group); applyLights(o.lights);
   camDist = o.cam.dist; camH = o.cam.height; camYaw = 0;
@@ -134,6 +138,8 @@ function clickWorld(e) {
   if (!world || !selfC || cutActive) return;
   ndc.set(e.clientX / innerWidth * 2 - 1, -(e.clientY / innerHeight) * 2 + 1); ray.setFromCamera(ndc, camera);
   if (decor.on) return decorClick();
+  if (world.bed && ray.intersectObject(world.bed, true).length) return openBed();
+  if (seated) standUp();
   const ground = []; world.group.traverse(o => { if (o.name === 'ground') ground.push(o); });
   const hit = ray.intersectObjects(ground, false)[0]; if (!hit) return;
   selfC.target = clampPos(hit.point.x, hit.point.z);
@@ -163,7 +169,7 @@ function stepSelf(dt) {
   wasMoving = moving;
 }
 function sendMove(anim) { lastSend = performance.now(); const r = selfC.root; socket.emit('move', { x: r.position.x, z: r.position.z, ry: r.rotation.y, anim }); }
-function emote(a) { if (!selfC) return; selfC.target = null; selfC.play(a, { restart: true }); socket.emit('emote', a); }
+function emote(a) { if (!selfC) return; if (seated) standUp(); selfC.target = null; selfC.play(a, { restart: true }); socket.emit('emote', a); }
 
 // ---------------- vòng lặp ----------------
 const clock = new THREE.Clock(); let T = 0;
@@ -178,10 +184,11 @@ renderer.setAnimationLoop(() => {
     if (world.flicker) for (const L of world.flicker) L.intensity = 2 + Math.sin(T * 9 + L.id) * .25 + Math.random() * .2;
     if (stage) stage.update(dt);
     else if (selfC && !gateSpin) {
-      const p = selfC.root.position;
+      let p = selfC.root.position;
+      if (seated?.ht?.c) { p = p.clone().add(seated.ht.c.root.position).multiplyScalar(.5); p.y = 0; }
       const want = new THREE.Vector3(p.x + Math.sin(camYaw) * camDist, camH, p.z + Math.cos(camYaw) * camDist);
       if (['phong', 'tamcung', 'lanhcung'].includes(world.loc)) { const b = world.bounds, m = .3; want.x = Math.min(b.maxX + m, Math.max(b.minX - m, want.x)); want.z = Math.min(b.maxZ + m, Math.max(b.minZ - m, want.z)); }
-      if (snapCam) { camera.position.copy(want); snapCam = false; } else camera.position.lerp(want, Math.min(1, dt * 6)); camera.lookAt(p.x, .85, p.z);
+      if (snapCam) { camera.position.copy(want); snapCam = false; } else camera.position.lerp(want, Math.min(1, dt * 6)); camera.lookAt(p.x, seated ? (world.bedTop || .4) + .32 : .85, p.z);
     }
   }
   renderer.render(scene, camera); labels.render(scene, camera);
@@ -277,7 +284,7 @@ function renderActs() {
   if (L === 'duongtam') add('🍲 Dâng canh Hoàng thượng', '1 lượt · 30 bạc · sủng ái +5', () => { emote('cui_chao'); act('dangcanh'); });
   if (L === 'hoavien') { add('👂 Dò tin', '1 lượt · nghe ngóng chuyện trong cung', () => act('dotin')); add('🎐 Luyện tài nghệ', '1 lượt · công trạng +8', () => { emote('mua'); act('luyen'); }); }
   if (L === 'phong') { add('🎐 Luyện tài nghệ', '1 lượt · công trạng +8', () => { emote('mua'); act('luyen'); }); add('👘 Thay trang phục', '', openWardrobe); add('🏮 Bài trí ' + (me.hasPalace ? 'cung' : 'phòng'), 'Đặt, xoay đồ nội thất', openDecor); }
-  if (L === 'tamcung') add('🌙 Rời tẩm cung', 'Trời sắp sáng', () => socket.emit('goto', 'phong'));
+  if (L === 'tamcung') { add('🛏 Lên giường', 'Ngồi cùng Hoàng thượng', openBed); add('🌙 Rời tẩm cung', 'Trời sắp sáng', () => socket.emit('goto', 'phong')); }
   if (L === 'lanhcung') { add('🧹 Làm việc lãnh cung', `Phục vị ${me.lanh?.tasks || 0}/3 · mỗi ngày 1 lần`, () => act('lanh')); if (me.lanh?.caseId) add('📜 Kêu oan', 'Điều tra lại vụ án cũ', () => openCase(me.lanh.caseId)); }
   if (!me.lanh) add('👥 Danh sách hậu cung', 'Tặng quà · ra tay', openRoster);
   add('💃 Động tác', 'Hành lễ, múa, che miệng cười…', openEmotes);
@@ -547,4 +554,42 @@ function startTour(force) {
   }
   addEventListener('resize', show);
   show();
+}
+
+// ---------------- tẩm cung: ngồi trên giường ----------------
+let seated = null;
+function openBed() {
+  if (!world?.bed || !selfC) return;
+  modal(`<button class="close" onclick="window._close()">✕</button><h3>Long sàng</h3><div style="color:var(--muted);font-size:13px">Chọn cách ngồi cùng Hoàng thượng</div>
+  <div class="btns"><button data-b="face">💞 Ngồi đối mặt</button><button data-b="lean">🌙 Tựa vào lòng Hoàng thượng</button>${seated ? '<button data-b="up">Đứng dậy</button>' : ''}</div>`);
+  $('mcard').querySelectorAll('[data-b]').forEach(b => b.onclick = () => { closeModal(); b.dataset.b === 'up' ? standUp() : sitBed(b.dataset.b); });
+}
+function placeSeated(c, x, z, ry) {
+  const r = c.root; r.position.set(x, 0, z); r.rotation.y = ry; r.updateMatrixWorld(true);
+  const s = seatPlacement(c); // đã chuyển sang động tác ngồi
+  r.position.x += x - s.x; r.position.z += z - s.z; r.position.y = world.bedTop - s.y;
+}
+function sitBed(kind) {
+  const ht = world.npcs.find(n => n.model === 'hoangthuong_dem'); if (!ht?.c || !selfC) return;
+  standUp(true);
+  const zf = world.bedFront - .2;
+  selfC.target = null;
+  if (kind === 'face') {
+    placeSeated(ht.c, -.3, zf, 1.0); placeSeated(selfC, .3, zf, -1.0);
+    ht.c.post = null; selfC.post = null;
+  } else {
+    placeSeated(ht.c, -.14, zf - .02, .3); placeSeated(selfC, .2, zf + .02, -.75);
+    // nàng nghiêng người tựa vào vai, Hoàng thượng choàng tay ôm
+    selfC.post = (c) => { aim(c.root, c.B.spine1, c.B.spine2, v3([-.42, .9, -.05])); aim(c.root, c.B.neck, c.B.head, v3([-.6, .8, 0])); };
+    ht.c.post = (c) => { aim(c.root, c.B.lArm, c.B.lFore, v3([.72, -.3, -.62])); aim(c.root, c.B.lFore, c.B.lHand, v3([.45, -.15, .88])); aim(c.root, c.B.neck, c.B.head, v3([.22, .97, .05])); };
+  }
+  seated = { kind, ht };
+  camYaw = 0; camDist = 2.3; camH = .95;
+}
+function standUp(keepCam) {
+  if (!seated) return;
+  const { ht } = seated; seated = null;
+  if (ht?.c && ht.home) { ht.c.post = null; ht.c.root.position.set(ht.home.x, 0, ht.home.z); ht.c.root.rotation.y = ht.home.ry; ht.c.play('dung_cho'); }
+  if (selfC) { selfC.post = null; const r = selfC.root; r.position.set(.3, 0, world.bedFront + .45); r.position.y = 0; selfC.play('dung_cho'); }
+  if (!keepCam && world) { camDist = world.cam.dist; camH = world.cam.height; }
 }
