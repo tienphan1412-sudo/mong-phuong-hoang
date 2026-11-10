@@ -276,7 +276,7 @@ export function buildLocation(loc, opts = {}) {
   else if (loc === 'duongtam') { hall(o, { plaque: '養心殿', screenGold: true }); o.npcs = [{ model: 'hoangthuong', sit: true, male: true, name: 'Hoàng thượng', talk: 'dangcanh' }, { model: 'thaigiam', x: 1.6, z: -2, ry: -Math.PI / 3, male: true, name: 'Tổng quản Lý Đức Toàn', talk: 'thaigiam' }, { model: 'thive', x: -3.6, z: 4.2, ry: Math.PI / 2, male: true, name: 'Thị vệ' }]; }
   else if (loc === 'hoavien') { garden(o); o.npcs = [{ model: 'cungnu', x: 3, z: -1.2, ry: -1, name: 'Cung nữ Tiểu Thúy', talk: 'dotin' }, { model: 'thive', x: 0, z: 8.6, ry: Math.PI, male: true, name: 'Thị vệ' }]; }
   else if (loc === 'phong') { room(o, { big: !!opts.palace, palaceName: opts.palace ? opts.palaceName : null }); o.npcs = [{ model: 'cungnu', x: (o.roomSize.W / 2 - .8), z: -o.roomSize.D / 2 + 1, ry: -2.3, name: 'Cung nữ thân tín', talk: 'cungnu' }]; o.decorable = true; }
-  else if (loc === 'tamcung') { bedroom(o); o.npcs = [{ model: 'hoangthuong_dem', x: -.5, z: -.4, ry: .4, male: true, name: 'Hoàng thượng' }]; }
+  else if (loc === 'tamcung') { bedroom(o); o.npcs = [{ model: 'hoangthuong_dem', x: -.5, z: -.4, ry: .4, male: true, name: 'Hoàng thượng', idle: 'khoanh_tay' }]; }
   else if (loc === 'lanhcung') { coldPalace(o); o.npcs = [{ model: 'mama', x: 2, z: -2.2, ry: -2.5, name: 'Lão ma ma lãnh cung', talk: 'lanh' }]; }
   return o;
 }

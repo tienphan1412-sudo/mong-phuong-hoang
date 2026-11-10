@@ -85,14 +85,14 @@ async function enterScene(loc, players) {
       c.play('ngoi');
     } else {
       c.root.position.set(n.x, 0, n.z); c.root.rotation.y = n.ry || 0;
-      c.play(n.model === 'cungnu' || n.model === 'mama' ? 'chap_tay' : 'dung_cho');
+      c.play(n.idle || (n.model === 'cungnu' || n.model === 'mama' ? 'chap_tay' : 'dung_cho'));
     }
     const lb = makeLabel(n.name, '', true, n.talk ? () => talk(n) : null); c.root.add(lb); n.label = lb;
   }
   if (tok !== loadToken) return;
   if (o.bed) { // chỉnh chiều cao giường cho vừa tư thế ngồi
     const ht = o.npcs.find(n => n.model === 'hoangthuong_dem');
-    if (ht?.c) { const r = ht.c.root, px = r.position.x, pz = r.position.z, ry = r.rotation.y; r.position.set(0, 0, 0); r.rotation.y = 0; const sp = seatPlacement(ht.c); o.bedTop = sp.y; o.bed.scale.y = Math.max(.6, sp.y / .38); r.position.set(px, 0, pz); r.rotation.y = ry; ht.c.play('dung_cho'); ht.home = { x: px, z: pz, ry }; }
+    if (ht?.c) { const r = ht.c.root, px = r.position.x, pz = r.position.z, ry = r.rotation.y; r.position.set(0, 0, 0); r.rotation.y = 0; const sp = seatPlacement(ht.c); o.bedTop = sp.y; o.bed.scale.y = Math.max(.6, sp.y / .38); r.position.set(px, 0, pz); r.rotation.y = ry; ht.c.play(ht.idle || 'dung_cho'); ht.home = { x: px, z: pz, ry }; }
   }
   clearWorld();
   world = o; scene.add(o.group); applyLights(o.lights);
@@ -600,7 +600,7 @@ function sitBedInner(kind, ht) {
 function standUp(keepCam) {
   if (!seated) return;
   const { ht } = seated; seated = null;
-  if (ht?.c && ht.home) { ht.c.post = null; ht.c.root.position.set(ht.home.x, 0, ht.home.z); ht.c.root.rotation.y = ht.home.ry; ht.c.play('dung_cho'); }
+  if (ht?.c && ht.home) { ht.c.post = null; ht.c.root.position.set(ht.home.x, 0, ht.home.z); ht.c.root.rotation.y = ht.home.ry; ht.c.play(ht.idle || 'dung_cho'); }
   if (selfC) { selfC.post = null; const r = selfC.root; r.position.set(.3, 0, world.bedFront + .45); r.position.y = 0; selfC.play('dung_cho'); }
   if (!keepCam && world) { camDist = world.cam.dist; camH = world.cam.height; }
 }

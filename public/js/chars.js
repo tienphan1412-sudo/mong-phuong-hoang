@@ -9,7 +9,7 @@ let FEMALE = null, MALE = null;
 export const MALE_MODELS = new Set(['hoangthuong', 'hoangthuong_dem', 'thaigiam', 'thive', 'thaiy']);
 
 function lock(clips) {
-  const LOCK = ['di', 'mua', 'dung_cho', 'vo_tay', 'khoc', 'gian', 'nga', 'cuoi', 'ngoi'];
+  const LOCK = ['di', 'mua', 'dung_cho', 'vo_tay', 'khoc', 'gian', 'nga', 'cuoi', 'ngoi', 'khoanh_tay', 'gio_tay', 'nam_tay', 'dung_cho_nam'];
   for (const c of clips) if (LOCK.includes(c.name)) for (const t of c.tracks) if (/Hips\.position$/.test(t.name)) {
     const v = t.values, x0 = v[0], z0 = v[2]; for (let i = 0; i < v.length; i += 3) { v[i] = x0; v[i + 2] = z0; }
   }
@@ -18,7 +18,7 @@ function lock(clips) {
 export function loadModel(name) {
   if (!cache[name]) cache[name] = loader.loadAsync(`models/${name}.glb`).then(g => {
     if (name === 'thuongtai') FEMALE = lock(g.animations);
-    if (name === 'hoangthuong') MALE = lock(g.animations);
+    if (name === 'hoangthuong') MALE = lock(g.animations); else lock(g.animations);
     g.scene.traverse(o => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; o.frustumCulled = false; } });
     return g;
   });
@@ -60,6 +60,7 @@ export async function spawn(modelName) {
   await ready();
   const male = MALE_MODELS.has(modelName);
   const root = SkeletonUtils.clone(g.scene);
+  if (modelName.startsWith('hoangthuong')) root.scale.setScalar(1.08); // Hoàng thượng cao hơn phi tần
   const B = {};
   root.traverse(o => { if (o.isBone) { const n = o.name.replace(/^mixamorig:?/, ''); if (MAPB[n]) B[MAPB[n]] = o; } if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; o.frustumCulled = false; } });
   const mixer = new THREE.AnimationMixer(root);
