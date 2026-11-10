@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<title>MỘNG PHƯỢNG HOÀNG · Phượng khởi thâm cung</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Serif:ital,wght@0,400;0,700;1,400&family=Be+Vietnam+Pro:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root { --gold:#e2bf6b; --gold2:#f3dc96; --red:#8a1a17; --panel:rgba(48,20,20,.88); --line:#7a4a3a; --text:#f8ecdc; --muted:#cdb59c; }
+* { box-sizing:border-box; }
+html,body { margin:0; height:100%; overflow:hidden; background:#3a1c18; color:var(--text); font-family:'Be Vietnam Pro',system-ui,sans-serif; font-size:14px; }
+#c { position:fixed; inset:0; width:100%; height:100%; display:block; }
+#labels { position:fixed; inset:0; pointer-events:none; }
+.hidden { display:none !important; }
+button { font:inherit; cursor:pointer; border-radius:10px; border:1px solid var(--line); background:rgba(90,30,26,.9); color:var(--text); padding:9px 12px; }
+button:hover { border-color:var(--gold); }
+button.gold { background:linear-gradient(#f0cf73,#c99a3c); color:#3a1408; border-color:#f3dc96; font-weight:600; }
+button:disabled { opacity:.45; cursor:default; }
+input, select { font:inherit; padding:10px 12px; border-radius:10px; border:1px solid var(--line); background:rgba(20,8,8,.6); color:var(--text); width:100%; }
+.serif { font-family:'Noto Serif',serif; }
+
+/* màn hình đăng nhập */
+#gate { position:fixed; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center; background:radial-gradient(ellipse at center, rgba(40,10,8,.25), rgba(30,8,6,.75)); z-index:20; }
+#gate h1 { font-family:'Noto Serif',serif; font-weight:700; font-size:clamp(34px,6vw,64px); letter-spacing:.08em; margin:0; color:var(--gold2); text-shadow:0 2px 0 #6a3a10, 0 0 24px rgba(240,190,90,.55); text-align:center; }
+#gate .sub { font-family:'Noto Serif',serif; font-size:clamp(16px,2.4vw,22px); color:var(--gold); margin:6px 0 4px; letter-spacing:.2em; }
+#gate .tag { font-family:'Noto Serif',serif; font-style:italic; color:var(--gold); font-size:clamp(13px,1.8vw,17px); margin:10px 0 26px; text-align:center; padding:0 16px; }
+.card { background:var(--panel); border:1px solid var(--line); border-radius:16px; padding:22px; width:min(380px,92vw); box-shadow:0 10px 40px rgba(0,0,0,.4); }
+.card h3 { margin:0 0 14px; font-family:'Noto Serif',serif; color:var(--gold2); font-weight:700; }
+.card label { display:block; font-size:12px; color:var(--muted); margin:10px 0 4px; }
+.row { display:flex; gap:8px; }
+.choices { display:grid; grid-template-columns:1fr 1fr; gap:8px; }
+.choice { text-align:left; padding:10px; font-size:13px; }
+.choice small { display:block; color:var(--muted); font-size:11.5px; margin-top:3px; line-height:1.35; }
+.choice.on { border-color:var(--gold); background:rgba(160,90,30,.45); }
+#err { color:#ffb4a0; font-size:13px; min-height:18px; margin-top:8px; }
+
+/* giao diện trong game */
+#hud { position:fixed; left:10px; top:10px; right:10px; display:flex; gap:10px; align-items:flex-start; pointer-events:none; z-index:5; }
+#hud > * { pointer-events:auto; }
+#who { background:var(--panel); border:1px solid var(--line); border-radius:14px; padding:10px 14px; min-width:220px; }
+#who .nm { font-family:'Noto Serif',serif; font-size:17px; color:var(--gold2); font-weight:700; }
+#who .rk { color:var(--gold); font-size:13px; }
+.bar { height:6px; background:rgba(0,0,0,.4); border-radius:3px; margin-top:6px; overflow:hidden; }
+.bar > i { display:block; height:100%; background:linear-gradient(90deg,#c99a3c,#f3dc96); }
+#stats { display:flex; gap:6px; flex-wrap:wrap; }
+.pill { background:var(--panel); border:1px solid var(--line); border-radius:999px; padding:6px 11px; font-size:12.5px; white-space:nowrap; }
+.pill b { color:var(--gold2); }
+#map { position:fixed; left:10px; top:50%; transform:translateY(-50%); display:flex; flex-direction:column; gap:6px; z-index:5; }
+#map button { text-align:left; min-width:140px; font-size:13px; }
+#map button.on { border-color:var(--gold); background:rgba(160,90,30,.55); }
+#acts { position:fixed; right:10px; top:50%; transform:translateY(-50%); display:flex; flex-direction:column; gap:6px; z-index:5; max-width:220px; }
+#acts .ttl { font-family:'Noto Serif',serif; color:var(--gold2); text-align:right; font-size:15px; margin-bottom:2px; text-shadow:0 1px 4px #000; }
+#acts button { text-align:left; font-size:13px; }
+#acts button small { display:block; color:var(--muted); font-size:11px; }
+#chat { position:fixed; left:10px; bottom:10px; width:min(360px,60vw); z-index:5; }
+#chatlog { max-height:150px; overflow-y:auto; font-size:13px; background:rgba(30,10,10,.55); border-radius:12px 12px 0 0; padding:8px 10px; }
+#chatlog div { margin:2px 0; text-shadow:0 1px 2px #000; }
+#chatlog b { color:var(--gold); font-weight:600; }
+#chatin { border-radius:0 0 12px 12px; }
+#newsbtn { position:fixed; right:10px; bottom:10px; z-index:5; }
+#news { position:fixed; right:10px; bottom:56px; width:min(360px,80vw); max-height:50vh; overflow-y:auto; background:var(--panel); border:1px solid var(--line); border-radius:14px; padding:12px; z-index:6; }
+#news h4 { margin:0 0 8px; font-family:'Noto Serif',serif; color:var(--gold2); }
+#news .n { padding:7px 0; border-bottom:1px solid rgba(255,255,255,.07); font-size:13px; line-height:1.45; }
+#news .n time { color:var(--muted); font-size:11px; display:block; }
+#toasts { position:fixed; top:84px; left:50%; transform:translateX(-50%); z-index:30; display:flex; flex-direction:column; gap:6px; align-items:center; pointer-events:none; }
+.toast { background:var(--panel); border:1px solid var(--line); border-radius:12px; padding:9px 14px; max-width:min(520px,92vw); font-size:13.5px; animation:fade 5s forwards; text-align:center; }
+.toast.good { border-color:#b9a04a; } .toast.bad { border-color:#c0503a; }
+@keyframes fade { 0%{opacity:0;transform:translateY(-6px)} 6%{opacity:1;transform:none} 85%{opacity:1} 100%{opacity:0} }
+.label { font-size:12px; text-align:center; color:#fff; text-shadow:0 1px 3px #000, 0 0 2px #000; white-space:nowrap; transform:translateY(-6px); }
+.label .r { color:var(--gold2); font-size:10.5px; display:block; }
+.label.npc { color:var(--gold2); }
+.bubble { background:rgba(255,248,236,.95); color:#3a1408; border-radius:10px; padding:5px 9px; font-size:12px; max-width:200px; white-space:normal; margin-bottom:4px; }
+.modal { position:fixed; inset:0; background:rgba(10,4,4,.55); display:flex; align-items:center; justify-content:center; z-index:15; }
+.modal .card { width:min(640px,94vw); max-height:88vh; overflow-y:auto; }
+.modal table { width:100%; border-collapse:collapse; font-size:13px; margin:8px 0; }
+.modal th, .modal td { text-align:left; padding:6px; border-bottom:1px solid rgba(255,255,255,.08); }
+.modal th { color:var(--gold); font-weight:600; }
+.close { float:right; padding:4px 10px; }
+.clue { background:rgba(0,0,0,.25); border-left:3px solid var(--gold); padding:6px 10px; margin:6px 0; border-radius:6px; font-size:13px; }
+.btns { display:flex; flex-wrap:wrap; gap:6px; margin:8px 0; }
+#cut { position:fixed; inset:0; z-index:25; display:flex; flex-direction:column; justify-content:flex-end; align-items:center; pointer-events:none; }
+#cut .scroll { pointer-events:auto; margin-bottom:5vh; width:min(720px,94vw); background:linear-gradient(#f6e6bf,#e8cf95); color:#4a1a08; border:3px solid #b8862d; border-radius:12px; padding:18px 22px; font-family:'Noto Serif',serif; font-size:16px; line-height:1.6; box-shadow:0 10px 40px rgba(0,0,0,.5); }
+#cut .scroll h3 { margin:0 0 6px; color:#8a1a17; font-size:20px; }
+#cut .scroll .btns { justify-content:flex-end; }
+#fade { position:fixed; inset:0; background:#000; opacity:0; pointer-events:none; transition:opacity .6s; z-index:24; }
+#decorbar { position:fixed; bottom:10px; left:50%; transform:translateX(-50%); display:flex; gap:6px; flex-wrap:wrap; justify-content:center; background:var(--panel); border:1px solid var(--line); border-radius:14px; padding:8px; z-index:7; max-width:94vw; }
+#decorbar button { font-size:12px; padding:7px 9px; }
+#decorbar button.on { border-color:var(--gold); background:rgba(160,90,30,.55); }
+@media (max-width:760px) { #map { top:auto; bottom:200px; transform:none; } #map button { min-width:0; padding:7px 9px; font-size:12px; } #acts { top:auto; bottom:200px; transform:none; max-width:170px; } #who { min-width:0; } #stats .pill { font-size:11.5px; } }
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="labels"></div>
+<div id="fade"></div>
+
+<div id="gate">
+  <h1>MỘNG PHƯỢNG HOÀNG</h1>
+  <div class="sub">Phượng khởi thâm cung</div>
+  <div class="tag">“Một hậu cung, ngàn toan tính. Ai sẽ bước lên ngôi Hoàng hậu?”</div>
+  <div class="card" id="loginCard">
+    <h3>Vào cung</h3>
+    <label>Tên đăng nhập</label><input id="lu" autocomplete="username">
+    <label>Mật khẩu</label><input id="lp" type="password" autocomplete="current-password">
+    <div class="row" style="margin-top:14px"><button class="gold" id="bLogin" style="flex:1">Đăng nhập</button><button id="bToReg" style="flex:1">Tiến cung (tạo mới)</button></div>
+    <div id="err"></div>
+  </div>
+  <div class="card hidden" id="regCard" style="width:min(520px,94vw)">
+    <h3>Tuyển tú</h3>
+    <div class="row"><div style="flex:1"><label>Tên đăng nhập</label><input id="ru" autocomplete="username"></div><div style="flex:1"><label>Mật khẩu</label><input id="rp" type="password" autocomplete="new-password"></div></div>
+    <label>Tên nhân vật (tên phong hiệu sau này)</label><input id="rn" maxlength="16" placeholder="Ví dụ: Thẩm My Trang">
+    <label>Xuất thân</label><div class="choices" id="origins"></div>
+    <label>Lối sống</label><div class="choices" id="paths"></div>
+    <div class="row" style="margin-top:14px"><button id="bBack" style="flex:1">Quay lại</button><button class="gold" id="bReg" style="flex:2">Tiến cung</button></div>
+    <div id="err2" style="color:#ffb4a0;font-size:13px;min-height:18px;margin-top:8px"></div>
+  </div>
+</div>
+
+<div id="game" class="hidden">
+  <div id="hud">
+    <div id="who"><div class="nm" id="hName"></div><div class="rk" id="hRank"></div><div class="bar"><i id="hBar"></i></div><div style="font-size:11px;color:var(--muted);margin-top:3px" id="hPts"></div></div>
+    <div id="stats"></div>
+  </div>
+  <div id="map"></div>
+  <div id="acts"></div>
+  <div id="chat"><div id="chatlog"></div><input id="chatin" placeholder="Nói gì đó… (Enter để gửi)" maxlength="200"></div>
+  <button id="newsbtn">📜 Bảng tin hậu cung</button>
+  <div id="news" class="hidden"><h4>Bảng tin hậu cung</h4><div id="newslist"></div></div>
+</div>
+<div id="decorbar" class="hidden"></div>
+<div id="toasts"></div>
+<div id="cut" class="hidden"></div>
+<div id="modal" class="modal hidden"><div class="card" id="mcard"></div></div>
+
+<script src="/socket.io/socket.io.js"></script>
+<script type="importmap">
+{ "imports": {
+  "three": "https://cdn.jsdelivr.net/npm/three@0.169.0/build/three.module.js",
+  "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.169.0/examples/jsm/"
+} }
+</script>
+<script type="module" src="js/game.js"></script>
+</body>
+</html>
