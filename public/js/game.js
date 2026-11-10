@@ -238,6 +238,7 @@ socket.on('me', async m => {
   renderHud(); renderMap(); renderActs();
   if (selfC && world && oldOutfit && oldOutfit !== me.outfit && !stage) { const r = selfC.root; await respawnSelf(r.position.x, r.position.z, r.rotation.y); }
   if (selfC) { const r = selfC.label.element.querySelector('.r'); if (r) { const t = rankTier(me.rankName); r.className = 'r ' + t; r.textContent = (t === 't3' ? '★ ' : '') + me.rankName; } }
+  if (!caseOpenId && me.cases?.length && !me.lanh) { caseOpenId = me.cases[0].id; nbMin = true; }
   if (caseOpenId) socket.emit('caseDetail', caseOpenId);
 });
 socket.on('scene', async d => { pendingScene = d; if (!stage) { await enterScene(d.loc, d.players); pendingScene = null; setTimeout(() => startTour(), 1200); } });
@@ -313,38 +314,14 @@ function talk(n) {
 
 // ---------------- hộp thoại ----------------
 function modal(html) { $('mcard').innerHTML = html; $('modal').classList.remove('hidden'); }
-function closeModal() { $('modal').classList.add('hidden'); caseOpenId = null; }
+function closeModal() { $('modal').classList.add('hidden'); }
 window._close = closeModal;
 $('modal').addEventListener('click', e => { if (e.target === $('modal')) closeModal(); });
 
-// vụ án
+// vụ án: xem sổ điều tra ở cuối file
 let caseOpenId = null;
-function openCase(id) { caseOpenId = id; socket.emit('caseDetail', id); }
-socket.on('caseDetail', c => {
-  if (caseOpenId !== c.id) return;
-  const left = Math.max(0, c.deadline - Date.now()), hh = Math.floor(left / 3600e3), mm = Math.floor(left % 3600e3 / 60e3);
-  const TN = { cung: 'Nơi ở', gio: 'Giờ lui tới', dau: 'Dấu vết' };
-  const clueBtns = [['hoi', 'Hỏi cung nữ', 'miễn phí · biết giờ'], ['so', 'Dò sổ quà Nội vụ phủ', '1 lượt · 40 bạc · biết nơi ở'], ['tro', 'Lục tro tàn', '1 lượt · biết dấu vết'], ['thaiy', 'Nhờ thái y kiểm nghiệm', '80 bạc · biết dấu vết, không thể bị xóa']];
-  const open = c.status === 'open' || c.reopen;
-  modal(`<button class="close" onclick="window._close()">✕</button>
-  <h3>⚖️ Vụ ${esc(c.methodName)}</h3>
-  <div style="color:var(--muted)">Tội danh: ${esc(c.crime)}. ${c.status === 'open' ? `Còn <b style="color:var(--gold2)">${hh} giờ ${mm} phút</b> trước phiên xử ở Từ Ninh cung.` : c.reopen ? 'Đang kêu oan từ lãnh cung: chỉ đúng thủ phạm sẽ được phục vị.' : 'Vụ án đã khép.'}</div>
-  <table><tr><th>Nghi phạm</th><th>${TN.cung}</th><th>${TN.gio}</th><th>${TN.dau}</th>${open ? '<th></th>' : ''}</tr>
-  ${c.table.map(s => `<tr><td>${esc(s.name)}</td><td>${esc(s.cung)}</td><td>${esc(s.gio)}</td><td>${esc(s.dau)}</td>${open ? `<td><button data-acc="${esc(s.id)}">Chỉ đích danh</button></td>` : ''}</tr>`).join('')}</table>
-  <div style="font-weight:600;color:var(--gold);margin-top:8px">Manh mối đã có</div>
-  ${c.found.length || c.witness ? '' : '<div style="color:var(--muted);font-size:13px">Chưa có manh mối nào. Mỗi manh mối cho biết một đặc điểm thật của thủ phạm.</div>'}
-  ${c.found.map(f => `<div class="clue"><b>${esc(f.name)}:</b> ${esc(f.text)}</div>`).join('')}
-  ${c.witness ? `<div class="clue"><b>Nhân chứng ${esc(c.witness.name)}:</b> ${esc(c.witness.text)} <i style="color:var(--muted)">(lời khai có thể sai nếu chính người này là thủ phạm)</i></div>` : ''}
-  ${open ? `<div class="btns">${clueBtns.filter(([k]) => !c.found.some(f => f.kind === k)).map(([k, n, s]) => `<button data-clue="${k}">${n}<small style="display:block;color:var(--muted);font-size:11px">${s}</small></button>`).join('')}
-  ${c.witness ? '' : '<button id="bWit">Nhờ người làm chứng<small style="display:block;color:var(--muted);font-size:11px">1 lượt</small></button>'}
-  ${c.status === 'open' ? '<button id="bConf">Nhận tội<small style="display:block;color:var(--muted);font-size:11px">giảm nhẹ: giáng 1 bậc</small></button>' : ''}</div>` : ''}`);
-  const mc = $('mcard');
-  mc.querySelectorAll('[data-clue]').forEach(b => b.onclick = () => socket.emit('case', { caseId: c.id, op: 'clue', kind: b.dataset.clue }));
-  mc.querySelectorAll('[data-acc]').forEach(b => b.onclick = () => { if (confirm('Chỉ đích danh người này? Sai sẽ bị phạt thêm tội vu cáo.')) socket.emit('case', { caseId: c.id, op: 'accuse', who: b.dataset.acc }); });
-  const bc = $('bConf'); if (bc) bc.onclick = () => { if (confirm('Nhận tội để được giảm nhẹ?')) socket.emit('case', { caseId: c.id, op: 'confess' }); };
-  const bw = $('bWit'); if (bw) bw.onclick = () => { witnessFor = c.id; socket.emit('roster'); };
-});
-socket.on('caseClosed', d => { closeModal(); showScroll('Phán quyết', d.text, [['Đóng', hideCut]]); });
+function openCase(id) { caseOpenId = id; nbMin = false; socket.emit('caseDetail', id); }
+socket.on('caseClosed', d => { if (trial) return trialResult(d); closeNotebook(); showScroll('Phán quyết', d.text, [['Đóng', hideCut]]); });
 let witnessFor = null, rosterMode = null;
 
 // danh sách hậu cung
@@ -353,7 +330,7 @@ socket.on('roster', r => {
   if (witnessFor) {
     const id = witnessFor;
     modal(`<button class="close" onclick="window._close()">✕</button><h3>Chọn người làm chứng</h3><table>${r.list.filter(p => p.id !== me.id).map(p => `<tr><td>${p.online ? '🟢' : '⚪'} ${esc(p.name)}</td><td>${esc(p.rankName)}</td><td><button data-w="${p.id}">Nhờ làm chứng</button></td></tr>`).join('') || '<tr><td>Chưa có ai khác trong cung.</td></tr>'}</table>`);
-    $('mcard').querySelectorAll('[data-w]').forEach(b => b.onclick = () => { socket.emit('case', { caseId: id, op: 'witness', who: b.dataset.w }); caseOpenId = id; witnessFor = null; });
+    $('mcard').querySelectorAll('[data-w]').forEach(b => b.onclick = () => { socket.emit('case', { caseId: id, op: 'witness', who: b.dataset.w }); caseOpenId = id; witnessFor = null; closeModal(); });
     return;
   }
   const seats = r.seats.filter(s => s.seats).map(s => `${s.name} ${s.used}/${s.seats}`).join(' · ');
@@ -423,12 +400,13 @@ const fade = (on) => new Promise(r => { $('fade').style.opacity = on ? 1 : 0; se
 
 const cutQ = []; let cutBusy = false;
 socket.on('cutscene', d => {
+  if (d.type === 'latan' && trial) return; // đã diễn trong phiên xử
   // nhiều lần tấn phong liền nhau: chỉ diễn lần cao nhất
   if (d.type === 'sacphong') { const i = cutQ.findIndex(x => x.type === 'sacphong'); if (i >= 0) { cutQ[i] = d; return; } }
   cutQ.push(d); nextCut();
 });
 async function nextCut() {
-  if (cutBusy || !cutQ.length) return; cutBusy = true;
+  if (cutBusy || trial || !cutQ.length) return; cutBusy = true;
   await new Promise(r => setTimeout(r, 500)); // gom các lần tấn phong liền nhau
   const d = cutQ.shift();
   await new Promise(done => { cutDone = done; playCut(d); });
@@ -438,7 +416,8 @@ let cutDone = () => {};
 async function playCut(d) {
   if (d.type === 'tiencung') showScroll('Tiến cung', `Tú nữ <b>${esc(d.name)}</b> đã vào cung với lối sống <b>${esc(d.path)}</b>.<br><br>Mỗi ngày: thỉnh an Thái hậu ở <b>Từ Ninh cung</b>, luyện tài nghệ và dò tin ở <b>Ngự hoa viên</b>, dâng canh ở <b>Dưỡng Tâm điện</b>. Đủ công trạng sẽ được tấn phong. Tối nào Hoàng thượng cũng lật thẻ bài.<br><br>Bấm xuống đất để đi, kéo để xoay góc nhìn, bấm tên NPC để nói chuyện.`, [['Vào cung', () => { hideCut(); setTimeout(() => startTour(), 600); }]]);
   else if (d.type === 'sacphong' || d.type === 'phucvi') runSacPhong(d);
-  else if (d.type === 'phatgiac') showScroll('Phát giác', `Quế ma ma khám phòng và tìm thấy <b>${esc(d.methodName)}</b>. Bổn cung bị nghi <b>${esc(d.crime)}</b>.<br><br>Có <b>${d.hours} giờ</b> trước phiên xử ở Từ Ninh cung. Hỏi cung nữ, dò sổ quà, lục tro, nhờ thái y, hoặc nhờ người làm chứng để tìm ra kẻ hãm hại.`, [['Để sau', hideCut], ['Xem vụ án', () => { hideCut(); openCase(d.caseId); }]]);
+  else if (d.type === 'phatgiac') runPhatGiac(d);
+  else if (d.type === 'phatgiac_old') showScroll('Phát giác', `Quế ma ma khám phòng và tìm thấy <b>${esc(d.methodName)}</b>. Bổn cung bị nghi <b>${esc(d.crime)}</b>.<br><br>Có <b>${d.hours} giờ</b> trước phiên xử ở Từ Ninh cung. Hỏi cung nữ, dò sổ quà, lục tro, nhờ thái y, hoặc nhờ người làm chứng để tìm ra kẻ hãm hại.`, [['Để sau', hideCut], ['Xem vụ án', () => { hideCut(); openCase(d.caseId); }]]);
   else if (d.type === 'lanhcung') { await fade(true); showScroll('Lãnh cung', `Bổn cung bị đày vào lãnh cung vì <b>${esc(d.reason)}</b>.<br><br>Ở đây vẫn có đường về: làm việc lãnh cung 3 ngày để được phục vị, hoặc tiếp tục điều tra và kêu oan.<br><i>“Được, chờ bổn cung quay về.”</i>`, [['Bước vào lãnh cung', async () => { hideCut(); socket.emit('goto', 'lanhcung'); await fade(false); }]]); }
   else if (d.type === 'latan') showScroll('Lật án', `Chân tướng đã rõ: thủ phạm là <b>${esc(d.culprit)}</b>. Thái hậu minh xét, trả lại trong sạch cho ${esc(d.name)}.`, [['Tạ ơn Thái hậu', () => { hideCut(); emote('hanh_le'); }]]);
 }
@@ -621,3 +600,232 @@ socket.on('top5', list => {
   if (!list.length) ol.innerHTML = '<li style="color:var(--muted)">Chưa có ai</li>';
   lastTopIds = list.map(p => p.id);
 });
+
+// =====================================================================
+// SỔ ĐIỀU TRA (thay cho bảng chữ): thẻ nghi phạm có chân dung, tự đóng dấu LOẠI
+// =====================================================================
+let nb = null, nbMin = false;
+const TRAIT_ICON = { cung: '🏯', gio: '🕯', dau: '👣' };
+const TRAIT_NAME = { cung: 'Nơi ở', gio: 'Giờ lui tới', dau: 'Dấu vết' };
+const CLUE_BTNS = [['hoi', '👧 Hỏi cung nữ', 'miễn phí · biết giờ'], ['so', '📖 Dò sổ quà Nội vụ phủ', '1 lượt · 40 bạc · biết nơi ở'], ['tro', '🔥 Lục tro tàn', '1 lượt · biết dấu vết'], ['thaiy', '⚕️ Nhờ thái y kiểm nghiệm', '80 bạc · biết dấu vết, không bị xóa']];
+const nbEl = document.createElement('div'); nbEl.id = 'case'; nbEl.className = 'hidden'; document.body.appendChild(nbEl);
+function closeNotebook() { nb = null; caseOpenId = null; nbEl.classList.add('hidden'); document.body.classList.remove('nbopen'); }
+socket.on('caseDetail', c => {
+  if (trial?.waiting) { trial.detail = c; return; }
+  if (caseOpenId !== c.id) return;
+  nb = c; renderNotebook();
+});
+function analyse(c) {
+  const known = {}; for (const f of c.found) if (f.value !== null && f.value !== undefined) known[f.trait] = f.value;
+  const w = c.witness;
+  return c.table.map(s => {
+    const chips = ['cung', 'gio', 'dau'].map(t => {
+      let st = '';
+      if (t in known) st = s.ti[t] === known[t] ? 'ok' : 'no';
+      else if (w && w.trait === t) st = s.ti[t] === w.value ? 'maybe' : 'doubt';
+      return { t, word: s[t], st };
+    });
+    return { ...s, chips, out: chips.some(x => x.st === 'no') };
+  });
+}
+function fmtLeft(ms) { ms = Math.max(0, ms); const h = Math.floor(ms / 3600e3), m = Math.floor(ms % 3600e3 / 60e3), sec = Math.floor(ms % 60e3 / 1000); return `${h}:${String(m).padStart(2, '0')}:${String(sec).padStart(2, '0')}`; }
+setInterval(() => { const t = $('nbTimer'); if (t && nb) t.textContent = fmtLeft(nb.deadline - Date.now()); }, 1000);
+async function renderNotebook() {
+  const c = nb; if (!c) return;
+  nbEl.classList.remove('hidden'); nbEl.classList.toggle('min', nbMin); document.body.classList.toggle('nbopen', !nbMin);
+  const open = c.status === 'open' || c.reopen;
+  if (nbMin) { nbEl.innerHTML = `<div class="nbtab">📒 Sổ điều tra · ⏳ <span id="nbTimer">${fmtLeft(c.deadline - Date.now())}</span></div>`; nbEl.onclick = () => { nbMin = false; renderNotebook(); }; return; }
+  nbEl.onclick = null;
+  const S = analyse(c), left = S.filter(s => !s.out);
+  nbEl.innerHTML = `
+  <div class="nbhead"><div><b>⚖️ ${esc(c.methodName)}</b><small>Tội danh: ${esc(c.crime)}</small></div><button class="nbx" title="Thu gọn">–</button></div>
+  ${c.status === 'open' ? `<div class="nbtime">⏳ Phiên xử ở Từ Ninh cung sau <b id="nbTimer">${fmtLeft(c.deadline - Date.now())}</b></div>` : c.reopen ? '<div class="nbtime">📜 Kêu oan từ lãnh cung: chỉ đúng thủ phạm sẽ được phục vị</div>' : '<div class="nbtime">Vụ án đã khép</div>'}
+  <div class="cards">${S.map(s => `<div class="sus ${s.out ? 'out' : ''} ${!s.out && left.length === 1 ? 'top' : ''}" data-id="${esc(s.id)}">
+    <img class="pt" data-m="${esc(s.model)}" alt=""><div class="sn">${esc(s.name)}</div>
+    ${s.chips.map(x => `<div class="chip ${x.st}" title="${TRAIT_NAME[x.t]}">${TRAIT_ICON[x.t]} ${esc(x.word)}</div>`).join('')}
+    ${s.out ? '<div class="stamp">LOẠI</div>' : ''}</div>`).join('')}</div>
+  ${left.length === 1 && c.found.length ? `<div class="hint">🔎 Chỉ còn <b>${esc(left[0].name)}</b> khả nghi. Ra phiên xử để buộc tội!</div>` : ''}
+  <div class="clues">${c.found.length || c.witness ? '' : '<div class="none">Chưa có manh mối. Mỗi manh mối cho biết một đặc điểm thật của thủ phạm, ai không khớp sẽ bị đóng dấu LOẠI.</div>'}
+  ${c.found.map(f => `<div class="cl">• <b>${esc(f.name)}:</b> ${esc(f.text)}</div>`).join('')}
+  ${c.witness ? `<div class="cl wit">• <b>Nhân chứng ${esc(c.witness.name)}:</b> ${esc(c.witness.text)} <i>(có thể khai gian)</i></div>` : ''}</div>
+  ${open ? `<div class="nbacts">${CLUE_BTNS.filter(([k]) => !c.found.some(f => f.kind === k)).map(([k, n, sub]) => `<button data-clue="${k}">${n}<small>${sub}</small></button>`).join('')}
+    ${c.witness ? '' : '<button id="nbWit">🙋 Nhờ người làm chứng<small>1 lượt · lời khai có thể sai</small></button>'}
+    ${c.status === 'open' ? '<button id="nbConf">🙇 Nhận tội<small>giảm nhẹ: giáng 1 bậc</small></button>' : ''}
+    <button class="gold big" id="nbTrial">⚖️ Ra phiên xử<small>buộc tội trước mặt Thái hậu · chỉ 1 lần</small></button></div>` : ''}`;
+  nbEl.querySelector('.nbx').onclick = (e) => { e.stopPropagation(); nbMin = true; renderNotebook(); };
+  nbEl.querySelectorAll('[data-clue]').forEach(b => b.onclick = () => socket.emit('case', { caseId: c.id, op: 'clue', kind: b.dataset.clue }));
+  const bw = $('nbWit'); if (bw) bw.onclick = () => { witnessFor = c.id; socket.emit('roster'); };
+  const bc = $('nbConf'); if (bc) bc.onclick = () => { if (confirm('Nhận tội để được giảm nhẹ (giáng 1 bậc)?')) socket.emit('case', { caseId: c.id, op: 'confess' }); };
+  const bt = $('nbTrial'); if (bt) bt.onclick = () => runTrial(c);
+  for (const img of nbEl.querySelectorAll('img.pt')) portrait(img.dataset.m).then(u => { img.src = u; }).catch(() => {});
+}
+
+// chân dung nhỏ cho thẻ nghi phạm
+const ptCache = new Map(); let ptR = null;
+function portrait(model) {
+  if (ptCache.has(model)) return ptCache.get(model);
+  const pr = (async () => {
+    if (!ptR) { ptR = new THREE.WebGLRenderer({ antialias: true, alpha: true, preserveDrawingBuffer: true }); ptR.setSize(112, 112); ptR.toneMapping = THREE.ACESFilmicToneMapping; ptR.toneMappingExposure = 1.3; }
+    const c = await spawn(model); c.play('dung_cho'); c.update(0.1);
+    const sc = new THREE.Scene(); sc.add(new THREE.HemisphereLight(0xffffff, 0x664444, 2.4)); const dl = new THREE.DirectionalLight(0xffffff, 1.4); dl.position.set(1, 2, 3); sc.add(dl); sc.add(c.root);
+    c.root.updateMatrixWorld(true); const hp = new THREE.Vector3(); c.B.head.getWorldPosition(hp);
+    const cam = new THREE.PerspectiveCamera(30, 1, .01, 10); cam.position.set(0, hp.y + .01, hp.z + .62); cam.lookAt(0, hp.y - .04, hp.z);
+    ptR.render(sc, cam); const url = ptR.domElement.toDataURL('image/png'); c.dispose(); return url;
+  })();
+  ptCache.set(model, pr); return pr;
+}
+
+// =====================================================================
+// CẢNH DIỄN DÙNG CHUNG
+// =====================================================================
+let trial = null;
+async function stageBegin(loc) {
+  sacBusy = true; cutActive = true; closeModal();
+  await fade(true); document.body.classList.add('staging');
+  const saved = world; scene.remove(saved.group);
+  const o = buildLocation(loc, { palace: me?.hasPalace, palaceName: me ? (me.name.split(' ').pop() + ' cung') : '' }); scene.add(o.group); applyLights(o.lights);
+  const S = { o, saved, chars: [], movers: [], extra: [] };
+  stage = { update: dt => { for (const m of S.movers.slice()) m(dt); for (const c of S.chars) c.update(dt); if (stage._cam) stage._cam(dt); if (stage.post) stage.post(); } };
+  return S;
+}
+async function stageChar(S, model, x, z, ry, anim) { const c = await spawn(model); c.root.position.set(x, 0, z); c.root.rotation.y = ry; S.o.group.add(c.root); if (anim) c.play(anim); S.chars.push(c); return c; }
+function walkTo(S, c, x, z, dur) {
+  return new Promise(res => { const fx = c.root.position.x, fz = c.root.position.z; let t = 0; c.root.rotation.y = Math.atan2(x - fx, z - fz); c.play('di');
+    const f = dt => { t += dt; const k = Math.min(1, t / dur); c.root.position.x = fx + (x - fx) * k; c.root.position.z = fz + (z - fz) * k; if (k >= 1) { S.movers.splice(S.movers.indexOf(f), 1); c.play('dung_cho'); res(); } };
+    S.movers.push(f); });
+}
+function camTo(pos, look, dur) {
+  return new Promise(res => { const p0 = camera.position.clone(), l0 = camera.userData.look?.clone() || look.clone(); let t = 0; const st = stage;
+    const f = dt => { t += dt; const k = Math.min(1, t / dur), e = k * k * (3 - 2 * k); camera.position.lerpVectors(p0, pos, e); const l = l0.clone().lerp(look, e); camera.lookAt(l); camera.userData.look = l; if (k >= 1) { st._cam = null; res(); } };
+    st._cam = f; });
+}
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+async function stageEnd(S, queued) {
+  hideBar(); $('cut').classList.add('hidden');
+  await fade(true);
+  S.chars.forEach(c => c.dispose()); scene.remove(S.o.group); stage = null;
+  scene.add(S.saved.group); applyLights(S.saved.lights); world = S.saved;
+  if (pendingScene) { const ps = pendingScene; pendingScene = null; await enterScene(ps.loc, ps.players); }
+  else if (selfC && selfC.outfit !== me.outfit) { const r = selfC.root; await respawnSelf(r.position.x, r.position.z, r.rotation.y); }
+  document.body.classList.remove('staging'); cutActive = false; snapCam = true;
+  await fade(false); sacBusy = false;
+  if (queued) { const f = cutDone; cutDone = () => {}; f(); }
+}
+// thanh lời thoại phía trên (không bị ẩn khi diễn)
+const barEl = document.createElement('div'); barEl.id = 'sbar'; barEl.className = 'hidden'; document.body.appendChild(barEl);
+function showBar(who, html, buttons = []) {
+  barEl.classList.remove('hidden');
+  barEl.innerHTML = `${who ? `<div class="who">${esc(who)}</div>` : ''}<div class="txt">${html}</div>${buttons.length ? `<div class="btns">${buttons.map((b, i) => `<button data-i="${i}" class="${b[2] || ''}">${b[0]}</button>`).join('')}</div>` : ''}`;
+  barEl.querySelectorAll('[data-i]').forEach(b => b.onclick = () => buttons[+b.dataset.i][1]());
+}
+function hideBar() { barEl.classList.add('hidden'); }
+
+// =====================================================================
+// 1. CẢNH PHÁT GIÁC
+// =====================================================================
+function makeEvidence(method) {
+  const g = new THREE.Group(); const M = (c, e = 0) => new THREE.MeshStandardMaterial({ color: c, emissive: c, emissiveIntensity: e, roughness: .6 });
+  if (method === 'tuithom') { const b = new THREE.Mesh(new THREE.SphereGeometry(.05, 16, 12), M(0xb3202a, .35)); b.scale.y = 1.25; b.position.y = .06; g.add(b); const k = new THREE.Mesh(new THREE.TorusGeometry(.022, .006, 6, 16), M(0xe2bf6b, .4)); k.position.y = .125; k.rotation.x = Math.PI / 2; g.add(k); const t = new THREE.Mesh(new THREE.CylinderGeometry(.004, .004, .09), M(0xe2bf6b, .4)); t.position.y = .0; g.add(t); }
+  else if (method === 'thu') { const p = new THREE.Mesh(new THREE.BoxGeometry(.16, .004, .11), M(0xf3ead2, .25)); p.position.y = .01; p.rotation.y = .3; g.add(p); for (let i = 0; i < 4; i++) { const l = new THREE.Mesh(new THREE.BoxGeometry(.005, .005, .08), M(0x222222)); l.position.set(-.05 + i * .03, .014, 0); l.rotation.y = .3; g.add(l); } }
+  else if (method === 'canh') { const b = new THREE.Mesh(new THREE.CylinderGeometry(.065, .04, .05, 24, 1, true), new THREE.MeshStandardMaterial({ color: 0xf4f0e6, side: THREE.DoubleSide })); b.position.y = .025; g.add(b); const l = new THREE.Mesh(new THREE.CircleGeometry(.06, 24), M(0x2a3d12, .5)); l.rotation.x = -Math.PI / 2; l.position.y = .042; g.add(l); }
+  else { const p = new THREE.Mesh(new THREE.BoxGeometry(.06, .004, .16), M(0xf2c63a, .35)); p.position.y = .01; g.add(p); const r = new THREE.Mesh(new THREE.BoxGeometry(.035, .006, .035), M(0xc0201b, .4)); r.position.set(0, .013, -.03); g.add(r); }
+  const light = new THREE.PointLight(0xffd27a, 0, 1.6); light.position.y = .25; g.add(light); g.userData.light = light;
+  return g;
+}
+async function runPhatGiac(d) {
+  const S = await stageBegin('phong');
+  const ev = makeEvidence(d.method || 'tuithom'); ev.position.set(.75, 0, -.55); S.o.group.add(ev);
+  let glow = 0; S.movers.push(dt => { glow += dt; ev.userData.light.intensity = 1.2 + Math.sin(glow * 5) * .6; ev.rotation.y += dt * .6; });
+  const me3 = await stageChar(S, me.outfit === 'aongu' ? 'tunu' : me.outfit, -.2, -.1, Math.PI * .85, 'dung_cho');
+  const mama = await stageChar(S, 'mama', 0, 2.4, Math.PI, 'dung_cho');
+  const g1 = await stageChar(S, 'thive', -.55, 2.6, Math.PI, 'dung_cho'), g2 = await stageChar(S, 'thive', .55, 2.6, Math.PI, 'dung_cho');
+  camera.position.set(1.7, 1.25, 2.3); camera.lookAt(0, .6, .3); camera.userData.look = new THREE.Vector3(0, .6, .3);
+  await fade(false);
+  showBar('Quế ma ma', 'Phụng ý chỉ Thái hậu, khám xét phòng này!');
+  walkTo(S, g1, -.7, 1.3, 1.6); walkTo(S, g2, .7, 1.3, 1.6);
+  await walkTo(S, mama, .45, -.05, 2.4);
+  mama.root.rotation.y = Math.atan2(.75 - .45, -.55 + .05);
+  me3.root.rotation.y = Math.atan2(.45 + .2, -.05 + .1);
+  await camTo(new THREE.Vector3(1.05, .55, .2), new THREE.Vector3(.75, .08, -.55), 1.4);
+  music.gong(); mama.play('gian');
+  showBar('Quế ma ma', `Tìm thấy rồi! <b>${esc(d.methodName)}</b> giấu ngay trong phòng!`);
+  await sleep(2600);
+  await camTo(new THREE.Vector3(1.5, 1.15, 2.1), new THREE.Vector3(0, .55, 0), 1.2);
+  me3.play('quy'); mama.root.rotation.y = Math.atan2(-.2 - .45, -.1 + .05);
+  showBar('Quế ma ma', `Chủ tử bị nghi <b>${esc(d.crime)}</b>. Thái hậu cho <b>${d.hours} giờ</b> để tự minh oan, sau đó lên Từ Ninh cung chịu xét xử!`,
+    [['📒 Mở sổ điều tra', async () => { await stageEnd(S, true); openCase(d.caseId); }, 'gold']]);
+}
+
+// =====================================================================
+// 4. PHIÊN XỬ ÁN Ở TỪ NINH CUNG
+// =====================================================================
+const tagWrap = document.createElement('div'); tagWrap.id = 'ttags'; document.body.appendChild(tagWrap);
+async function runTrial(c) {
+  if (trial || stage) return;
+  trial = { c, waiting: null };
+  closeNotebook();
+  const S = await stageBegin('tuninh'); trial.S = S;
+  const o = S.o;
+  const th = await stageChar(S, 'thaihau', 0, 0, 0, null);
+  th.root.position.set(0, o.dais.y, o.dais.z); const sp = seatPlacement(th);
+  o.throne.position.set(sp.x, sp.y - .04, sp.z); o.throne.rotation.y = sp.ry;
+  for (const l of o.throne.userData.legs) { const h = sp.y - .04 - o.dais.y; l.scale.y = h; l.position.y = -h / 2; }
+  th.play('ngoi');
+  const n = c.table.length, xs = c.table.map((_, i) => (i - (n - 1) / 2) * .78);
+  trial.sus = [];
+  for (let i = 0; i < n; i++) { const s = c.table[i]; const ch = await stageChar(S, s.model, xs[i], 1.05, 0, 'quy'); trial.sus.push({ s, ch }); }
+  const self3 = await stageChar(S, me.outfit === 'aongu' ? 'tunu' : me.outfit, 0, 2.45, Math.PI, 'dung_cho'); trial.self = self3;
+  const mama = await stageChar(S, 'mama', -2.2, .3, Math.PI / 2, 'dung_cho');
+  stage.post = placeTags;
+  camera.position.set(.85, 1.2, 4.25); camera.lookAt(0, .5, 1.1); camera.userData.look = new THREE.Vector3(0, .5, 1.1);
+  // thẻ tên bấm được trên đầu từng nghi phạm
+  tagWrap.innerHTML = ''; tagWrap.classList.remove('hidden');
+  const A = analyse(c);
+  for (const t of trial.sus) {
+    const a = A.find(x => x.id === t.s.id); const el = document.createElement('button'); el.className = 'ttag' + (a?.out ? ' out' : '');
+    el.innerHTML = `${esc(t.s.name)}${a?.out ? '<small>đã loại</small>' : ''}`;
+    el.onclick = () => pickAccused(t); tagWrap.appendChild(el); t.el = el;
+  }
+  await fade(false); music.gong();
+  showBar('Thái hậu', 'Kẻ nào to gan dám hãm hại hậu cung? Ngươi nói đi, ai là thủ phạm?<br><small>Bấm vào tên người muốn buộc tội.</small>', [['Lui về', () => endTrial()]]);
+}
+function placeTags() {
+  if (!trial?.sus) return; const v = new THREE.Vector3();
+  for (const t of trial.sus) { if (!t.el) continue; t.ch.root.getWorldPosition(v); v.y += .82; v.project(camera); t.el.style.left = (v.x * .5 + .5) * innerWidth + 'px'; t.el.style.top = (-v.y * .5 + .5) * innerHeight + 'px'; }
+}
+function pickAccused(t) {
+  if (trial.waiting) return;
+  trial.sus.forEach(x => x.el.classList.toggle('sel', x === t));
+  showBar('Thái hậu', `Ngươi buộc tội <b>${esc(t.s.name)}</b>? Nếu sai, ngươi sẽ mang thêm tội vu cáo.`, [['Chọn lại', () => { trial.sus.forEach(x => x.el.classList.remove('sel')); showBar('Thái hậu', 'Ai là thủ phạm? Bấm vào tên người muốn buộc tội.', [['Lui về', () => endTrial()]]); }], ['⚖️ Buộc tội', () => accuse(t), 'gold']]);
+}
+function accuse(t) {
+  trial.waiting = t; showBar('', 'Thái hậu đang cân nhắc chứng cứ…');
+  t.ch.root.rotation.y = 0; trial.self.play('chap_tay');
+  socket.emit('case', { caseId: trial.c.id, op: 'accuse', who: t.s.id });
+  trial.timer = setTimeout(() => { if (trial?.waiting) trialResult({ verdict: 'reopenfail' }); }, 2500);
+}
+async function trialResult(d) {
+  if (!trial?.waiting) return; clearTimeout(trial.timer);
+  const t = trial.waiting; trial.waiting = null; tagWrap.classList.add('hidden');
+  const self3 = trial.self;
+  await camTo(new THREE.Vector3(t.ch.root.position.x * .5 + .5, 1.2, 3.5), new THREE.Vector3(t.ch.root.position.x, .4, 1.05), 1.0);
+  music.gong();
+  if (d.verdict === 'latan') {
+    t.ch.play('khoc'); setTimeout(() => t.ch.play('nga'), 2200);
+    for (const x of trial.sus) if (x !== t) x.ch.play('cui_chao');
+    self3.play('hanh_le');
+    showBar('Thái hậu', `Chứng cứ rành rành! <b>${esc(t.s.name)}</b> chính là kẻ hãm hại. Trả lại trong sạch cho ${esc(me.name)}, kẻ có tội phải chịu phạt gấp đôi!`, [['🙇 Tạ ơn Thái hậu', () => endTrial(), 'gold']]);
+  } else if (d.verdict === 'vucao') {
+    t.ch.play('gian'); self3.play('quy'); setTimeout(() => self3.play('khoc'), 1600);
+    showBar('Thái hậu', `<b>${esc(t.s.name)}</b> vô can! Ngươi không tìm ra thủ phạm lại còn vu cáo người khác. Phạt thêm tội vu cáo!`, [['Lui ra', () => endTrial()]]);
+  } else {
+    t.ch.play('gian'); self3.play('khoc');
+    showBar('Thái hậu', `<b>${esc(t.s.name)}</b> không phải thủ phạm. Kêu oan sai người, hãy về tìm thêm chứng cứ.`, [['Lui ra', () => endTrial()]]);
+  }
+}
+async function endTrial() {
+  if (!trial) return; const S = trial.S, id = trial.c.id; tagWrap.classList.add('hidden'); tagWrap.innerHTML = '';
+  await stageEnd(S, false); trial = null;
+  if (me.cases?.some(x => x.id === id) || me.lanh?.caseId === id) openCase(id);
+  nextCut();
+}

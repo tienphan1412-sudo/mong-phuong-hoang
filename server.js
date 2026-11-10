@@ -182,13 +182,13 @@ function createCase(victim, culprit /* player or null for NPC */, opts = {}) {
   DB.state.cases[id] = c;
   news(`Ma ma khám xét phòng ${victim.name} và tìm thấy ${method.name}. ${victim.name} bị gọi lên Từ Ninh cung.`, 'an');
   const s = sockOf(victim.id);
-  if (s) s.emit('cutscene', { type: 'phatgiac', caseId: id, methodName: method.name, crime: method.crime, hours: opts.hours ?? C.CASE_HOURS });
+  if (s) s.emit('cutscene', { type: 'phatgiac', caseId: id, method: method.id, methodName: method.name, crime: method.crime, hours: opts.hours ?? C.CASE_HOURS });
   push(victim); save();
   return c;
 }
 function caseView(c, viewer) {
   return {
-    id: c.id, methodName: c.methodName, crime: c.crime, status: c.status, deadline: c.deadline,
+    id: c.id, method: c.method, methodName: c.methodName, crime: c.crime, status: c.status, deadline: c.deadline,
     suspects: c.suspects.map(s => ({ id: s.id, name: s.name })),
     found: c.found, witness: c.witness, traitNames: C.TRAITS,
   };
@@ -207,7 +207,12 @@ function revealClue(c, kind, p) {
 }
 function suspectTraitText(c) {
   // cho người chơi bảng đặc điểm từng nghi phạm để tự loại trừ
-  return c.suspects.map(s => ({ id: s.id, name: s.name, cung: C.TRAITS.cung[s.traits.cung], gio: C.TRAITS.gio[s.traits.gio], dau: C.TRAITS.dau[s.traits.dau] }));
+  return c.suspects.map(s => ({ id: s.id, name: s.name, model: suspectModel(s), ti: s.traits, cung: C.TRAITS.cung[s.traits.cung], gio: C.TRAITS.gio[s.traits.gio], dau: C.TRAITS.dau[s.traits.dau] }));
+}
+function suspectModel(s) {
+  if (s.id.startsWith('npc:')) { const n = s.name; if (/Cung nữ/.test(n)) return 'cungnu'; if (/Thái giám/.test(n)) return 'thaigiam'; if (/Tần/.test(n)) return 'tan'; if (/Quý nhân/.test(n)) return 'quynhan'; return 'thuongtai'; }
+  const q = P(s.id); if (!q) return 'tunu';
+  return q.outfit && q.outfit !== 'aongu' ? q.outfit : C.RANKS[q.rank].outfit;
 }
 function punishVictim(c, extra = 0, why) {
   const v = P(c.victim); if (!v) return;

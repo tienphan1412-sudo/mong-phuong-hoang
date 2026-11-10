@@ -61,7 +61,7 @@ module.exports = {
     { id: 'tuithom', name: 'Túi thơm có xạ hương', crime: 'mưu hại long thai, làm hại phi tần' },
     { id: 'thu', name: 'Thư tư thông giả mạo', crime: 'tư thông với người ngoài cung' },
     { id: 'canh', name: 'Thuốc độc trong chén canh', crime: 'đầu độc phi tần' },
-    { id: 'bua', name: 'Búa yểm có tên Thái hậu', crime: 'yểm bùa nguyền rủa Thái hậu' },
+    { id: 'bua', name: 'Bùa yểm có tên Thái hậu', crime: 'yểm bùa nguyền rủa Thái hậu' },
   ],
   // đặc điểm để loại trừ nghi phạm
   TRAITS: {

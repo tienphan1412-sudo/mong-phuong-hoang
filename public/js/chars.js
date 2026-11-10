@@ -55,9 +55,15 @@ function maleStance(c) {
 }
 export { aim, v3 };
 
+let HT_IDLE = null; // Hoàng thượng đứng khoanh tay (cắt đoạn giữa của động tác, lặp mượt)
 export async function spawn(modelName) {
   const g = await loadModel(modelName);
   await ready();
+  const isHT = modelName.startsWith('hoangthuong');
+  if (isHT && !HT_IDLE) {
+    const d = await loadModel('hoangthuong_dem'); const k = d.animations.find(a => a.name === 'khoanh_tay');
+    if (k) HT_IDLE = THREE.AnimationUtils.subclip(k, 'khoanh_tay', 78, 432, 30);
+  }
   const male = MALE_MODELS.has(modelName);
   const root = SkeletonUtils.clone(g.scene);
   if (modelName.startsWith('hoangthuong')) root.scale.setScalar(1.08); // Hoàng thượng cao hơn phi tần
@@ -68,6 +74,7 @@ export async function spawn(modelName) {
   for (const clip of FEMALE) actions[clip.name] = mixer.clipAction(clip);
   if (male) for (const clip of MALE) actions[clip.name] = mixer.clipAction(clip);
   for (const clip of g.animations || []) if (!actions[clip.name] || male) actions[clip.name] = mixer.clipAction(clip);
+  if (isHT && HT_IDLE) { actions.khoanh_tay = mixer.clipAction(HT_IDLE); actions.dung_cho = actions.khoanh_tay; }
   const idle = actions.dung_cho; idle.play(); mixer.update(0); root.updateMatrixWorld(true);
   const idlePose = new Map(); root.traverse(o => { if (o.isBone) idlePose.set(o, o.quaternion.clone()); });
   idle.stop();
@@ -100,7 +107,7 @@ export async function spawn(modelName) {
       aim(root, B.lArm, B.lFore, v3([.18, -.9, .38])); aim(root, B.lFore, B.lHand, v3([-.35, -.25, .9]));
       aim(root, B.rArm, B.rFore, v3([-.18, -.9, .38])); aim(root, B.rFore, B.rHand, v3([.35, -.25, .9]));
     }
-    if (male && c.curName === 'dung_cho' && !c.pose) { root.updateMatrixWorld(true); maleStance(c); }
+    if (male && !isHT && c.curName === 'dung_cho' && !c.pose) { root.updateMatrixWorld(true); maleStance(c); }
     if (c.pose) { root.updateMatrixWorld(true); POSES[c.pose](c, c.t); }
     if (c.post) { root.updateMatrixWorld(true); c.post(c, c.t); }
   };
