@@ -70,7 +70,7 @@ function freshDay(p) {
 }
 function allowedOutfits(p) {
   const s = new Set(['aongu']);
-  for (let r = 0; r <= p.rank; r++) s.add(C.RANKS[r].outfit);
+  for (let r = 0; r <= p.rank; r++) { s.add(C.RANKS[r].outfit); for (const x of C.RANKS[r].extra || []) s.add(x); }
   return [...s];
 }
 function publicView(p) {

@@ -16,12 +16,12 @@ module.exports = {
     { name: 'Tú nữ',          pts: 0,    seats: 0, outfit: 'tunu' },
     { name: 'Quan nữ tử',     pts: 30,   seats: 0, outfit: 'tunu' },
     { name: 'Đáp ứng',        pts: 80,   seats: 0, outfit: 'thuongtai' },
-    { name: 'Thường tại',     pts: 150,  seats: 0, outfit: 'thuongtai' },
-    { name: 'Quý nhân',       pts: 250,  seats: 6, outfit: 'quynhan' },
-    { name: 'Tần',            pts: 400,  seats: 4, outfit: 'tan' },
+    { name: 'Thường tại',     pts: 150,  seats: 0, outfit: 'thuongtai_hong' },
+    { name: 'Quý nhân',       pts: 250,  seats: 6, outfit: 'quynhan', extra: ['quynhan_lam'] },
+    { name: 'Tần',            pts: 400,  seats: 4, outfit: 'tan', extra: ['tan_tim'] },
     { name: 'Phi',            pts: 600,  seats: 3, outfit: 'phi' },
-    { name: 'Quý phi',        pts: 850,  seats: 2, outfit: 'quyphi' },
-    { name: 'Hoàng quý phi',  pts: 1150, seats: 1, outfit: 'hoangquyphi' },
+    { name: 'Quý phi',        pts: 850,  seats: 2, outfit: 'quyphi', extra: ['quyphi_phuong'] },
+    { name: 'Hoàng quý phi',  pts: 1150, seats: 1, outfit: 'hoangquyphi', extra: ['hoangquyphi_kim'] },
   ],
   FIGHT_RANK: 4,               // từ Quý nhân mới được hãm hại / bị hãm hại
   PALACE_RANK: 5,              // từ Tần được ban cung riêng

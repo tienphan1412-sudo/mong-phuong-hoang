@@ -229,7 +229,7 @@ socket.on('me', async m => {
   me = m;
   if (first) {
     $('gate').classList.add('hidden'); $('game').classList.remove('hidden'); gateSpin = false;
-    setTimeout(() => { for (const m of ['thaihau', 'cungnu', 'thaigiam', 'mama', 'thaiy', 'thive', 'hoangthuong_dem', 'tunu', 'quynhan', 'tan', 'phi', 'quyphi', 'hoangquyphi', 'hoanghau', 'aongu']) loadModel(m).catch(() => {}); }, 1500);
+    setTimeout(() => { for (const m of ['thaihau', 'cungnu', 'thaigiam', 'mama', 'thaiy', 'thive', 'hoangthuong_dem', 'tunu', 'thuongtai_hong', 'quynhan', 'tan', 'phi', 'quyphi', 'hoangquyphi', 'hoanghau', 'aongu']) loadModel(m).catch(() => {}); }, 1500);
     musicBtn();
   }
   renderHud(); renderMap(); renderActs();
@@ -370,7 +370,7 @@ socket.on('roster', r => {
 });
 
 // tủ đồ
-const OUTFIT_NAMES = { tunu: 'Tú nữ · xanh lá', thuongtai: 'Thường tại · tím mũ hoa', quynhan: 'Quý nhân · xanh dương', tan: 'Tần · cam áo khoác', phi: 'Phi · tím chuỗi ngọc', quyphi: 'Quý phi · đỏ vân kiên', hoangquyphi: 'Hoàng quý phi · cam rồng phượng', hoanghau: 'Hoàng hậu · vàng mũ phượng', aongu: 'Áo ngủ · trắng' };
+const OUTFIT_NAMES = { tunu: 'Tú nữ · xanh lá', thuongtai: 'Đáp ứng · tím mũ hoa', thuongtai_hong: 'Thường tại · hồng gile kem', quynhan: 'Quý nhân · xanh dương', quynhan_lam: 'Quý nhân · xanh lam thêu bạc', tan: 'Tần · cam áo khoác', tan_tim: 'Tần · tím hoa mẫu đơn', phi: 'Phi · tím chuỗi ngọc', quyphi: 'Quý phi · đỏ vân kiên', quyphi_phuong: 'Quý phi · đỏ kim phượng', hoangquyphi: 'Hoàng quý phi · cam rồng phượng', hoangquyphi_kim: 'Hoàng quý phi · đỏ rượu áo choàng kim', hoanghau: 'Hoàng hậu · vàng mũ phượng', aongu: 'Áo ngủ · trắng' };
 function openWardrobe() {
   modal(`<button class="close" onclick="window._close()">✕</button><h3>Tủ trang phục</h3><div style="color:var(--muted);font-size:12.5px">Mở khóa theo cấp bậc. Bị giáng cấp vẫn giữ trong tủ, nhưng chỉ mặc được bộ từ cấp hiện tại trở xuống.</div><div class="btns">${Object.entries(OUTFIT_NAMES).map(([k, n]) => `<button data-o="${k}" ${me.outfits.includes(k) ? '' : 'disabled'} ${me.outfit === k ? 'class="gold"' : ''}>${me.outfits.includes(k) ? '' : '🔒 '}${n}</button>`).join('')}</div>`);
   $('mcard').querySelectorAll('[data-o]').forEach(b => b.onclick = () => { socket.emit('wardrobe', b.dataset.o); closeModal(); });
@@ -410,7 +410,7 @@ function decorClick() {
 // ---------------- cảnh diễn ----------------
 let cutActive = false, stage = null, latTheMe = false;
 function showScroll(title, html, buttons) {
-  cutActive = true; const c = $('cut'); c.classList.remove('hidden');
+  cutActive = true; const c = $('cut'); c.classList.remove('hidden'); c.classList.toggle('top', title === 'Thánh chỉ');
   c.innerHTML = `<div class="scroll${title === 'Thánh chỉ' ? ' edict' : ''}"><h3>${esc(title)}</h3><div>${html}</div><div class="btns">${buttons.map((b, i) => `<button class="${i === buttons.length - 1 ? 'gold' : ''}" data-i="${i}">${b[0]}</button>`).join('')}</div></div>`;
   c.querySelectorAll('[data-i]').forEach(b => b.onclick = () => buttons[+b.dataset.i][1]());
 }
@@ -454,11 +454,11 @@ async function runSacPhong(d) {
   let pc = await spawn(prevOutfit); pc.root.position.set(0, 0, 2.4); pc.root.rotation.y = Math.PI; o.group.add(pc.root); pc.play('quy');
   const maids = [];
   stage = { update: dt => { tg.update(dt); pc.update(dt); maids.forEach(m => m.update(dt)); holdEdict(tg, edict); } };
-  camera.position.set(1.9, 1.15, 4.5); camera.lookAt(-.2, .62, 1.7);
+  camera.position.set(1.2, 1.1, 4.7); camera.lookAt(-.1, .6, 1.7);
   await fade(false); music.gong();
   const edictText = d.type === 'phucvi'
     ? `Phụng thiên thừa vận, Hoàng đế chiếu viết: <b>${esc(d.name)}</b> nhận lỗi thành tâm, nay cho phục vị <b>${esc(d.rankName)}</b>. Khâm thử!`
-    : `Phụng thiên thừa vận, Hoàng đế chiếu viết: <b>${esc(d.name)}</b> tính tình hiền thục, cẩn trọng đoan trang, nay đặc phong làm <b>${esc(d.rankName)}</b>${d.palace ? `, ban cho cung riêng` : ''}. Khâm thử!`;
+    : `Phụng thiên thừa vận, Hoàng đế chiếu viết: <b>${esc(d.name)}</b> tính tình hiền thục, cẩn trọng đoan trang, từ ngày nhập cung hầu hạ chu toàn, được Thái hậu khen ngợi. Nay đặc phong làm <b>${esc(d.rankName)}</b>${d.palace ? `, ban cho cung riêng` : ''}. Khâm thử!`;
   showScroll('Thánh chỉ', edictText, [['Thần thiếp tạ ơn', async () => {
     hideCut(); cutActive = true; await fade(true); edict.visible = false;
     pc.dispose(); pc = await spawn(d.outfit); pc.root.position.set(0, 0, 2.0); pc.root.rotation.y = 0; o.group.add(pc.root); pc.play('hanh_le');
