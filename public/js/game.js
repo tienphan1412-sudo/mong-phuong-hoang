@@ -188,6 +188,8 @@ renderer.setAnimationLoop(() => {
       if (seated?.ht?.c) { p = p.clone().add(seated.ht.c.root.position).multiplyScalar(.5); p.y = 0; }
       const want = new THREE.Vector3(p.x + Math.sin(camYaw) * camDist, camH, p.z + Math.cos(camYaw) * camDist);
       if (['phong', 'tamcung', 'lanhcung'].includes(world.loc)) { const b = world.bounds, m = .3; want.x = Math.min(b.maxX + m, Math.max(b.minX - m, want.x)); want.z = Math.min(b.maxZ + m, Math.max(b.minZ - m, want.z)); }
+      if (!Number.isFinite(camera.position.x + camera.position.y + camera.position.z)) snapCam = true;
+      if (!Number.isFinite(want.x + want.y + want.z)) { want.set(0, 1.6, 3); }
       if (snapCam) { camera.position.copy(want); snapCam = false; } else camera.position.lerp(want, Math.min(1, dt * 6)); camera.lookAt(p.x, seated ? (world.bedTop || .4) + .32 : .85, p.z);
     }
   }
@@ -232,6 +234,7 @@ socket.on('me', async m => {
     setTimeout(() => { for (const m of ['thaihau', 'cungnu', 'thaigiam', 'mama', 'thaiy', 'thive', 'hoangthuong_dem', 'tunu', 'thuongtai_hong', 'quynhan', 'tan', 'phi', 'quyphi', 'hoangquyphi', 'hoanghau', 'aongu']) loadModel(m).catch(() => {}); }, 1500);
     musicBtn();
   }
+  if (me.latThe) latTheMe = true;
   renderHud(); renderMap(); renderActs();
   if (selfC && world && oldOutfit && oldOutfit !== me.outfit && !stage) { const r = selfC.root; await respawnSelf(r.position.x, r.position.z, r.rotation.y); }
   if (selfC) { const r = selfC.label.element.querySelector('.r'); if (r) { const t = rankTier(me.rankName); r.className = 'r ' + t; r.textContent = (t === 't3' ? '★ ' : '') + me.rankName; } }
@@ -570,7 +573,15 @@ function placeSeated(c, x, z, ry) {
   r.position.x += x - s.x; r.position.z += z - s.z; r.position.y = world.bedTop - s.y;
 }
 function sitBed(kind) {
-  const ht = world.npcs.find(n => n.model === 'hoangthuong_dem'); if (!ht?.c || !selfC) return;
+  const ht = world.npcs.find(n => n.model === 'hoangthuong_dem'); if (!ht?.c || !selfC) return toast('Hoàng thượng chưa tới, chờ chút nhé.');
+  if (!Number.isFinite(world.bedTop)) world.bedTop = .42;
+  if (!Number.isFinite(world.bedFront)) world.bedFront = -1.1;
+  if (!ht.home) ht.home = { x: ht.c.root.position.x, z: ht.c.root.position.z, ry: ht.c.root.rotation.y };
+  try { sitBedInner(kind, ht); } catch (e) { console.error(e); standUp(); toast('Chưa ngồi được, thử lại nhé.', 'bad'); }
+  const ok = [selfC.root.position, ht.c.root.position].every(v => Number.isFinite(v.x + v.y + v.z));
+  if (!ok) { standUp(); toast('Chưa ngồi được, thử lại nhé.', 'bad'); }
+}
+function sitBedInner(kind, ht) {
   standUp(true);
   const zf = world.bedFront - .2;
   selfC.target = null;

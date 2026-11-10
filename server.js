@@ -10,7 +10,7 @@ const C = require('./config');
 const app = express();
 const server = http.createServer(app);
 const io = new Server(server);
-app.use(express.static(path.join(__dirname, 'public'), { maxAge: '1h' }));
+app.use(express.static(path.join(__dirname, 'public'), { maxAge: '1h', setHeaders: (res, f) => { if (/\.(js|html|css)$/.test(f)) res.setHeader('Cache-Control', 'no-cache'); } }));
 app.get('/health', (_, res) => res.send('ok'));
 
 // ---------------- lưu trữ: MongoDB nếu có, không thì file JSON ----------------
@@ -84,7 +84,7 @@ function selfView(p) {
     stats: p.stats, tasks: p.tasks, thinhAn: p.thinhAn, waiting: p.waiting || false, lanh: p.lanh || null,
     outfits: allowedOutfits(p), decor: p.decor || [], hasPalace: p.rank >= C.PALACE_RANK, cases: open,
     protectedUntil: p.protectUntil || 0, admin: !!p.admin, canFight: !p.lanh && p.rank >= C.FIGHT_RANK,
-    attacksLeft: C.ATTACK_PER_DAY - (p.attacks || 0),
+    attacksLeft: C.ATTACK_PER_DAY - (p.attacks || 0), latThe: (p.tamCungUntil || 0) > now(),
   };
 }
 function push(p) { const s = sockOf(p.id); if (s) s.emit('me', selfView(p)); }
@@ -352,7 +352,9 @@ io.on('connection', sock => {
     sock.emit('auth', { token: p.token });
     sock.emit('newsAll', DB.state.news.slice(0, 30));
     push(p);
-    enter(p, p.lanh ? 'lanhcung' : (p.loc && p.loc !== 'tamcung' ? p.loc : 'hoavien'), sock);
+    const back = p.lanh ? 'lanhcung' : (p.loc === 'tamcung' && p.tamCungUntil > now() ? 'tamcung' : (p.loc && p.loc !== 'tamcung' ? p.loc : 'hoavien'));
+    if (p.outfit === 'aongu' && back !== 'tamcung' && back !== 'phong') p.outfit = p.lanh ? 'tunu' : C.RANKS[p.rank].outfit;
+    enter(p, back, sock);
     tryPromote(p); save();
   };
   sock.on('register', d => {
