@@ -103,7 +103,7 @@ function tryPromote(p) {
   while (p.rank < C.RANKS.length - 1 && p.pts >= C.RANKS[p.rank + 1].pts) {
     const next = C.RANKS[p.rank + 1];
     if (next.seats && seatCount(p.rank + 1) >= next.seats) { if (!p.waiting) toast(p, `Đủ công trạng lên ${next.name} nhưng hết ghế. Chờ có người rời ghế.`); p.waiting = true; break; }
-    p.waiting = false; p.rank++; changed = true;
+    p.waiting = false; p.rank++; changed = true; p.trend = { dir: 1, t: now() };
     p.outfit = next.outfit;
     news(`Thánh chỉ: ${p.name} được tấn phong ${next.name}.`, 'phong');
     const s = sockOf(p.id);
@@ -120,7 +120,7 @@ function addPts(p, n) { p.pts += n; tryPromote(p); }
 
 function demote(p, steps, reason) {
   const before = p.rank;
-  p.rank = Math.max(0, p.rank - steps);
+  p.rank = Math.max(0, p.rank - steps); p.trend = { dir: -1, t: now() };
   p.waiting = false;
   if (!allowedOutfits(p).includes(p.outfit)) p.outfit = C.RANKS[p.rank].outfit;
   p.protectUntil = now() + C.PROTECT_HOURS * 3600e3;
@@ -130,6 +130,7 @@ function demote(p, steps, reason) {
   push(p); freeSeatCheck();
 }
 function sendToLanhCung(p, reason, caseId) {
+  if (!p.lanh) p.trend = { dir: -1, t: now() };
   if (p.lanh) { if (caseId) p.lanh.caseId = caseId; return; }
   p.lanh = { from: p.rank, tasks: 0, caseId: caseId || null, since: now() };
   p.waiting = false;
@@ -145,7 +146,7 @@ function phucVi(p, toRank, how) {
   delete p.lanh;
   let r = Math.min(toRank, from);
   while (r > 2 && C.RANKS[r].seats && seatCount(r) >= C.RANKS[r].seats) r--;
-  p.rank = r; p.outfit = C.RANKS[r].outfit; p.pts = Math.max(p.pts, C.RANKS[r].pts);
+  p.rank = r; p.outfit = C.RANKS[r].outfit; p.pts = Math.max(p.pts, C.RANKS[r].pts); p.trend = { dir: 1, t: now() };
   p.loc = 'phong';
   news(`${p.name} được phục vị ${C.RANKS[r].name} ${how}.`, 'phong');
   const s = sockOf(p.id); if (s) s.emit('cutscene', { type: 'phucvi', rank: r, rankName: C.RANKS[r].name, outfit: p.outfit, name: p.name });
@@ -315,7 +316,7 @@ function nightTick() {
   for (const p of Object.values(DB.players)) {
     if (p.lanh || p.rank < C.PALACE_RANK) continue;
     const days = (now() - (p.lastSeen || now())) / 864e5;
-    if (days >= C.ABSENT_LOSE_DAYS && !online.has(p.id)) { const r = p.rank; p.rank = C.FIGHT_RANK - 1; p.outfit = C.RANKS[p.rank].outfit; news(`${p.name} vắng mặt quá lâu, nhường ghế ${C.RANKS[r].name}.`); freeSeatCheck(); }
+    if (days >= C.ABSENT_LOSE_DAYS && !online.has(p.id)) { const r = p.rank; p.rank = C.FIGHT_RANK - 1; p.trend = { dir: -1, t: now() }; p.outfit = C.RANKS[p.rank].outfit; news(`${p.name} vắng mặt quá lâu, nhường ghế ${C.RANKS[r].name}.`); freeSeatCheck(); }
   }
   checkDeadlines();
   // vụ án do hệ thống dàn dựng khi cung vắng người
@@ -535,6 +536,18 @@ function admin(p, text) {
   else return toast(p, 'Lệnh: /latthe /diem N /diemcho N tên /bac N /ngay /vuan /hethan /lanhcung');
   toast(p, 'Đã chạy ' + cmd); push(p); save();
 }
+
+// ---------- bảng xếp hạng top 5 ----------
+function top5() {
+  const H = 24 * 3600e3;
+  return Object.values(DB.players).filter(p => !p.lanh)
+    .sort((a, b) => b.rank - a.rank || b.pts - a.pts || b.sung - a.sung)
+    .slice(0, 5)
+    .map(p => ({ id: p.id, name: p.name, rankName: C.RANKS[p.rank].name, pts: p.pts, online: online.has(p.id), trend: p.trend && now() - p.trend.t < H ? p.trend.dir : 0 }));
+}
+let lastTop = '';
+setInterval(() => { const t = JSON.stringify(top5()); if (t !== lastTop) { lastTop = t; io.emit('top5', JSON.parse(t)); } }, 2000);
+io.on('connection', s => s.emit('top5', top5()));
 
 const PORT = process.env.PORT || 3000;
 loadDB().then(() => {

@@ -515,6 +515,7 @@ function holdEdict(c, m) {
 const TOUR = [
   { el: '#who', title: 'Thân phận của bổn cung', text: 'Tên, chức vị và lối sống. Thanh vàng là <b>công trạng</b>: đầy thanh sẽ được Hoàng thượng tấn phong lên bậc tiếp theo, từ Tú nữ cho tới Hoàng quý phi.' },
   { el: '#stats', title: 'Bạc, lượt và nhiệm vụ', text: '<b>Bạc</b> để tặng quà, dâng canh, điều tra. <b>Lượt</b>: mỗi ngày 5 lượt, làm việc sẽ tốn lượt, sang ngày mới được hồi lại. <b>Sủng ái</b> càng cao càng dễ được lật thẻ bài. <b>Thái hậu</b> là độ hài lòng của Thái hậu.<br>Làm đủ 3 <b>nhiệm vụ</b> thỉnh an, luyện, dò tin mỗi ngày được thưởng thêm công trạng.' },
+  { el: '#top5', title: 'Bảng xếp hạng', text: 'Top 5 phi tần cao nhất hậu cung, cập nhật liên tục. <b style="color:#2e9d4f">▲ xanh</b> là vừa thăng cấp, <b style="color:#c0392b">▼ đỏ</b> là vừa bị giáng cấp trong 24 giờ qua. Chấm xanh là đang online.<br>Bấm vào tiêu đề để thu gọn.' },
   { el: '#map', title: 'Đi lại trong cung', text: 'Bấm để đến <b>Ngự hoa viên</b>, <b>Từ Ninh cung</b> (Thái hậu), <b>Dưỡng Tâm điện</b> (Hoàng thượng) và <b>phòng riêng</b>. Đêm nào được lật thẻ bài sẽ hiện thêm <b>Tẩm cung</b>.' },
   { el: '#acts', title: 'Việc làm ở nơi đang đứng', text: 'Mỗi nơi có việc riêng: thỉnh an ở Từ Ninh cung, dâng canh ở Dưỡng Tâm điện, luyện tài nghệ và dò tin ở Ngự hoa viên, thay đồ và bài trí ở phòng riêng.' },
   { el: 'center', title: 'Di chuyển và nói chuyện', text: '<b>Bấm xuống đất</b> để đi tới đó. <b>Kéo chuột</b> để xoay góc nhìn, <b>lăn chuột</b> để phóng to thu nhỏ. Bấm vào <b>tên NPC</b> màu vàng để nói chuyện, cung nữ và thái y còn giúp điều tra vụ án.' },
@@ -604,3 +605,19 @@ function standUp(keepCam) {
   if (selfC) { selfC.post = null; const r = selfC.root; r.position.set(.3, 0, world.bedFront + .45); r.position.y = 0; selfC.play('dung_cho'); }
   if (!keepCam && world) { camDist = world.cam.dist; camH = world.cam.height; }
 }
+
+// ---------------- bảng xếp hạng top 5 ----------------
+let lastTopIds = [];
+$('top5').querySelector('.t').onclick = () => $('top5').classList.toggle('min');
+socket.on('top5', list => {
+  const ol = $('top5list'); ol.innerHTML = '';
+  list.forEach((p, i) => {
+    const li = document.createElement('li'); if (p.id === me?.id) li.className = 'me';
+    const tr = p.trend > 0 ? '<span class="tr up" title="Vừa thăng cấp">▲</span>' : p.trend < 0 ? '<span class="tr down" title="Vừa bị giáng cấp">▼</span>' : '<span class="tr"></span>';
+    li.innerHTML = `<span class="no">${i + 1}</span><span class="on ${p.online ? 'y' : ''}"></span><span class="nm">${esc(p.name)}</span><span class="rk">${esc(p.rankName)}</span>${tr}`;
+    if (lastTopIds.length && lastTopIds[i] !== p.id) { li.classList.add('flash'); setTimeout(() => li.classList.remove('flash'), 1500); }
+    ol.appendChild(li);
+  });
+  if (!list.length) ol.innerHTML = '<li style="color:var(--muted)">Chưa có ai</li>';
+  lastTopIds = list.map(p => p.id);
+});

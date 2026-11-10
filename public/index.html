@@ -38,6 +38,22 @@ input, select { font:inherit; padding:10px 12px; border-radius:10px; border:1px 
 /* giao diện trong game */
 #hud { position:fixed; left:10px; top:10px; right:10px; display:flex; gap:10px; align-items:flex-start; pointer-events:none; z-index:5; }
 #hud > * { pointer-events:auto; }
+#top5 { position:fixed; left:10px; top:118px; width:250px; z-index:5; background:var(--panel); border:1px solid var(--line); border-radius:12px; padding:7px 10px 6px; font-size:12.5px; }
+#top5 .t { font-family:'Noto Serif',serif; color:var(--gold2); font-weight:700; font-size:13px; margin-bottom:3px; cursor:pointer; user-select:none; }
+#top5.min ol { display:none; }
+#top5 ol { list-style:none; margin:0; padding:0; }
+#top5 li { display:flex; align-items:center; gap:6px; padding:2.5px 0; border-top:1px solid rgba(255,255,255,.06); transition:background .6s; }
+#top5 li.me { color:var(--gold2); font-weight:700; }
+#top5 li.flash { background:rgba(243,210,122,.25); }
+#top5 .no { width:16px; text-align:center; font-weight:700; color:var(--gold); }
+#top5 li:nth-child(1) .no { color:#ffd76a; } 
+#top5 .nm { flex:1; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+#top5 .rk { font-size:11px; color:var(--muted); white-space:nowrap; }
+#top5 .tr { width:14px; text-align:center; font-weight:900; font-size:13px; }
+#top5 .tr.up { color:#3fd46b; } #top5 .tr.down { color:#ff4d4d; }
+#top5 .on { width:6px; height:6px; border-radius:50%; background:#555; flex:none; } #top5 .on.y { background:#3fd46b; }
+body.staging #top5 { display:none !important; }
+@media (max-width:760px) { #top5 { top:auto; bottom:250px; width:200px; } }
 #who { background:var(--panel); border:1px solid var(--line); border-radius:14px; padding:10px 14px; min-width:220px; }
 #who .nm { font-family:'Noto Serif',serif; font-size:17px; color:var(--gold2); font-weight:700; }
 #who .rk { color:var(--gold); font-size:13px; }
@@ -46,7 +62,7 @@ input, select { font:inherit; padding:10px 12px; border-radius:10px; border:1px 
 #stats { display:flex; gap:6px; flex-wrap:wrap; max-width:calc(100vw - 520px); }
 .pill { background:var(--panel); border:1px solid var(--line); border-radius:999px; padding:6px 11px; font-size:12.5px; white-space:nowrap; }
 .pill b { color:var(--gold2); }
-#map { position:fixed; left:10px; top:50%; transform:translateY(-50%); display:flex; flex-direction:column; gap:6px; z-index:5; }
+#map { position:fixed; left:10px; top:max(50%, 380px); transform:translateY(-50%); display:flex; flex-direction:column; gap:6px; z-index:5; }
 #map button { text-align:left; min-width:140px; font-size:13px; }
 #map button.on { border-color:var(--gold); background:rgba(160,90,30,.55); }
 #acts { position:fixed; right:10px; top:50%; transform:translateY(-50%); display:flex; flex-direction:column; gap:6px; z-index:5; max-width:220px; }
@@ -145,6 +161,7 @@ body.staging #cut .scroll.edict, #cut .scroll.edict { width:min(880px,94vw); min
     <div id="who"><div class="nm" id="hName"></div><div class="rk" id="hRank"></div><div class="bar"><i id="hBar"></i></div><div style="font-size:11px;color:var(--muted);margin-top:3px" id="hPts"></div></div>
     <div id="stats"></div>
   </div>
+  <div id="top5"><div class="t">🏆 Bảng xếp hạng hậu cung</div><ol id="top5list"></ol></div>
   <div id="map"></div>
   <div id="acts"></div>
   <div id="chat"><div id="chatlog"></div><input id="chatin" placeholder="Nói gì đó… (Enter để gửi)" maxlength="200"></div>
