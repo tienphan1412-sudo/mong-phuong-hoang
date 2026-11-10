@@ -2,7 +2,8 @@
 import * as THREE from 'three';
 import { CSS2DRenderer, CSS2DObject } from 'three/addons/renderers/CSS2DRenderer.js';
 import { buildLocation, DECOR } from './scenes.js';
-import { spawn, seatPlacement, ready } from './chars.js';
+import { spawn, seatPlacement, ready, loadModel } from './chars.js';
+import * as music from './music.js';
 
 const $ = id => document.getElementById(id);
 const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
@@ -26,7 +27,7 @@ let world = null;        // địa điểm hiện tại
 let me = null;           // thông tin bản thân từ máy chủ
 let selfC = null;        // nhân vật của mình
 const others = new Map();
-let camYaw = 0, camDist = 3.2, camH = 1.6;
+let camYaw = 0, camDist = 3.2, camH = 1.6, snapCam = false;
 let loadToken = 0;
 
 function applyLights(L) {
@@ -60,14 +61,15 @@ function clearWorld() {
 async function enterScene(loc, players) {
   const tok = ++loadToken;
   closeDecor();
-  clearWorld();
+  music.setMode(loc);
+  // dựng cảnh mới ở hậu trường, cảnh cũ vẫn hiện cho tới khi xong
   const o = buildLocation(loc, { palace: me?.hasPalace, palaceName: me ? (me.name.split(' ').pop() + ' cung') : '' });
-  o.loc = loc; world = o; scene.add(o.group); applyLights(o.lights);
-  camDist = o.cam.dist; camH = o.cam.height; camYaw = 0;
+  o.loc = loc;
   await ready();
-  // NPC
+  await Promise.all([...o.npcs.map(n => loadModel(n.model)), loadModel(me.outfit), ...(players || []).map(p => loadModel(p.outfit))]).catch(() => {});
+  if (tok !== loadToken) return;
   for (const n of o.npcs) {
-    const c = await spawn(n.model); if (tok !== loadToken) return c.dispose();
+    const c = await spawn(n.model); if (tok !== loadToken) { c.dispose(); o.npcs.forEach(x => x.c && x.c !== c && x.c.dispose()); return; }
     n.c = c; o.group.add(c.root);
     if (n.sit && o.throne) {
       c.root.position.set(0, o.dais.y, o.dais.z); const s = seatPlacement(c);
@@ -80,12 +82,16 @@ async function enterScene(loc, players) {
     }
     const lb = makeLabel(n.name, '', true, n.talk ? () => talk(n) : null); c.root.add(lb); n.label = lb;
   }
+  if (tok !== loadToken) return;
+  clearWorld();
+  world = o; scene.add(o.group); applyLights(o.lights);
+  camDist = o.cam.dist; camH = o.cam.height; camYaw = 0;
   if (o.decorable) renderDecor(me.decor);
   // bản thân
   const sp = clampPos(o.spawn.x + (Math.random() - .5) * 1.4, o.spawn.z + (Math.random() - .5) * .6);
   await respawnSelf(sp.x, sp.z, Math.PI);
   if (tok !== loadToken) return;
-  sendMove('dung_cho');
+  sendMove('dung_cho'); snapCam = true;
   for (const p of players || []) addOther(p);
   renderMap(); renderActs();
 }
@@ -138,7 +144,7 @@ function stepSelf(dt) {
     const dx = selfC.target.x - r.position.x, dz = selfC.target.z - r.position.z, d = Math.hypot(dx, dz);
     if (d < 0.05) { selfC.target = null; }
     else {
-      const sp = 0.85 * dt, k = Math.min(1, sp / d);
+      const sp = 1.35 * dt, k = Math.min(1, sp / d);
       const np = clampPos(r.position.x + dx * k, r.position.z + dz * k); r.position.x = np.x; r.position.z = np.z;
       const want = Math.atan2(dx, dz); let diff = want - r.rotation.y; diff = Math.atan2(Math.sin(diff), Math.cos(diff)); r.rotation.y += diff * Math.min(1, dt * 10);
       if (selfC.curName !== 'di') selfC.play('di');
@@ -168,11 +174,20 @@ renderer.setAnimationLoop(() => {
       const p = selfC.root.position;
       const want = new THREE.Vector3(p.x + Math.sin(camYaw) * camDist, camH, p.z + Math.cos(camYaw) * camDist);
       if (['phong', 'tamcung', 'lanhcung'].includes(world.loc)) { const b = world.bounds, m = .3; want.x = Math.min(b.maxX + m, Math.max(b.minX - m, want.x)); want.z = Math.min(b.maxZ + m, Math.max(b.minZ - m, want.z)); }
-      camera.position.lerp(want, Math.min(1, dt * 6)); camera.lookAt(p.x, .85, p.z);
+      if (snapCam) { camera.position.copy(want); snapCam = false; } else camera.position.lerp(want, Math.min(1, dt * 6)); camera.lookAt(p.x, .85, p.z);
     }
   }
   renderer.render(scene, camera); labels.render(scene, camera);
 });
+
+// ---------------- nhạc ----------------
+addEventListener('pointerdown', () => music.start(), { once: true });
+addEventListener('keydown', () => music.start(), { once: true });
+function musicBtn() {
+  const b = document.createElement('button'); b.id = 'musicbtn';
+  const paint = () => b.textContent = music.isOn() ? '🎵 Nhạc: bật' : '🔇 Nhạc: tắt';
+  b.onclick = () => { music.toggle(); paint(); }; paint(); document.body.appendChild(b);
+}
 
 // ---------------- màn hình vào cung ----------------
 let gateSpin = true;
@@ -197,7 +212,11 @@ socket.on('kicked', () => { toast('Tài khoản vừa đăng nhập ở nơi kh�
 socket.on('me', async m => {
   const first = !me; const oldOutfit = me?.outfit;
   me = m;
-  if (first) { $('gate').classList.add('hidden'); $('game').classList.remove('hidden'); gateSpin = false; }
+  if (first) {
+    $('gate').classList.add('hidden'); $('game').classList.remove('hidden'); gateSpin = false;
+    setTimeout(() => { for (const m of ['thaihau', 'cungnu', 'thaigiam', 'mama', 'thaiy', 'thive', 'hoangthuong_dem', 'tunu', 'quynhan', 'tan', 'phi', 'quyphi', 'hoangquyphi', 'hoanghau', 'aongu']) loadModel(m).catch(() => {}); }, 1500);
+    musicBtn();
+  }
   renderHud(); renderMap(); renderActs();
   if (selfC && world && oldOutfit && oldOutfit !== me.outfit && !stage) { const r = selfC.root; await respawnSelf(r.position.x, r.position.z, r.rotation.y); }
   if (selfC) { selfC.label.element.querySelector('.r') && (selfC.label.element.querySelector('.r').textContent = me.rankName); }
@@ -377,7 +396,7 @@ function decorClick() {
 let cutActive = false, stage = null, latTheMe = false;
 function showScroll(title, html, buttons) {
   cutActive = true; const c = $('cut'); c.classList.remove('hidden');
-  c.innerHTML = `<div class="scroll"><h3>${esc(title)}</h3><div>${html}</div><div class="btns">${buttons.map((b, i) => `<button class="${i === buttons.length - 1 ? 'gold' : ''}" data-i="${i}">${b[0]}</button>`).join('')}</div></div>`;
+  c.innerHTML = `<div class="scroll${title === 'Thánh chỉ' ? ' edict' : ''}"><h3>${esc(title)}</h3><div>${html}</div><div class="btns">${buttons.map((b, i) => `<button class="${i === buttons.length - 1 ? 'gold' : ''}" data-i="${i}">${b[0]}</button>`).join('')}</div></div>`;
   c.querySelectorAll('[data-i]').forEach(b => b.onclick = () => buttons[+b.dataset.i][1]());
 }
 function hideCut() { $('cut').classList.add('hidden'); cutActive = false; if (!stage && !sacBusy) { const f = cutDone; cutDone = () => {}; f(); } }
@@ -411,25 +430,26 @@ socket.on('latthe', d => {
 });
 
 async function runSacPhong(d) {
-  sacBusy = true; cutActive = true; await fade(true);
+  sacBusy = true; cutActive = true; await fade(true); document.body.classList.add('staging');
   const saved = world; scene.remove(saved.group);
   const o = buildLocation('tuninh'); o.loc = 'stage'; scene.add(o.group); applyLights(o.lights);
   const prevOutfit = selfC?.outfit || 'tunu';
   const tg = await spawn('thaigiam'); tg.root.position.set(0, 0, 1.2); tg.root.rotation.y = 0; o.group.add(tg.root); tg.play('doc_chi');
+  const edict = makeEdictProp(); o.group.add(edict);
   let pc = await spawn(prevOutfit); pc.root.position.set(0, 0, 2.4); pc.root.rotation.y = Math.PI; o.group.add(pc.root); pc.play('quy');
   const maids = [];
-  stage = { update: dt => { tg.update(dt); pc.update(dt); maids.forEach(m => m.update(dt)); } };
-  camera.position.set(1.6, 1.2, 3.9); camera.lookAt(0, .7, 1.8);
-  await fade(false);
-  const edict = d.type === 'phucvi'
+  stage = { update: dt => { tg.update(dt); pc.update(dt); maids.forEach(m => m.update(dt)); holdEdict(tg, edict); } };
+  camera.position.set(1.9, 1.15, 4.5); camera.lookAt(-.2, .62, 1.7);
+  await fade(false); music.gong();
+  const edictText = d.type === 'phucvi'
     ? `Phụng thiên thừa vận, Hoàng đế chiếu viết: <b>${esc(d.name)}</b> nhận lỗi thành tâm, nay cho phục vị <b>${esc(d.rankName)}</b>. Khâm thử!`
     : `Phụng thiên thừa vận, Hoàng đế chiếu viết: <b>${esc(d.name)}</b> tính tình hiền thục, cẩn trọng đoan trang, nay đặc phong làm <b>${esc(d.rankName)}</b>${d.palace ? `, ban cho cung riêng` : ''}. Khâm thử!`;
-  showScroll('Thánh chỉ', edict, [['Thần thiếp tạ ơn', async () => {
-    hideCut(); cutActive = true; await fade(true);
+  showScroll('Thánh chỉ', edictText, [['Thần thiếp tạ ơn', async () => {
+    hideCut(); cutActive = true; await fade(true); edict.visible = false;
     pc.dispose(); pc = await spawn(d.outfit); pc.root.position.set(0, 0, 2.0); pc.root.rotation.y = 0; o.group.add(pc.root); pc.play('hanh_le');
     tg.root.position.set(-1.5, 0, 1.6); tg.root.rotation.y = Math.atan2(1.5, .4); tg.play('cui_chao');
     for (const x of [-.85, .85]) { const m = await spawn('cungnu'); m.root.position.set(x, 0, 2.9); m.root.rotation.y = Math.atan2(-x, -.9); m.play('cui_chao'); o.group.add(m.root); maids.push(m); }
-    camera.position.set(0, 1.25, 5.6); camera.lookAt(0, .8, 2.2);
+    camera.position.set(0, 1.0, 5.4); camera.lookAt(0, .72, 2.2);
     await fade(false);
     setTimeout(() => pc.play('dung_cho'), 4200);
     showScroll(d.type === 'phucvi' ? 'Phục vị' : 'Sắc phong', `${esc(d.name)} · <b>${esc(d.rankName)}</b>${d.palace ? '<br>Được ban cung riêng. Vào mục Cung riêng để bài trí.' : ''}`, [['📷 Lưu ảnh kỷ niệm', () => snapPhoto(d)], ['Tiếp tục', async () => {
@@ -438,7 +458,7 @@ async function runSacPhong(d) {
       scene.add(saved.group); applyLights(saved.lights); world = saved;
       if (pendingScene) { const ps = pendingScene; pendingScene = null; await enterScene(ps.loc, ps.players); }
       else if (selfC && selfC.outfit !== me.outfit) { const r = selfC.root; await respawnSelf(r.position.x, r.position.z, r.rotation.y); }
-      cutActive = false; await fade(false); sacBusy = false; { const f = cutDone; cutDone = () => {}; f(); }
+      document.body.classList.remove('staging'); cutActive = false; await fade(false); sacBusy = false; { const f = cutDone; cutDone = () => {}; f(); }
       if (d.palace || d.type === 'phucvi') socket.emit('goto', 'phong');
     }]]);
   }]]);
@@ -453,4 +473,22 @@ function snapPhoto(d) {
   g.font = 'italic 22px "Noto Serif", serif'; g.fillStyle = '#e2bf6b'; g.fillText(`MỘNG PHƯỢNG HOÀNG · ${new Date().toLocaleDateString('vi-VN')}`, w / 2, h + 92);
   const a = document.createElement('a'); a.download = `mong-phuong-hoang-${d.rankName}.png`; a.href = c.toDataURL('image/png'); a.click();
   toast('Đã lưu ảnh kỷ niệm.', 'good');
+}
+
+// thánh chỉ trên tay tổng quản thái giám
+let edictTex = null;
+function makeEdictProp() {
+  if (!edictTex) { edictTex = new THREE.TextureLoader().load('img/thanhchi_s.png'); edictTex.colorSpace = THREE.SRGBColorSpace; }
+  const m = new THREE.Mesh(new THREE.PlaneGeometry(.34, .22), new THREE.MeshStandardMaterial({ map: edictTex, transparent: true, alphaTest: .4, side: THREE.DoubleSide, roughness: .6 }));
+  m.castShadow = true; return m;
+}
+const _a = new THREE.Vector3(), _b = new THREE.Vector3(), _f = new THREE.Vector3();
+function holdEdict(c, m) {
+  if (!m.visible || !c.B.lHand || !c.B.rHand) return;
+  c.B.lHand.getWorldPosition(_a); c.B.rHand.getWorldPosition(_b);
+  m.parent.worldToLocal(_a); m.parent.worldToLocal(_b);
+  m.position.copy(_a).add(_b).multiplyScalar(.5);
+  _f.set(Math.sin(c.root.rotation.y), 0, Math.cos(c.root.rotation.y));
+  m.position.addScaledVector(_f, .03); m.position.y += .05;
+  m.rotation.set(-.35, c.root.rotation.y + Math.PI, 0, 'YXZ');
 }

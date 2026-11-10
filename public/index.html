@@ -80,8 +80,15 @@ input, select { font:inherit; padding:10px 12px; border-radius:10px; border:1px 
 .clue { background:rgba(0,0,0,.25); border-left:3px solid var(--gold); padding:6px 10px; margin:6px 0; border-radius:6px; font-size:13px; }
 .btns { display:flex; flex-wrap:wrap; gap:6px; margin:8px 0; }
 #cut { position:fixed; inset:0; z-index:25; display:flex; flex-direction:column; justify-content:flex-end; align-items:center; pointer-events:none; }
-#cut .scroll { pointer-events:auto; margin-bottom:5vh; width:min(720px,94vw); background:linear-gradient(#f6e6bf,#e8cf95); color:#4a1a08; border:3px solid #b8862d; border-radius:12px; padding:18px 22px; font-family:'Noto Serif',serif; font-size:16px; line-height:1.6; box-shadow:0 10px 40px rgba(0,0,0,.5); }
-#cut .scroll h3 { margin:0 0 6px; color:#8a1a17; font-size:20px; }
+#cut .scroll { pointer-events:auto; margin-bottom:3vh; width:min(560px,94vw); max-height:42vh; overflow-y:auto; background:linear-gradient(#f6e6bfee,#e8cf95ee); color:#4a1a08; border:2px solid #b8862d; border-radius:12px; padding:12px 18px; font-family:'Noto Serif',serif; font-size:14.5px; line-height:1.55; box-shadow:0 8px 30px rgba(0,0,0,.45); }
+body.staging #cut { align-items:flex-end; padding-right:2vw; }
+body.staging #cut .scroll { width:min(400px,92vw); font-size:13.5px; }
+body.staging #map, body.staging #acts, body.staging #who, body.staging #stats, body.staging #chat, body.staging #newsbtn, body.staging #news, body.staging #labels, body.staging #musicbtn { display:none !important; }
+#cut .scroll.edict { width:min(540px,94vw); aspect-ratio:792/511; max-height:none; overflow:visible; background:url(img/thanhchi.png) center/100% 100% no-repeat; border:0; box-shadow:none; border-radius:0; padding:5% 10% 4%; display:flex; flex-direction:column; justify-content:center; text-align:center; filter:drop-shadow(0 8px 20px rgba(0,0,0,.5)); }
+#cut .scroll.edict h3 { font-size:17px; letter-spacing:.2em; }
+#cut .scroll.edict .btns { justify-content:center; margin-top:6px; }
+#musicbtn { position:fixed; right:10px; top:10px; z-index:6; background:var(--panel); color:var(--gold2); border:1px solid var(--line); border-radius:10px; padding:7px 12px; font-size:13px; cursor:pointer; }
+#cut .scroll h3 { margin:0 0 4px; color:#8a1a17; font-size:17px; }
 #cut .scroll .btns { justify-content:flex-end; }
 #fade { position:fixed; inset:0; background:#000; opacity:0; pointer-events:none; transition:opacity .6s; z-index:24; }
 #decorbar { position:fixed; bottom:10px; left:50%; transform:translateX(-50%); display:flex; gap:6px; flex-wrap:wrap; justify-content:center; background:var(--panel); border:1px solid var(--line); border-radius:14px; padding:8px; z-index:7; max-width:94vw; }
