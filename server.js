@@ -190,7 +190,7 @@ function caseView(c, viewer) {
   return {
     id: c.id, method: c.method, methodName: c.methodName, crime: c.crime, status: c.status, deadline: c.deadline,
     suspects: c.suspects.map(s => ({ id: s.id, name: s.name })),
-    found: c.found, witness: c.witness, traitNames: C.TRAITS,
+    found: c.found, witness: c.witness, witnessWait: c.witnessReq ? c.witnessReq.name : null, traitNames: C.TRAITS,
   };
 }
 function revealClue(c, kind, p) {
@@ -243,16 +243,15 @@ function caseOp(p, data) {
     revealClue(c, data.kind, p);
     toast(p, freeMuu ? 'Nhờ mưu kế, manh mối này không tốn gì.' : 'Đã có thêm manh mối.', 'good');
   } else if (op === 'witness') {
-    if (c.witness) return toast(p, 'Đã có người làm chứng.');
+    if (c.witness || c.witnessReq) return toast(p, 'Đã nhờ người làm chứng rồi.');
     const w = P(data.who); if (!w || w.id === p.id) return toast(p, 'Chọn người làm chứng khác.', 'bad');
     if (p.turns < 1) return toast(p, 'Hết lượt hôm nay.', 'bad');
     p.turns -= 1;
     const guilty = c.suspects.find(s => s.guilty);
     const trait = pick(['cung', 'gio', 'dau']);
-    let value = guilty.traits[trait];
-    if (w.id === c.culprit) value = (value + 1) % C.TRAITS[trait].length; // thủ phạm khai sai
-    c.witness = { who: w.id, name: title(w), text: `${w.name} khai: hôm ấy thấy một người có ${C.TRAITS[trait][value]} lảng vảng gần phòng.`, trait, value };
-    toast(w, `${p.name} nhờ bổn cung làm chứng trong vụ ${c.methodName}.`);
+    c.witnessReq = { who: w.id, name: title(w), trait, value: guilty.traits[trait], at: now() };
+    if (sockOf(w.id)) { askWitness(c); toast(p, `Đã nhờ ${w.name} làm chứng. Chờ người ấy khai…`); setTimeout(() => autoWitness(c.id), C.WITNESS_WAIT_MS); }
+    else autoWitness(c.id);
   } else if (op === 'confess') {
     if (isReopen) return;
     closeCase(c, 'nhantoi', `${p.name} nhận tội, được giảm nhẹ: giáng một bậc.`);
@@ -281,8 +280,27 @@ function caseOp(p, data) {
   save(); push(p);
   const sk = sockOf(p.id); if (sk) sk.emit('caseDetail', { ...caseView(c, p), table: suspectTraitText(c) });
 }
+// ---------- nhân chứng là người chơi thật ----------
+function askWitness(c) {
+  const r = c.witnessReq; if (!r) return; const s = sockOf(r.who); if (!s) return;
+  s.emit('witnessAsk', { caseId: c.id, victimName: c.victimName, methodName: c.methodName, trait: r.trait, traitName: { cung: 'nơi ở', gio: 'giờ lui tới', dau: 'dấu vết' }[r.trait], options: C.TRAITS[r.trait], truth: r.value, guilty: r.who === c.culprit, waitMs: Math.max(0, C.WITNESS_WAIT_MS - (now() - r.at)) });
+}
+function setWitness(c, value, auto) {
+  const r = c.witnessReq; if (!r) return; const w = P(r.who);
+  c.witness = { who: r.who, name: r.name, trait: r.trait, value, auto: !!auto, text: `${w ? w.name : r.name} khai: hôm ấy thấy một người có ${C.TRAITS[r.trait][value]} lảng vảng gần phòng.` };
+  c.witnessReq = null;
+  const v = P(c.victim); if (v) { toast(v, `${w ? w.name : r.name} đã khai xong.`, 'good'); const s = sockOf(v.id); if (s) s.emit('caseDetail', { ...caseView(c, v), table: suspectTraitText(c), reopen: !!(v.lanh && v.lanh.caseId === c.id) }); }
+  save();
+}
+function autoWitness(id) {
+  const c = DB.state.cases[id]; if (!c || !c.witnessReq) return;
+  const r = c.witnessReq; let value = r.value;
+  if (r.who === c.culprit) value = (value + 1) % C.TRAITS[r.trait].length; // thủ phạm vắng mặt: tự khai sai
+  setWitness(c, value, true);
+}
 function checkDeadlines() {
   for (const c of Object.values(DB.state.cases)) {
+    if (c.witnessReq && now() - c.witnessReq.at > C.WITNESS_WAIT_MS + 5000) autoWitness(c.id);
     if (c.status === 'open' && now() > c.deadline) {
       closeCase(c, 'xu', `Hết hạn mà không tìm ra thủ phạm. Thái hậu phán phạt.`);
       news(`Hết hạn điều tra, Thái hậu phán ${P(c.victim)?.name} có tội ${c.crime}.`, 'phat');
@@ -352,6 +370,7 @@ function enter(p, loc, sock) {
 io.on('connection', sock => {
   let me = null;
   const ok = p => {
+    setTimeout(() => { for (const c of Object.values(DB.state.cases)) if (c.witnessReq?.who === p.id) askWitness(c); }, 3000);
     if (online.has(p.id)) { try { online.get(p.id).emit('kicked'); online.get(p.id).disconnect(); } catch (e) {} }
     me = p; online.set(p.id, sock); p.lastSeen = now(); freshDay(p);
     if (!p.token) p.token = crypto.randomBytes(16).toString('hex');
@@ -498,6 +517,12 @@ io.on('connection', sock => {
     save(); push(me);
   });
   sock.on('case', d => { if (me) caseOp(me, d); });
+  sock.on('witnessAnswer', d => {
+    if (!me || !d) return; const c = DB.state.cases[d.caseId]; if (!c || !c.witnessReq || c.witnessReq.who !== me.id) return;
+    if (d.refuse) { const v = P(c.victim); c.witnessReq = null; if (v) { v.turns += 1; toast(v, `${me.name} từ chối làm chứng. Đã trả lại 1 lượt.`, 'bad'); push(v); const s = sockOf(v.id); if (s) s.emit('caseDetail', { ...caseView(c, v), table: suspectTraitText(c) }); } save(); return; }
+    const val = +d.value; if (!(val >= 0 && val < C.TRAITS[c.witnessReq.trait].length)) return;
+    setWitness(c, val, false); addPts(me, 3); push(me); toast(me, 'Đã khai xong, được thêm 3 công trạng.', 'good');
+  });
   sock.on('caseDetail', id => { if (!me) return; const c = DB.state.cases[id]; if (c && c.victim === me.id) sock.emit('caseDetail', { ...caseView(c, me), table: suspectTraitText(c), reopen: !!(me.lanh && me.lanh.caseId === id) }); });
   sock.on('wardrobe', o => {
     if (!me || !allowedOutfits(me).includes(o)) return;

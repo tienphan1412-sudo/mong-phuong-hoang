@@ -57,6 +57,7 @@ module.exports = {
   THINH_AN: { pts: 10, haiLong: 3 },
   LAT_THE: { pts: 25, sung: 20 },
 
+  WITNESS_WAIT_MS: 5 * 60e3, // chờ nhân chứng khai tối đa 5 phút, quá hạn thì tự khai
   METHODS: [
     { id: 'tuithom', name: 'Túi thơm có xạ hương', crime: 'mưu hại long thai, làm hại phi tần' },
     { id: 'thu', name: 'Thư tư thông giả mạo', crime: 'tư thông với người ngoài cung' },

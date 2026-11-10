@@ -102,7 +102,7 @@ async function enterScene(loc, players) {
   const sp = clampPos(o.spawn.x + (Math.random() - .5) * 1.4, o.spawn.z + (Math.random() - .5) * .6);
   await respawnSelf(sp.x, sp.z, Math.PI);
   if (tok !== loadToken) return;
-  sendMove('dung_cho'); snapCam = true;
+  sendMove('dung_cho'); snapCam = true; refreshClueMarkers(); if (nb) renderNotebook();
   for (const p of players || []) addOther(p);
   renderMap(); renderActs();
 }
@@ -139,6 +139,7 @@ function clickWorld(e) {
   ndc.set(e.clientX / innerWidth * 2 - 1, -(e.clientY / innerHeight) * 2 + 1); ray.setFromCamera(ndc, camera);
   if (decor.on) return decorClick();
   if (world.bed && ray.intersectObject(world.bed, true).length) return openBed();
+  if (world.brazier && ray.intersectObject(world.brazier, true).length) return clueTro();
   if (seated) standUp();
   const ground = []; world.group.traverse(o => { if (o.name === 'ground') ground.push(o); });
   const hit = ray.intersectObjects(ground, false)[0]; if (!hit) return;
@@ -306,9 +307,10 @@ function talk(n) {
   else if (n.talk === 'dangcanh') { emote('cui_chao'); act('dangcanh'); }
   else if (n.talk === 'dotin') act('dotin');
   else if (n.talk === 'lanh') act('lanh');
-  else if (n.talk === 'thaiy') { if (c) socket.emit('case', { caseId: c.id, op: 'clue', kind: 'thaiy' }); else bubble(n.label, 'Nương nương khí sắc tốt lắm, không có gì đáng lo.'); }
-  else if (n.talk === 'cungnu') { if (c) socket.emit('case', { caseId: c.id, op: 'clue', kind: 'hoi' }); else bubble(n.label, ['Nương nương nghỉ ngơi chút đi ạ.', 'Nô tỳ đã pha trà hoa cúc.', 'Hôm nay trong cung có vẻ yên ắng.'][Math.floor(Math.random() * 3)]); }
+  else if (n.talk === 'thaiy') { if (c && clueOpen('thaiy')) clueThaiY(n); else bubble(n.label, 'Nương nương khí sắc tốt lắm, không có gì đáng lo.'); }
+  else if (n.talk === 'cungnu') { if (c && clueOpen('hoi')) clueCungNu(n); else bubble(n.label, ['Nương nương nghỉ ngơi chút đi ạ.', 'Nô tỳ đã pha trà hoa cúc.', 'Hôm nay trong cung có vẻ yên ắng.'][Math.floor(Math.random() * 3)]); }
   else if (n.talk === 'mama') bubble(n.label, 'Trong cung quy củ nghiêm ngặt, các vị chủ tử nhớ giữ mình.');
+  else if (n.talk === 'thaigiam' && c && clueOpen('so')) clueSoQua(n);
   else if (n.talk === 'thaigiam') bubble(n.label, 'Hoàng thượng đang phê tấu chương, chủ tử muốn dâng canh thì nô tài thông báo giúp.');
 }
 
@@ -607,13 +609,14 @@ socket.on('top5', list => {
 let nb = null, nbMin = false;
 const TRAIT_ICON = { cung: '🏯', gio: '🕯', dau: '👣' };
 const TRAIT_NAME = { cung: 'Nơi ở', gio: 'Giờ lui tới', dau: 'Dấu vết' };
-const CLUE_BTNS = [['hoi', '👧 Hỏi cung nữ', 'miễn phí · biết giờ'], ['so', '📖 Dò sổ quà Nội vụ phủ', '1 lượt · 40 bạc · biết nơi ở'], ['tro', '🔥 Lục tro tàn', '1 lượt · biết dấu vết'], ['thaiy', '⚕️ Nhờ thái y kiểm nghiệm', '80 bạc · biết dấu vết, không bị xóa']];
+const CLUE_BTNS = [['hoi', '👧 Hỏi cung nữ thân tín', 'miễn phí · biết giờ', 'phong', 'Phòng riêng', 'cung nữ'], ['so', '📖 Dò sổ quà Nội vụ phủ', '1 lượt · 40 bạc · biết nơi ở', 'duongtam', 'Dưỡng Tâm điện', 'Tổng quản thái giám'], ['tro', '🔥 Lục tro trong lò than', '1 lượt · biết dấu vết', 'hoavien', 'Ngự hoa viên', 'lò than 🔍'], ['thaiy', '⚕️ Nhờ thái y kiểm nghiệm', '80 bạc · biết dấu vết, không bị xóa', 'tuninh', 'Từ Ninh cung', 'Thái y']];
 const nbEl = document.createElement('div'); nbEl.id = 'case'; nbEl.className = 'hidden'; document.body.appendChild(nbEl);
 function closeNotebook() { nb = null; caseOpenId = null; nbEl.classList.add('hidden'); document.body.classList.remove('nbopen'); }
 socket.on('caseDetail', c => {
   if (trial?.waiting) { trial.detail = c; return; }
   if (caseOpenId !== c.id) return;
-  nb = c; renderNotebook();
+  nb = c; renderNotebook(); refreshClueMarkers();
+  for (const w of clueWaiters.splice(0)) w(c);
 });
 function analyse(c) {
   const known = {}; for (const f of c.found) if (f.value !== null && f.value !== undefined) known[f.trait] = f.value;
@@ -648,12 +651,14 @@ async function renderNotebook() {
   <div class="clues">${c.found.length || c.witness ? '' : '<div class="none">Chưa có manh mối. Mỗi manh mối cho biết một đặc điểm thật của thủ phạm, ai không khớp sẽ bị đóng dấu LOẠI.</div>'}
   ${c.found.map(f => `<div class="cl">• <b>${esc(f.name)}:</b> ${esc(f.text)}</div>`).join('')}
   ${c.witness ? `<div class="cl wit">• <b>Nhân chứng ${esc(c.witness.name)}:</b> ${esc(c.witness.text)} <i>(có thể khai gian)</i></div>` : ''}</div>
-  ${open ? `<div class="nbacts">${CLUE_BTNS.filter(([k]) => !c.found.some(f => f.kind === k)).map(([k, n, sub]) => `<button data-clue="${k}">${n}<small>${sub}</small></button>`).join('')}
-    ${c.witness ? '' : '<button id="nbWit">🙋 Nhờ người làm chứng<small>1 lượt · lời khai có thể sai</small></button>'}
+  ${open ? `<div class="nbacts">${CLUE_BTNS.filter(([k]) => !c.found.some(f => f.kind === k)).map(([k, n, sub, loc, locName, who]) => me.lanh ? `<button data-clue="${k}">${n}<small>${sub}</small></button>` : world?.loc === loc ? `<button class="here" data-here="${k}">${n}<small>✨ Đang ở ${locName}: bấm vào ${who} có dấu 🔍</small></button>` : `<button data-go="${loc}">${n}<small>${sub} · đi tới ${locName} ➜</small></button>`).join('')}
+    ${c.witness ? '' : c.witnessWait ? `<button disabled>⏳ Đang chờ ${esc(c.witnessWait)} khai…<small>tối đa 5 phút, quá hạn sẽ tự khai</small></button>` : '<button id="nbWit">🙋 Nhờ người làm chứng<small>1 lượt · người thật tự chọn lời khai, có thể khai gian</small></button>'}
     ${c.status === 'open' ? '<button id="nbConf">🙇 Nhận tội<small>giảm nhẹ: giáng 1 bậc</small></button>' : ''}
     <button class="gold big" id="nbTrial">⚖️ Ra phiên xử<small>buộc tội trước mặt Thái hậu · chỉ 1 lần</small></button></div>` : ''}`;
   nbEl.querySelector('.nbx').onclick = (e) => { e.stopPropagation(); nbMin = true; renderNotebook(); };
   nbEl.querySelectorAll('[data-clue]').forEach(b => b.onclick = () => socket.emit('case', { caseId: c.id, op: 'clue', kind: b.dataset.clue }));
+  nbEl.querySelectorAll('[data-go]').forEach(b => b.onclick = () => socket.emit('goto', b.dataset.go));
+  nbEl.querySelectorAll('[data-here]').forEach(b => b.onclick = () => startClueHere(b.dataset.here));
   const bw = $('nbWit'); if (bw) bw.onclick = () => { witnessFor = c.id; socket.emit('roster'); };
   const bc = $('nbConf'); if (bc) bc.onclick = () => { if (confirm('Nhận tội để được giảm nhẹ (giáng 1 bậc)?')) socket.emit('case', { caseId: c.id, op: 'confess' }); };
   const bt = $('nbTrial'); if (bt) bt.onclick = () => runTrial(c);
@@ -829,3 +834,120 @@ async function endTrial() {
   if (me.cases?.some(x => x.id === id) || me.lanh?.caseId === id) openCase(id);
   nextCut();
 }
+
+// =====================================================================
+// 2. ĐI TÌM MANH MỐI TẬN NƠI
+// =====================================================================
+const clueWaiters = [];
+const CLUE_AT = { hoi: { loc: 'phong', talk: 'cungnu' }, so: { loc: 'duongtam', talk: 'thaigiam' }, thaiy: { loc: 'tuninh', talk: 'thaiy' }, tro: { loc: 'hoavien' } };
+function clueOpen(kind) { return nb && (nb.status === 'open' || nb.reopen) && !nb.found.some(f => f.kind === kind); }
+function getClue(kind) {
+  return new Promise(res => {
+    let done = false; const t = setTimeout(() => { if (!done) { done = true; res(null); } }, 3500);
+    clueWaiters.push(function w(c) { const f = c.found.find(x => x.kind === kind); if (f && !done) { done = true; clearTimeout(t); res(f); } else if (!done) clueWaiters.push(w); });
+    socket.emit('case', { caseId: nb.id, op: 'clue', kind });
+  });
+}
+function startClueHere(kind) {
+  if (kind === 'tro') return clueTro();
+  const n = world?.npcs.find(x => x.talk === CLUE_AT[kind].talk); if (n) talk(n);
+}
+function refreshClueMarkers() {
+  if (!world) return;
+  for (const n of world.npcs) if (n.label) { const want = Object.entries(CLUE_AT).some(([k, v]) => v.talk === n.talk && v.loc === world.loc && clueOpen(k)); n.label.element.classList.toggle('clue', want); }
+  // lò than ở Ngự hoa viên
+  if (world.loc === 'hoavien' && clueOpen('tro') && !world.brazier) {
+    const g = new THREE.Group(); g.position.set(1.8, 0, 4.3); const mt = new THREE.MeshStandardMaterial({ color: 0x5b4a3a, metalness: .5, roughness: .5 });
+    const bowl = new THREE.Mesh(new THREE.CylinderGeometry(.32, .2, .28, 16), mt); bowl.position.y = .42; g.add(bowl);
+    for (const a of [0, 2.1, 4.2]) { const l = new THREE.Mesh(new THREE.CylinderGeometry(.03, .03, .3, 6), mt); l.position.set(Math.cos(a) * .18, .14, Math.sin(a) * .18); g.add(l); }
+    const ash = new THREE.Mesh(new THREE.CircleGeometry(.29, 16), new THREE.MeshStandardMaterial({ color: 0x8a8580, emissive: 0xff5a1a, emissiveIntensity: .25 })); ash.rotation.x = -Math.PI / 2; ash.position.y = .55; g.add(ash);
+    const pl = new THREE.PointLight(0xff8a3a, 1.2, 2); pl.position.y = .8; g.add(pl);
+    const d = document.createElement('div'); d.className = 'label npc clue'; d.innerHTML = '<div class="bbl"></div>Lò than'; d.style.pointerEvents = 'auto'; d.style.cursor = 'pointer'; d.onclick = e => { e.stopPropagation(); clueTro(); };
+    const lb = new CSS2DObject(d); lb.position.set(0, 1.0, 0); g.add(lb);
+    world.group.add(g); world.brazier = g; world.blocks = [...(world.blocks || []), { x: 1.8, z: 4.3, r: .45 }];
+  } else if (world.brazier && !clueOpen('tro')) { world.brazier.traverse(o => { if (o.isCSS2DObject) o.element.remove(); }); world.group.remove(world.brazier); world.brazier = null; }
+}
+// khung hội thoại kiểu truyện tranh, có chân dung
+const dlgEl = document.createElement('div'); dlgEl.id = 'dlg'; dlgEl.className = 'hidden'; document.body.appendChild(dlgEl);
+function say(model, name, text, choices = [['Tiếp', null]]) {
+  return new Promise(res => {
+    dlgEl.classList.remove('hidden');
+    dlgEl.innerHTML = `<img class="pt" alt=""><div class="body"><div class="who">${esc(name)}</div><div class="txt">${text}</div><div class="btns">${choices.map((c, i) => `<button data-i="${i}" class="${c[2] || ''}">${c[0]}</button>`).join('')}</div></div>`;
+    portrait(model).then(u => { const im = dlgEl.querySelector('img.pt'); if (im) im.src = u; }).catch(() => {});
+    dlgEl.querySelectorAll('[data-i]').forEach(b => b.onclick = () => res(+b.dataset.i));
+  });
+}
+const dlgClose = () => dlgEl.classList.add('hidden');
+const meModel = () => (me.outfit === 'aongu' ? 'tunu' : me.outfit);
+async function clueCungNu(n) {
+  if (await say('cungnu', n.name, 'Nương nương… chuyện tang vật, nô tỳ có điều muốn bẩm. Đêm ấy nô tỳ trực ngoài cửa, hình như có người lén vào phòng.', [['Ngươi thấy gì? Nói mau!', 1, 'gold'], ['Để sau', 0]]) === 0) {
+    const f = await getClue('hoi'); if (!f) return dlgClose();
+    await say('cungnu', n.name, `Nô tỳ không dám nhìn kỹ… <i>“${esc(f.text)}”</i><br><small>📒 Đã ghi vào sổ điều tra.</small>`, [['Tốt lắm', 0, 'gold']]);
+  }
+  dlgClose();
+}
+async function clueThaiY(n) {
+  if (await say('thaiy', n.name, `Thần nghe nói phòng của nương nương có ${esc(nb.methodName.toLowerCase())}. Nếu nương nương mang tang vật tới, thần có thể kiểm nghiệm xem nó dính thứ gì. Phí thuốc thử 80 lượng bạc.`, [['Nhờ thái y kiểm nghiệm (80 bạc)', 1, 'gold'], ['Thôi', 0]]) === 0) {
+    await say('thaiy', n.name, 'Để thần xem… <i>(thái y ngửi, soi dưới đèn, nhỏ thuốc thử)</i>', [['…', 0]]);
+    const f = await getClue('thaiy'); if (!f) return dlgClose();
+    await say('thaiy', n.name, `Bẩm nương nương: <b>${esc(f.text)}</b> Thứ này không thể giả được.<br><small>📒 Đã ghi vào sổ điều tra.</small>`, [['Đa tạ thái y', 0, 'gold']]);
+  }
+  dlgClose();
+}
+// sổ quà Nội vụ phủ: tìm dòng ghi món đồ khả nghi
+const DECOY_GIFTS = ['Lụa Tô Châu hai xấp', 'Trâm ngọc phỉ thúy', 'Trà Long Tỉnh thượng hạng', 'Phấn sáp Giang Nam', 'Đèn lồng sa vẽ hoa', 'Hộp mứt táo đỏ', 'Quạt lụa thêu điệp', 'Gối ngọc mát'];
+async function clueSoQua(n) {
+  if (await say('thaigiam', n.name, 'Sổ ghi quà của Nội vụ phủ đây ạ. Mọi món đồ ra vào hậu cung đều được ghi lại, chủ tử muốn tra thì nô tài mở cho. Phí bôi trơn 40 lượng bạc, tốn 1 lượt.', [['Mở sổ ra xem', 1, 'gold'], ['Thôi', 0]]) !== 0) return dlgClose();
+  dlgClose();
+  const rows = DECOY_GIFTS.sort(() => Math.random() - .5).slice(0, 5); const pos = Math.floor(Math.random() * 6); rows.splice(pos, 0, '★');
+  const days = ['Mùng 3', 'Mùng 5', 'Mùng 8', 'Mười hai', 'Mười lăm', 'Mười chín'];
+  modal(`<button class="close" onclick="window._close()">✕</button><div class="ledger"><h3>📖 Sổ quà Nội vụ phủ</h3><div class="sub">Tìm dòng ghi món đồ giống tang vật trong vụ án: <b>${esc(nb.methodName)}</b></div>
+  ${rows.map((r, i) => `<div class="lrow" data-i="${i}"><span class="d">${days[i]}</span><span class="it">${r === '★' ? esc(nb.methodName) : esc(r)}</span><span class="fr">gửi từ: <i>${r === '★' ? '<span class="blot">▒▒▒▒▒▒</span>' : '…'}</i></span></div>`).join('')}</div>`);
+  $('mcard').querySelectorAll('.lrow').forEach(el => el.onclick = async () => {
+    if (+el.dataset.i !== pos) { el.classList.add('shake'); el.querySelector('.fr').innerHTML = 'món này không liên quan'; setTimeout(() => el.classList.remove('shake'), 500); return; }
+    el.classList.add('hit'); el.querySelector('.fr').innerHTML = 'đang dò…';
+    const f = await getClue('so'); if (!f) return closeModal();
+    el.querySelector('.fr').innerHTML = `<b>${esc(f.text)}</b>`;
+    $('mcard').insertAdjacentHTML('beforeend', '<div class="btns"><button class="gold" onclick="window._close()">📒 Ghi vào sổ điều tra</button></div>');
+  });
+}
+// lục tro: kéo chuột phủi tro để lộ mảnh thư cháy dở
+async function clueTro() {
+  if (!clueOpen('tro')) return toast('Lò than này đã lục rồi.');
+  if (!confirm('Lục tro trong lò than? (tốn 1 lượt)')) return;
+  const f = await getClue('tro'); if (!f) return;
+  modal(`<button class="close" onclick="window._close()">✕</button><h3>🔥 Lục tro tàn</h3><div class="sub" style="color:var(--muted);font-size:13px">Kéo chuột để phủi lớp tro, xem mảnh giấy cháy dở bên dưới viết gì.</div><canvas id="ash" width="440" height="240" style="width:100%;max-width:440px;border-radius:10px;display:block;margin:8px auto;cursor:grab;touch-action:none"></canvas><div id="ashDone" class="btns hidden"><button class="gold" onclick="window._close()">📒 Ghi vào sổ điều tra</button></div>`);
+  const cv = $('ash'), g = cv.getContext('2d'), W = cv.width, H = cv.height;
+  // lớp dưới: giấy cháy có chữ
+  const under = document.createElement('canvas'); under.width = W; under.height = H; const u = under.getContext('2d');
+  u.fillStyle = '#2a1a12'; u.fillRect(0, 0, W, H);
+  u.fillStyle = '#e9d7b0'; u.beginPath(); u.moveTo(40, 40); for (let x = 40; x <= 400; x += 20) u.lineTo(x, 32 + Math.random() * 16); for (let y = 40; y <= 200; y += 20) u.lineTo(400 + Math.random() * 14, y); for (let x = 400; x >= 40; x -= 20) u.lineTo(x, 200 + Math.random() * 14); for (let y = 200; y >= 40; y -= 20) u.lineTo(32 + Math.random() * 14, y); u.fill();
+  u.fillStyle = '#3a1408'; u.font = 'italic 17px "Noto Serif", serif'; u.textAlign = 'center';
+  const words = f.text.split(' '); let line = '', y = 92; const lines = [];
+  for (const w of words) { if ((line + ' ' + w).length > 34) { lines.push(line); line = w; } else line = (line + ' ' + w).trim(); } lines.push(line);
+  lines.forEach((l, i) => u.fillText(l, W / 2, y + i * 26));
+  // lớp trên: tro
+  const ashC = document.createElement('canvas'); ashC.width = W; ashC.height = H; const a = ashC.getContext('2d');
+  for (let i = 0; i < 9000; i++) { const v = 90 + Math.random() * 70; a.fillStyle = `rgb(${v},${v - 4},${v - 8})`; a.fillRect(Math.random() * W, Math.random() * H, 3 + Math.random() * 5, 3 + Math.random() * 5); }
+  a.fillStyle = 'rgba(120,115,108,.9)'; a.globalCompositeOperation = 'destination-over'; a.fillRect(0, 0, W, H); a.globalCompositeOperation = 'destination-out';
+  const draw = () => { g.clearRect(0, 0, W, H); g.drawImage(under, 0, 0); g.drawImage(ashC, 0, 0); };
+  draw(); let down = false, done = false;
+  const rub = e => { if (!down) return; const r = cv.getBoundingClientRect(); const x = (e.clientX - r.left) * W / r.width, y2 = (e.clientY - r.top) * H / r.height; const gr = a.createRadialGradient(x, y2, 2, x, y2, 34); gr.addColorStop(0, 'rgba(0,0,0,1)'); gr.addColorStop(1, 'rgba(0,0,0,0)'); a.fillStyle = gr; a.beginPath(); a.arc(x, y2, 34, 0, 7); a.fill(); draw(); check(); };
+  const check = () => { if (done) return; const d = a.getImageData(0, 0, W, H).data; let clear = 0; for (let i = 3; i < d.length; i += 64) if (d[i] < 60) clear++; if (clear / (d.length / 64) > .45) { done = true; a.clearRect(0, 0, W, H); draw(); $('ashDone').classList.remove('hidden'); } };
+  cv.onpointerdown = e => { down = true; cv.setPointerCapture(e.pointerId); rub(e); }; cv.onpointermove = rub; cv.onpointerup = () => { down = false; };
+}
+
+// =====================================================================
+// 5. NHÂN CHỨNG LÀ NGƯỜI CHƠI THẬT
+// =====================================================================
+socket.on('witnessAsk', d => {
+  const end = Date.now() + d.waitMs;
+  modal(`<h3>🙋 Lời nhờ làm chứng</h3>
+  <div style="line-height:1.6"><b>${esc(d.victimName)}</b> nhờ bổn cung làm chứng trong vụ <b>${esc(d.methodName)}</b>.<br>
+  Hôm ấy bổn cung có thấy một người lảng vảng gần phòng. Điều bổn cung thật sự nhớ về <b>${esc(d.traitName)}</b> của người đó: <b style="color:var(--gold2)">${esc(d.options[d.truth])}</b>.</div>
+  ${d.guilty ? '<div class="clue" style="border-color:#c0503a;margin-top:8px">🤫 <b>Chính bổn cung là kẻ đã ra tay vụ này.</b> Khai thật sẽ tự tố mình; khai gian có thể thoát… nếu người kia không tìm thêm chứng cứ.</div>' : ''}
+  <div style="margin-top:8px;color:var(--muted);font-size:13px">Chọn lời khai (<span id="wTimer"></span> nữa sẽ tự khai):</div>
+  <div class="btns" style="flex-direction:column;align-items:stretch">${d.options.map((o, i) => `<button data-v="${i}" class="${i === d.truth ? 'gold' : ''}">${i === d.truth ? '✓ Khai thật: ' : 'Khai: '}${esc(o)}</button>`).join('')}<button data-v="-1">Từ chối làm chứng</button></div>`);
+  const tick = setInterval(() => { const el = $('wTimer'); if (!el) return clearInterval(tick); const l = Math.max(0, end - Date.now()); el.textContent = `${Math.floor(l / 60e3)}:${String(Math.floor(l % 60e3 / 1000)).padStart(2, '0')}`; if (l <= 0) { clearInterval(tick); closeModal(); } }, 500);
+  $('mcard').querySelectorAll('[data-v]').forEach(b => b.onclick = () => { const v = +b.dataset.v; socket.emit('witnessAnswer', v < 0 ? { caseId: d.caseId, refuse: true } : { caseId: d.caseId, value: v }); clearInterval(tick); closeModal(); });
+});
