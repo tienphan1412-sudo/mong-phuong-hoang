@@ -43,12 +43,14 @@ function rankTier(r) {
   if (/Phế|lãnh/.test(r)) return 'tx';
   return 't0';
 }
-function makeLabel(name, rank, npc, onClick) {
+function makeLabel(name, rank, npc, onClick, tt) {
   const d = document.createElement('div'); d.className = 'label' + (npc ? ' npc' : '');
-  d.innerHTML = `<div class="bbl"></div>${esc(name)}${rank ? `<br><span class="r ${rankTier(rank)}">${rankTier(rank) === 't3' ? '★ ' : ''}${esc(rank)}</span>` : ''}`;
+  d.innerHTML = `<div class="bbl"></div><div class="tt">${tt ? '「' + esc(tt) + '」' : ''}</div>${esc(name)}${rank ? `<br><span class="r ${rankTier(rank)}">${rankTier(rank) === 't3' ? '★ ' : ''}${esc(rank)}</span>` : ''}`;
   if (onClick) { d.style.pointerEvents = 'auto'; d.style.cursor = 'pointer'; d.title = 'Bấm để nói chuyện'; d.onclick = e => { e.stopPropagation(); onClick(); }; }
   const o = new CSS2DObject(d); o.position.set(0, 1.12, 0); return o;
 }
+function myTitle() { return me?.ach?.find(a => a.id === me.titleSel && a.got)?.name || ''; }
+socket.on('ptitle', d => { const o = others.get(d.id); const el = o?.c?.label?.element.querySelector('.tt'); if (el) el.textContent = d.tt ? '「' + d.tt + '」' : ''; });
 function bubble(label, text) {
   const b = label.element.querySelector('.bbl'); if (!b) return;
   b.className = 'bbl bubble'; b.textContent = text; clearTimeout(b._t); b._t = setTimeout(() => { b.className = 'bbl'; b.textContent = ''; }, 5000);
@@ -59,7 +61,7 @@ function clearWorld() {
   if (!world) return;
   scene.remove(world.group);
   for (const n of world.npcs) if (n.c) { n.c.dispose(); }
-  for (const [, o] of others) o.c.dispose();
+  for (const [, o] of others) o.c?.dispose();
   others.clear();
   if (selfC) { selfC.dispose(); selfC = null; }
   world.group.traverse(o => { if (o.isCSS2DObject) o.element.remove(); });
@@ -115,7 +117,7 @@ async function respawnSelf(x, z, ry) {
   if (tok !== loadToken) return c.dispose();
   if (selfC) { selfC.label?.element.remove(); selfC.root.parent?.remove(selfC.root); selfC.dispose(); }
   selfC = c; c.root.position.set(x, 0, z); c.root.rotation.y = ry; world.group.add(c.root);
-  c.label = makeLabel(me.name, me.rankName); c.root.add(c.label);
+  c.label = makeLabel(me.name, me.rankName, false, null, myTitle()); c.root.add(c.label);
   c.target = null; c.outfit = me.outfit;
 }
 async function addOther(p) {
@@ -125,7 +127,7 @@ async function addOther(p) {
   const c = await spawn(p.outfit);
   if (others.get(p.id) !== holder || !world) return c.dispose();
   holder.c = c; c.root.position.set(p.x, 0, p.z); c.root.rotation.y = p.ry; world.group.add(c.root);
-  c.label = makeLabel(p.name, p.rankName); c.root.add(c.label);
+  c.label = makeLabel(p.name, p.rankName, false, null, p.tt); c.root.add(c.label);
   applyAnim(holder, p.anim || 'dung_cho', false);
 }
 function removeOther(id) { const o = others.get(id); if (!o) return; if (o.c) { o.c.root.remove(o.c.label); o.c.label.element.remove(); o.c.dispose(); } others.delete(id); }
@@ -249,6 +251,7 @@ socket.on('me', async m => {
   if (feast) feast.mine = me.feast?.names?.includes(`${me.name} ${me.rankName}`) || feast.mine;
   renderHud(); renderMap(); renderActs();
   if (selfC && world && oldOutfit && oldOutfit !== me.outfit && !stage) { const r = selfC.root; await respawnSelf(r.position.x, r.position.z, r.rotation.y); }
+  if (selfC) { const tt = selfC.label.element.querySelector('.tt'); if (tt) tt.textContent = myTitle() ? '「' + myTitle() + '」' : ''; }
   if (selfC) { const r = selfC.label.element.querySelector('.r'); if (r) { const t = rankTier(me.rankName); r.className = 'r ' + t; r.textContent = (t === 't3' ? '★ ' : '') + me.rankName; } }
   if (!caseOpenId && me.cases?.length && !me.lanh) { caseOpenId = me.cases[0].id; nbMin = true; }
   if (caseOpenId) socket.emit('caseDetail', caseOpenId);
@@ -286,8 +289,9 @@ function renderHud() {
   const lo = me.nextPts ? (me.pts / me.nextPts) : 1; $('hBar').style.width = Math.min(100, lo * 100) + '%';
   $('hPts').textContent = me.nextPts ? `Công trạng ${me.pts}/${me.nextPts}` : `Công trạng ${me.pts}`;
   const t = me.tasks || {};
-  $('stats').innerHTML = `<span class="pill">💰 Bạc <b>${me.silver}</b></span><span class="pill" title="Cứ 90 phút hồi 1 lượt (tối đa ${me.turnCap}). Làm đủ 3 nhiệm vụ ngày, dự yến tiệc, được lật thẻ cũng được thêm lượt.">⏳ Lượt <b>${me.turns}</b>${me.nextTurn ? ` <small id="turnT" style="opacity:.75"></small>` : ''}</span><span class="pill">💗 Sủng ái <b>${me.sung}</b></span><span class="pill">🍵 Thái hậu <b>${me.haiLong}</b></span><span class="pill">Nhiệm vụ: ${t.thinhan ? '✅' : '⬜'} thỉnh an ${t.luyen ? '✅' : '⬜'} luyện ${t.dotin ? '✅' : '⬜'} dò tin</span>${me.camTuc ? `<span class="pill" style="border-color:#c0503a">🔒 Cấm túc còn ${Math.max(1, Math.ceil((me.camTuc - Date.now()) / 3600e3))} giờ</span>` : ''}${htPill()}${feast ? `<span class="pill feast">🎎 Yến tiệc · <b id="feastT"></b> · ${feast.n} tiết mục</span>` : ''}${me.cases.length ? `<button class="pill" id="caseBtn" style="border-color:#c0503a">⚖️ Vụ án đang mở (${me.cases.length})</button>` : ''}`;
+  $('stats').innerHTML = `<span class="pill">💰 Bạc <b>${me.silver}</b></span><span class="pill" title="Cứ 90 phút hồi 1 lượt (tối đa ${me.turnCap}). Làm đủ 3 nhiệm vụ ngày, dự yến tiệc, được lật thẻ cũng được thêm lượt.">⏳ Lượt <b>${me.turns}</b>${me.nextTurn ? ` <small id="turnT" style="opacity:.75"></small>` : ''}</span><span class="pill">💗 Sủng ái <b>${me.sung}</b></span><span class="pill">🍵 Thái hậu <b>${me.haiLong}</b></span><span class="pill">Nhiệm vụ: ${t.thinhan ? '✅' : '⬜'} thỉnh an ${t.luyen ? '✅' : '⬜'} luyện ${t.dotin ? '✅' : '⬜'} dò tin</span>${me.camTuc ? `<span class="pill" style="border-color:#c0503a">🔒 Cấm túc còn ${Math.max(1, Math.ceil((me.camTuc - Date.now()) / 3600e3))} giờ</span>` : ''}${me.thai ? `<span class="pill" style="border-color:#f3a6c8" title="Mỗi ngày uống thuốc an thai ở chỗ Thái y (Từ Ninh cung). Uống đủ 2 ngày trở lên thì sinh thuận.">🤰 Long thai · còn ${Math.max(0, Math.ceil((me.thai.due - Date.now()) / 3600e3))} giờ · an thai ${me.thai.antai ? '✅' : '⬜'}</span>` : ''}${me.isHH ? '<button class="pill" id="hhBtn" style="border-color:#e8c25a">👑 Hoàng hậu</button>' : ''}${me.hhVote ? `<button class="pill" id="voteBtn" style="border-color:#e8c25a">👑 Bầu phượng ấn · còn ${Math.max(1, Math.ceil((me.hhVote.end - Date.now()) / 3600e3))} giờ</button>` : ''}${me.event ? `<span class="pill" title="${esc(me.event.desc)}">🎐 ${esc(me.event.name)}</span>` : ''}${htPill()}${feast ? `<span class="pill feast">🎎 Yến tiệc · <b id="feastT"></b> · ${feast.n} tiết mục</span>` : ''}${me.cases.length ? `<button class="pill" id="caseBtn" style="border-color:#c0503a">⚖️ Vụ án đang mở (${me.cases.length})</button>` : ''}`;
   const cb = $('caseBtn'); if (cb) cb.onclick = () => openCase(me.cases[0].id);
+  const hb = $('hhBtn'); if (hb) hb.onclick = openHH; const vb = $('voteBtn'); if (vb) vb.onclick = openVote;
 }
 const LOCNAMES = { yentiec: '🎎 Yến tiệc', hoavien: 'Ngự hoa viên', tuninh: 'Từ Ninh cung', duongtam: 'Dưỡng Tâm điện', phong: 'Phòng riêng', tamcung: 'Tẩm cung', lanhcung: 'Lãnh cung' };
 function renderMap() {
@@ -312,8 +316,12 @@ function renderActs() {
   if (L === 'phong') { add('🎐 Luyện tài nghệ', '1 lượt · chơi càng hay càng nhiều điểm', () => chooseTai(t => gameRhythm(t, q => act('luyen', { tai: t, q })))); add('🎁 Ban thưởng cung nữ', `20 bạc · trung thành ${me.loyal ?? 50}/100 · mỗi ngày 1 lần`, () => act('thuongcn')); add('👘 Thay trang phục', '', openWardrobe); add('🏮 Bài trí ' + (me.hasPalace ? 'cung' : 'phòng'), 'Đặt, xoay đồ nội thất', openDecor); }
   if (L === 'tamcung') { add('🛏 Lên giường', 'Ngồi cùng Hoàng thượng', openBed); add('🌙 Rời tẩm cung', 'Trời sắp sáng', () => socket.emit('goto', 'phong')); }
   if (L === 'lanhcung') { add('🧹 Làm việc lãnh cung', `Phục vị ${me.lanh?.tasks || 0}/3 · mỗi ngày 1 lần`, gameLanh); add('🕯 Hỏi chuyện phế phi', 'Mỗi ngày một lần · bà biết nhiều bí mật', () => act('phephi')); if (me.lanh?.caseId) add('📜 Kêu oan', 'Điều tra lại vụ án cũ', () => openCase(me.lanh.caseId)); }
+  const ev = me.event; if (ev?.loc && ev.loc === L && !me.lanh) add(ev.act, ev.done ? 'Hôm nay đã tham gia · mai quay lại' : `${ev.sub} · sự kiện tuần`, () => act('event'), ev.done);
+  if (L === 'tuninh' && me.hhVote) add('👑 Bầu phượng ấn', me.hhVote.mine ? 'Đã tiến cử · có thể đổi' : 'Tiến cử người xứng làm Hoàng hậu', openVote);
+  if (me.isHH) add('👑 Quyền Hoàng hậu', 'Ân xá · phạt cấm túc · thiết yến', openHH);
   add('💞 Tỷ muội', me.group ? `${esc(me.group.name)} · ${me.group.members.length} người` : 'Kết nghĩa để giúp đỡ nhau', openSis);
   if (!me.lanh) { add('👥 Danh sách hậu cung', 'Tặng quà · kết nghĩa · ra tay', openRoster); add('🏪 Nội vụ phủ', 'Mua nhân sâm, hương, đồ bài trí', openShop); }
+  add('🏅 Danh hiệu', `${me.ach ? me.ach.filter(a => a.got).length : 0}/${me.ach?.length || 0} · chọn danh hiệu hiện trên đầu`, openAch);
   add('💃 Động tác', 'Hành lễ, múa, che miệng cười…', openEmotes);
 }
 function openEmotes() {
@@ -353,6 +361,7 @@ let witnessFor = null, rosterMode = null;
 // danh sách hậu cung
 function openRoster() { witnessFor = null; socket.emit('roster'); }
 socket.on('roster', r => {
+  if (hhMode) return;
   if (witnessFor) {
     const id = witnessFor;
     modal(`<button class="close" onclick="window._close()">✕</button><h3>Chọn người làm chứng</h3><table>${r.list.filter(p => p.id !== me.id).map(p => `<tr><td>${p.online ? '🟢' : '⚪'} ${esc(p.name)}</td><td>${esc(p.rankName)}</td><td><button data-w="${p.id}">Nhờ làm chứng</button></td></tr>`).join('') || '<tr><td>Chưa có ai khác trong cung.</td></tr>'}</table>`);
@@ -360,15 +369,15 @@ socket.on('roster', r => {
     return;
   }
   const seats = r.seats.filter(s => s.seats).map(s => `${s.name} ${s.used}/${s.seats}`).join(' · ');
-  modal(`<button class="close" onclick="window._close()">✕</button><h3>Danh sách hậu cung</h3><div style="color:var(--muted);font-size:12.5px">Ghế: ${seats}. Hoàng hậu: NPC giữ ngôi.</div>
-  <table><tr><th>Phi tần</th><th>Cấp bậc</th><th>Sủng ái</th><th></th></tr>${r.list.map(p => `<tr><td>${p.online ? '🟢' : '⚪'} ${esc(p.name)}</td><td>${esc(p.rankName)}</td><td>${p.sung}</td><td>${p.id === me.id ? '' : `<button data-g="${p.id}">Tặng quà</button> ${me.canFight && p.canTarget ? `<button data-r="${p.id}" style="border-color:#c0503a">Ra tay</button>` : ''}`}</td></tr>`).join('')}</table>
+  modal(`<button class="close" onclick="window._close()">✕</button><h3>Danh sách hậu cung</h3><div style="color:var(--muted);font-size:12.5px">Ghế: ${seats}. Hoàng hậu: ${r.hh ? esc(r.hh) : 'NPC giữ ngôi, chờ bầu phượng ấn'}.</div>
+  <table><tr><th>Phi tần</th><th>Cấp bậc</th><th>Sủng ái</th><th></th></tr>${r.list.map(p => `<tr><td>${p.online ? '🟢' : '⚪'} ${esc(p.name)}${p.thai ? ' 🤰' : ''}${p.kids ? ' 👶' + (p.kids > 1 ? '×' + p.kids : '') : ''}</td><td>${p.rankName === 'Hoàng hậu' ? '👑 ' : ''}${esc(p.rankName)}</td><td>${p.sung}</td><td>${p.id === me.id ? '' : `<button data-g="${p.id}">Tặng quà</button> ${me.canFight && p.canTarget ? `<button data-r="${p.id}" style="border-color:#c0503a">Ra tay</button>` : ''}`}</td></tr>`).join('')}</table>
   <div style="color:var(--muted);font-size:12px">Tặng quà: 1 lượt · 40 bạc. ${me.canFight ? `Ra tay: 1 lượt · ${me.path === 'muuke' ? 80 : 120} bạc, còn ${me.attacksLeft} lần hôm nay.` : 'Từ Quý nhân mới được ra tay.'}</div>`);
   const mc = $('mcard');
   mc.querySelectorAll('[data-g]').forEach(b => b.onclick = () => act('tangqua', { target: b.dataset.g }));
   mc.querySelectorAll('tr').forEach(tr => { const g = tr.querySelector('[data-g]'); if (!g) return; const id = g.dataset.g; if (me.group?.members.some(m => m.id === id)) { g.insertAdjacentHTML('afterend', ' <span style="color:#f3a6c8">💞 tỷ muội</span>'); tr.querySelector('[data-r]')?.remove(); } else if (!me.group || me.group.members.length < 4) { const b = document.createElement('button'); b.textContent = '💞 Kết nghĩa'; b.onclick = () => inviteSis(id); g.after(' ', b); } });
   mc.querySelectorAll('[data-r]').forEach(b => b.onclick = () => {
     const t = r.list.find(p => p.id === b.dataset.r);
-    modal(`<button class="close" onclick="window._close()">✕</button><h3>Ra tay với ${esc(t.name)}</h3><label>Mưu kế</label><select id="meth">${r.methods.map(m => `<option value="${m.id}">${esc(m.name)} — tội ${esc(m.crime)}</option>`).join('')}</select>
+    modal(`<button class="close" onclick="window._close()">✕</button><h3>Ra tay với ${esc(t.name)}</h3><label>Mưu kế</label><select id="meth">${(t.thai ? r.thaiMethods : []).map(m => `<option value="${m.id}">🤰 ${esc(m.name)} — hại long thai</option>`).join('')}${r.methods.map(m => `<option value="${m.id}">${esc(m.name)} — tội ${esc(m.crime)}</option>`).join('')}</select>
     <label style="display:flex;gap:8px;align-items:center;margin-top:10px"><input type="checkbox" id="blur" style="width:auto"> Chi thêm 100 bạc xóa bớt dấu vết (một manh mối sẽ bị mờ)</label>
     <div style="color:var(--muted);font-size:12.5px;margin-top:8px">Nạn nhân sẽ có ${24} giờ điều tra. Nếu bị lật án, bổn cung chịu phạt nặng gấp đôi.</div>
     <div class="btns"><button class="gold" id="goR">Cài tang vật</button></div>`);
@@ -448,6 +457,10 @@ async function playCut(d) {
   else if (d.type === 'doncung') runDonCung(d);
   else if (d.type === 'phatgiac_old') showScroll('Phát giác', `Quế ma ma khám phòng và tìm thấy <b>${esc(d.methodName)}</b>. Bổn cung bị nghi <b>${esc(d.crime)}</b>.<br><br>Có <b>${d.hours} giờ</b> trước phiên xử ở Từ Ninh cung. Hỏi cung nữ, dò sổ quà, lục tro, nhờ thái y, hoặc nhờ người làm chứng để tìm ra kẻ hãm hại.`, [['Để sau', hideCut], ['Xem vụ án', () => { hideCut(); openCase(d.caseId); }]]);
   else if (d.type === 'lanhcung') { await fade(true); showScroll('Lãnh cung', `Bổn cung bị đày vào lãnh cung vì <b>${esc(d.reason)}</b>.<br><br>Ở đây vẫn có đường về: làm việc lãnh cung 3 ngày để được phục vị, hoặc tiếp tục điều tra và kêu oan.<br><i>“Được, chờ bổn cung quay về.”</i>`, [['Bước vào lãnh cung', async () => { hideCut(); socket.emit('goto', 'lanhcung'); await fade(false); }]]); }
+  else if (d.type === 'baohy') showScroll('Báo hỷ', `Thái y quỳ xuống chúc mừng: <b>${esc(d.name)}</b> có hỷ mạch!<br><br>Long thai sẽ chào đời sau <b>${d.days} ngày</b>. Mỗi ngày đến Từ Ninh cung nhờ Thái y sắc <b>thuốc an thai</b>: uống đủ 2 ngày thì sinh thuận, và nếu có kẻ giở trò thì phát hiện sớm hơn.<br><br><i>Cẩn thận, trong cung nhiều người không muốn thấy đứa trẻ này ra đời.</i>`, [['Tạ ơn trời phật', () => { hideCut(); emote('chap_tay'); }]]);
+  else if (d.type === 'thainguy') showScroll('Long thai lâm nguy', `Bổn cung đau bụng dữ dội. Thái y phát hiện <b>${esc(d.methodName)}</b>!<br><br>Có <b>${d.hours} giờ</b> để tìm ra kẻ hãm hại. Chỉ đúng hung thủ thì giữ được long thai và kẻ đó vào lãnh cung. Chỉ sai người hoặc hết hạn thì <b>sảy thai</b>.`, [['📒 Mở sổ điều tra', () => { hideCut(); openCase(d.caseId); }]]);
+  else if (d.type === 'saythai') showScroll('Sảy thai', `Long thai không giữ được${d.why ? ' vì ' + esc(d.why) : ''}…<br><br>Thái hậu thở dài, Hoàng thượng ban an ủi. Ngày còn dài, chủ tử giữ gìn sức khỏe rồi sẽ lại có tin vui.`, [['Lau nước mắt', () => { hideCut(); emote('khoc'); }]]);
+  else if (d.type === 'sinhcon') showScroll('Hỷ sự', `${d.hard ? 'Sau một đêm khó sinh, ' : ''}<b>${esc(d.name)}</b> hạ sinh ${d.sex === 'trai' ? '<b>hoàng tử</b>' : '<b>công chúa</b>'}. Hoàng thượng ban tên <b>${esc(d.child)}</b>.<br><br>Được thưởng sủng ái, bạc và công trạng${d.hard ? ' (giảm một nửa vì thai yếu)' : ', đủ để lên một bậc'}. Từ nay mỗi ngày <b>thêm 1 lượt</b> và dễ được lật thẻ hơn.`, [['Bế con', () => { hideCut(); emote('che_mieng'); }]]);
   else if (d.type === 'latan') showScroll('Lật án', `Chân tướng đã rõ: thủ phạm là <b>${esc(d.culprit)}</b>. Thái hậu minh xét, trả lại trong sạch cho ${esc(d.name)}.`, [['Tạ ơn Thái hậu', () => { hideCut(); emote('hanh_le'); }]]);
 }
 socket.on('latthe', d => {
@@ -532,8 +545,10 @@ const TOUR = [
   { el: 'center', title: 'Yến tiệc và lật thẻ', text: '<b>Yến tiệc</b> mỗi ngày lúc <b>9h30, 12h30</b> (ngoài trời) và <b>17h, 20h</b> (trong điện), mỗi tiệc 20 phút. Vào ngồi cùng mọi người, bước ra dâng tiết mục, ai hay nhất được trọng thưởng.<br><b>Lật thẻ</b> lúc <b>11h30 trưa</b> và <b>21h tối</b>. Được chọn thì vào tẩm cung hầu chuyện Hoàng thượng; không được chọn cũng có quà an ủi.' },
   { el: () => [...document.querySelectorAll('#acts button')].find(b => b.textContent.includes('Nội vụ phủ')), title: 'Nội vụ phủ', text: 'Tiệm trong cung: nhân sâm thêm lượt, hương mê điệp dễ được lật thẻ, lễ vật cho Thái hậu, và đồ bài trí phòng.' },
   { el: 'center', title: 'Ngồi ở đình Ngự hoa viên', text: 'Trong đình bát giác ở Ngự hoa viên có 3 đôn sứ. Bấm vào đôn để ngồi, bấm xuống đất để đứng dậy nhường chỗ. Chỗ tụ tập tán gẫu của các tỷ muội.' },
-  { isNew: 1, el: 'center', title: 'Hết lượt vẫn có việc làm', text: '<b>Câu cá</b> ở hồ Ngự hoa viên miễn phí, không tốn lượt: cá bán lấy bạc (15 con đầu mỗi ngày), hiếm khi gặp <b>cá chép vàng</b> để dâng Hoàng thượng.<br><br>Bấm vào <b>Thái hậu, Quế ma ma, Thái y, Tổng quản</b> để trò chuyện, biếu quà. Thân thiết càng sâu càng được giúp đỡ, và họ <b>nhớ</b> chủ tử đã làm gì.' },
-  { el: () => [...document.querySelectorAll('#acts button')].find(b => b.textContent.includes('Tỷ muội')), isNew: 1, title: 'Kết nghĩa tỷ muội', text: 'Mở Danh sách hậu cung, bấm <b>💞 Kết nghĩa</b> để lập nhóm tối đa 4 người: có kênh chat riêng, góp bạc may áo dâng Thái hậu, cầu tình khi tỷ muội vào lãnh cung, cùng diễn ở yến tiệc được thưởng thêm. Tỷ muội không được ra tay với nhau.' },
+  { isNew: 3, el: 'center', title: 'Hết lượt vẫn có việc làm', text: '<b>Câu cá</b> ở hồ Ngự hoa viên miễn phí, không tốn lượt: cá bán lấy bạc (15 con đầu mỗi ngày), hiếm khi gặp <b>cá chép vàng</b> để dâng Hoàng thượng.<br><br>Bấm vào <b>Thái hậu, Quế ma ma, Thái y, Tổng quản</b> để trò chuyện, biếu quà. Thân thiết càng sâu càng được giúp đỡ, và họ <b>nhớ</b> chủ tử đã làm gì.' },
+  { el: () => [...document.querySelectorAll('#acts button')].find(b => b.textContent.includes('Tỷ muội')), isNew: 3, title: 'Kết nghĩa tỷ muội', text: 'Mở Danh sách hậu cung, bấm <b>💞 Kết nghĩa</b> để lập nhóm tối đa 4 người: có kênh chat riêng, góp bạc may áo dâng Thái hậu, cầu tình khi tỷ muội vào lãnh cung, cùng diễn ở yến tiệc được thưởng thêm. Tỷ muội không được ra tay với nhau.' },
+  { isNew: 4, el: 'center', title: 'Long thai và ngôi Hoàng hậu', text: 'Được lật thẻ có thể <b>mang long thai</b>. Nhờ Thái y bắt mạch, uống thuốc an thai mỗi ngày. Sau 3 ngày sinh hoàng tự: lên bậc, mỗi ngày thêm 1 lượt. Coi chừng kẻ ra tay hại thai!<br><br>Từ <b>Tần</b> trở lên được ứng cử <b>Hoàng hậu</b>. Định kỳ cả cung tiến cử ở Từ Ninh cung. Hoàng hậu được ân xá, phạt cấm túc, thiết yến.' },
+  { isNew: 4, el: '#stats', title: 'Sự kiện tuần, điểm danh, danh hiệu', text: 'Mỗi tuần một <b>sự kiện</b> mới (hoa đăng, đi săn, Phật đản, dịch bệnh, hội câu cá) với việc làm riêng. Đăng nhập liên tục để nhận quà <b>điểm danh</b>, ngày thứ 7 quà to. Vào mục <b>🏅 Danh hiệu</b> để chọn danh hiệu hiện trên đầu.' },
   { el: '#chat', title: 'Trò chuyện', text: 'Gõ rồi nhấn Enter để nói với mọi người cùng chỗ. Xưng "tui", gọi "bà" sẽ tự đổi thành <b>thần thiếp</b>, <b>bổn cung</b>, <b>tỷ tỷ</b>.' },
   { el: '#newsbtn', title: 'Bảng tin hậu cung', text: 'Tin mới trong cung: ai vừa được tấn phong, đêm nay ai được lật thẻ, vụ án nào bị lật.' },
   { el: '#musicbtn', title: 'Nhạc nền', text: 'Bật hoặc tắt nhạc. Mỗi nơi có nhạc riêng.' },
@@ -542,10 +557,10 @@ const TOUR = [
 let tourOn = false;
 function startTour(force) {
   if (tourOn || !me || !world) return;
-  const key = 'mph_tour3_' + me.id;
+  const key = 'mph_tour4_' + me.id;
   try { if (!force && localStorage.getItem(key)) return; } catch {}
   if (cutActive || stage || !$('modal').classList.contains('hidden')) { if (!force) setTimeout(() => startTour(), 1500); return; }
-  let T = TOUR; try { if (!force && localStorage.getItem('mph_tour2_' + me.id)) T = TOUR.filter(st => st.isNew); } catch {}
+  let T = TOUR; try { const seen = localStorage.getItem('mph_tour3_' + me.id) ? 3 : localStorage.getItem('mph_tour2_' + me.id) ? 2 : 0; if (!force && seen) T = TOUR.filter(st => (st.isNew || 0) > seen); } catch {}
   tourOn = true; let i = 0;
   const wrap = document.createElement('div'); wrap.id = 'tour';
   wrap.innerHTML = '<div class="hole"></div><div class="tip"><div class="step"></div><h4></h4><div class="txt"></div><div class="btns"><button class="skip">Bỏ qua</button><button class="gold next">Tiếp tục</button></div></div>';
@@ -677,8 +692,8 @@ async function renderNotebook() {
   nbEl.onclick = null;
   const S = analyse(c), left = S.filter(s => !s.out);
   nbEl.innerHTML = `
-  <div class="nbhead"><div><b>⚖️ ${esc(c.methodName)}</b><small>Tội danh: ${esc(c.crime)}</small></div><button class="nbx" title="Thu gọn">–</button></div>
-  ${c.status === 'open' ? `<div class="nbtime">⏳ Phiên xử ở Từ Ninh cung sau <b id="nbTimer">${fmtLeft(c.deadline - Date.now())}</b></div>` : c.reopen ? '<div class="nbtime">📜 Kêu oan từ lãnh cung: chỉ đúng thủ phạm sẽ được phục vị</div>' : '<div class="nbtime">Vụ án đã khép</div>'}
+  <div class="nbhead"><div><b>⚖️ ${esc(c.methodName)}</b><small>${c.thai ? '🤰 Kẻ nào đó mưu hại long thai' : 'Tội danh: ' + esc(c.crime)}</small></div><button class="nbx" title="Thu gọn">–</button></div>
+  ${c.status === 'open' ? `<div class="nbtime">⏳ ${c.thai ? 'Long thai chỉ giữ được thêm' : 'Phiên xử ở Từ Ninh cung sau'} <b id="nbTimer">${fmtLeft(c.deadline - Date.now())}</b></div>` : c.reopen ? '<div class="nbtime">📜 Kêu oan từ lãnh cung: chỉ đúng thủ phạm sẽ được phục vị</div>' : '<div class="nbtime">Vụ án đã khép</div>'}
   <div class="cards">${S.map(s => `<div class="sus ${s.out ? 'out' : ''} ${!s.out && left.length === 1 ? 'top' : ''}" data-id="${esc(s.id)}">
     <img class="pt" data-m="${esc(s.model)}" alt=""><div class="sn">${esc(s.name)}</div>
     ${s.chips.map(x => `<div class="chip ${x.st}" title="${TRAIT_NAME[x.t]}">${TRAIT_ICON[x.t]} ${esc(x.word)}</div>`).join('')}
@@ -689,7 +704,7 @@ async function renderNotebook() {
   ${c.witness ? `<div class="cl wit">• <b>Nhân chứng ${esc(c.witness.name)}:</b> ${esc(c.witness.text)} <i>(có thể khai gian)</i></div>` : ''}</div>
   ${open ? `<div class="nbacts">${CLUE_BTNS.filter(([k]) => !c.found.some(f => f.kind === k)).map(([k, n, sub, loc, locName, who]) => me.lanh ? `<button data-clue="${k}">${n}<small>${sub}</small></button>` : world?.loc === loc ? `<button class="here" data-here="${k}">${n}<small>✨ Đang ở ${locName}: bấm vào ${who} có dấu 🔍</small></button>` : `<button data-go="${loc}">${n}<small>${sub} · đi tới ${locName} ➜</small></button>`).join('')}
     ${c.witness ? '' : c.witnessWait ? `<button disabled>⏳ Đang chờ ${esc(c.witnessWait)} khai…<small>tối đa 5 phút, quá hạn sẽ tự khai</small></button>` : '<button id="nbWit">🙋 Nhờ người làm chứng<small>1 lượt · người thật tự chọn lời khai, có thể khai gian</small></button>'}
-    ${c.status === 'open' ? '<button id="nbConf">🙇 Nhận tội<small>giảm nhẹ: cấm túc 1 ngày hoặc giáng 1 bậc</small></button>' : ''}
+    ${c.status === 'open' && !c.thai ? '<button id="nbConf">🙇 Nhận tội<small>giảm nhẹ: cấm túc 1 ngày hoặc giáng 1 bậc</small></button>' : ''}
     <button class="gold big" id="nbTrial">⚖️ Ra phiên xử<small>buộc tội trước mặt Thái hậu · chỉ 1 lần</small></button></div>` : ''}`;
   nbEl.querySelector('.nbx').onclick = (e) => { e.stopPropagation(); nbMin = true; renderNotebook(); };
   nbEl.querySelectorAll('[data-clue]').forEach(b => b.onclick = () => socket.emit('case', { caseId: c.id, op: 'clue', kind: b.dataset.clue }));
@@ -1328,6 +1343,8 @@ async function npcMenu(n) {
   if (k === 'thaihau' && !me.thinhAn) opts.push(['🙇 Thỉnh an', 'th', 'gold']);
   if (k === 'thaiy' && me.cases[0] && clueOpen('thaiy')) opts.push(['⚕️ Nhờ kiểm nghiệm tang vật', 'clue', 'gold']);
   if (k === 'tonggiam' && me.cases[0] && clueOpen('so')) opts.push(['📖 Xem sổ quà Nội vụ phủ', 'clue', 'gold']);
+  if (k === 'thaiy' && !me.relDayMach) opts.push(['🩺 Bắt mạch', 'mach', me.thai ? '' : 'gold']);
+  if (k === 'thaiy' && me.thai) opts.push([me.thai.antai ? '🍵 Hôm nay đã uống thuốc an thai' : `🍵 Uống thuốc an thai (${me.event?.id === 'dichbenh' ? 'miễn phí' : '20 bạc'})`, 'antai', me.thai.antai ? '' : 'gold']);
   opts.push([day[k + ':talk'] ? '💬 Trò chuyện' : '💬 Trò chuyện (+thân thiết)', 'talk', '']);
   opts.push([day[k + ':gift'] ? '🎁 Đã biếu quà hôm nay' : '🎁 Biếu quà (30 bạc)', 'gift', '']);
   opts.push(['Thôi', 'x', '']);
@@ -1335,6 +1352,7 @@ async function npcMenu(n) {
   const op = opts[i][1]; dlgClose();
   if (op === 'th') return thinhAn();
   if (op === 'clue') return k === 'thaiy' ? clueThaiY(n) : clueSoQua(n);
+  if (op === 'mach' || op === 'antai') return socket.emit('npc', { npc: k, op });
   if (op === 'talk' || op === 'gift') { if (op === 'gift' && day[k + ':gift']) return toast('Hôm nay đã biếu quà rồi.'); socket.emit('npc', { npc: k, op }); }
 }
 socket.on('npcTalk', async d => { await say(NPC_MODEL[d.npc], { thaihau: 'Thái hậu', mama: 'Quế ma ma', thaiy: 'Thái y', tonggiam: 'Tổng quản Lý Đức Toàn' }[d.npc], `${esc(d.line)}<br><small>Quan hệ: ${relWord(d.rel)} (${d.rel})${d.first || d.gift ? ' · đã tăng' : ''}</small>`, [['Lui', 0, 'gold']]); dlgClose(); });
@@ -1406,3 +1424,44 @@ function openSis() {
 // nút đổi kênh chat
 { const b = document.createElement('button'); b.id = 'chBtn'; b.title = 'Đổi kênh: chung / tỷ muội'; b.textContent = '🗨'; $('chat').appendChild(b);
   b.onclick = () => { if (!me?.group) { chatCh = 'all'; return toast('Chưa kết nghĩa tỷ muội nên chỉ có kênh chung.'); } chatCh = chatCh === 'tm' ? 'all' : 'tm'; b.textContent = chatCh === 'tm' ? '💞' : '🗨'; $('chatin').placeholder = chatCh === 'tm' ? 'Nói riêng với tỷ muội… (Enter)' : 'Nói gì đó… (Enter để gửi)'; $('chat').classList.toggle('tm', chatCh === 'tm'); }; }
+
+// ---------------- giai đoạn 3: Hoàng hậu, bầu phượng ấn, danh hiệu ----------------
+function openVote() {
+  const v = me.hhVote; if (!v) return toast('Hiện không bầu phượng ấn.');
+  const here = world?.loc === 'tuninh';
+  modal(`<button class="close" onclick="window._close()">✕</button><h3>👑 Bầu phượng ấn</h3>
+  <div style="color:var(--muted);font-size:12.5px">Còn ${Math.max(1, Math.ceil((v.end - Date.now()) / 3600e3))} giờ. Điểm = số người tiến cử × 15 + hài lòng của Thái hậu + thân thiết với Thái hậu + sủng ái + hoàng tự. Mỗi người tiến cử 1 người (đổi được), không tự tiến cử mình.</div>
+  <table><tr><th>Ứng cử</th><th>Tiến cử</th><th>Hoàng tự</th><th>Điểm</th><th></th></tr>${v.cands.map(c => `<tr><td>${esc(c.name)}</td><td>${c.votes}</td><td>${c.children || '–'}</td><td><b>${c.score}</b></td><td>${c.id === me.id ? '<small>bổn cung</small>' : v.mine === c.id ? '<span style="color:#e8c25a">✓ đã chọn</span>' : here ? `<button data-v="${c.id}">Tiến cử</button>` : ''}</td></tr>`).join('')}</table>
+  ${here ? '' : '<div class="btns"><button class="gold" id="goTN">Đến Từ Ninh cung để tiến cử ➜</button></div>'}`);
+  $('mcard').querySelectorAll('[data-v]').forEach(b => b.onclick = () => { socket.emit('hh', { op: 'vote', who: b.dataset.v }); closeModal(); });
+  const g = $('goTN'); if (g) g.onclick = () => { socket.emit('goto', 'tuninh'); closeModal(); };
+}
+let hhMode = null;
+function openHH() {
+  if (!me.isHH) return; const d = me.hhDay || {};
+  modal(`<button class="close" onclick="window._close()">✕</button><h3>👑 Quyền Hoàng hậu</h3>
+  <div style="color:var(--muted);font-size:12.5px">Mỗi quyền dùng 1 lần mỗi ngày. Hoàng hậu bị giáng cấp hay vào lãnh cung thì mất phượng ấn. Mỗi ngày được thêm ${100} bạc và 2 lượt.</div>
+  <div class="btns" style="flex-direction:column;align-items:stretch">
+    <button data-h="anxa" ${d.anxa ? 'disabled' : ''}>🕊 Ân xá<small style="display:block;color:var(--muted)">Cho một người ra khỏi cấm túc hoặc lãnh cung${d.anxa ? ' · hôm nay đã dùng' : ''}</small></button>
+    <button data-h="phat" ${d.phat ? 'disabled' : ''}>🔒 Phạt cấm túc 6 giờ<small style="display:block;color:var(--muted)">Không phạt được người mang long thai hay đang được bảo hộ${d.phat ? ' · hôm nay đã dùng' : ''}</small></button>
+    <button data-h="yentiec" ${d.yentiec ? 'disabled' : ''}>🎎 Thiết yến ngay<small style="display:block;color:var(--muted)">Mở yến tiệc 10 phút trong điện cho cả cung${d.yentiec ? ' · hôm nay đã dùng' : ''}</small></button>
+  </div>`);
+  $('mcard').querySelectorAll('[data-h]').forEach(b => b.onclick = () => { const op = b.dataset.h; if (op === 'yentiec') { socket.emit('hh', { op }); closeModal(); } else { hhMode = op; socket.emit('roster'); } });
+}
+socket.on('roster', r => {
+  if (!hhMode) return; const op = hhMode; hhMode = null;
+  const list = r.list.filter(p => p.id !== me.id && (op === 'anxa' ? (p.lanh || p.camTuc) : (!p.lanh && !p.camTuc && !p.thai)));
+  modal(`<button class="close" onclick="window._close()">✕</button><h3>${op === 'anxa' ? '🕊 Ân xá cho ai?' : '🔒 Phạt ai cấm túc?'}</h3>
+  ${op === 'phat' ? '<label>Lý do (cả cung sẽ đọc trên bảng tin)</label><input id="hhWhy" maxlength="40" placeholder="thất lễ với bổn cung">' : ''}
+  <table>${list.map(p => `<tr><td>${esc(p.name)}</td><td>${esc(p.rankName)}</td><td><button data-p="${p.id}">${op === 'anxa' ? 'Ân xá' : 'Phạt'}</button></td></tr>`).join('') || `<tr><td>${op === 'anxa' ? 'Không có ai đang bị phạt.' : 'Không có ai để phạt.'}</td></tr>`}</table>`);
+  $('mcard').querySelectorAll('[data-p]').forEach(b => b.onclick = () => { socket.emit('hh', { op, who: b.dataset.p, why: $('hhWhy')?.value || '' }); closeModal(); });
+});
+function openAch() {
+  const A = me.ach || [];
+  modal(`<button class="close" onclick="window._close()">✕</button><h3>🏅 Danh hiệu</h3>
+  <div style="color:var(--muted);font-size:12.5px">Đạt danh hiệu nào thì chọn để hiện trên đầu nhân vật cho cả cung thấy.</div>
+  <table>${A.map(a => `<tr style="${a.got ? '' : 'opacity:.6'}"><td>${a.got ? '🏅' : '🔒'} <b>${esc(a.name)}</b><br><small>${esc(a.desc)}</small></td><td>${a.cur}/${a.need}</td><td>${a.got ? (me.titleSel === a.id ? '<span style="color:#e8c25a">✓ đang hiện</span>' : `<button data-t="${a.id}">Hiện</button>`) : ''}</td></tr>`).join('')}</table>
+  <div class="btns">${me.titleSel ? '<button id="tOff">Ẩn danh hiệu</button>' : ''}<span style="color:var(--muted);font-size:12px;align-self:center">📅 Điểm danh liên tục: ${me.streak || 0} ngày</span></div>`);
+  $('mcard').querySelectorAll('[data-t]').forEach(b => b.onclick = () => { socket.emit('title', b.dataset.t); closeModal(); });
+  const o = $('tOff'); if (o) o.onclick = () => { socket.emit('title', ''); closeModal(); };
+}

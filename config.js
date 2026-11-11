@@ -89,6 +89,28 @@ module.exports = {
     { id: 'canh', name: 'Thuốc độc trong chén canh', crime: 'đầu độc phi tần' },
     { id: 'bua', name: 'Bùa yểm có tên Thái hậu', crime: 'yểm bùa nguyền rủa Thái hậu' },
   ],
+  // ---------- giai đoạn 3 ----------
+  THAI_CHANCE: 0.3,            // tỉ lệ mang long thai sau mỗi lần được lật thẻ
+  THAI_DAYS: 3,                // thai kỳ (ngày thật) tính từ lúc Thái y báo hỷ
+  THAI_CASE_HOURS: 12,         // thời hạn tìm kẻ hãm hại long thai
+  THAI_METHODS: [
+    { id: 'honghoa', name: 'Hồng hoa trộn trong thuốc an thai', crime: 'mưu hại long thai' },
+    { id: 'xahuong2', name: 'Gối thêu nhồi xạ hương', crime: 'mưu hại long thai' },
+  ],
+  CHILD_NAMES: { trai: ['Vĩnh Kỳ', 'Vĩnh Hoằng', 'Vĩnh Diễm', 'Vĩnh Thành', 'Vĩnh Tinh', 'Vĩnh Lân'], gai: ['Hòa Kính', 'Hòa Gia', 'Cố Luân', 'Hòa Thạc', 'Minh Châu', 'Ngọc Dung'] },
+  HH_MIN_RANK: 5,              // từ Tần trở lên được ứng cử Hoàng hậu
+  HH_CYCLE_DAYS: 14,           // bao lâu bầu phượng ấn một lần
+  HH_VOTE_HOURS: 24,           // thời gian tiến cử
+  HH_DAILY: { silver: 100, turns: 2 },
+  LOGIN_REWARD: [20, 30, 40, 50, 60, 80, 200], // bạc điểm danh ngày 1..7 (ngày 7 thêm 1 lượt, 10 sủng ái)
+  KEEPALIVE_HOURS: [7, 24],    // giờ VN giữ server thức (ngoài giờ này server được ngủ để tiết kiệm giờ miễn phí của Render)
+  EVENTS: [
+    { id: 'hoadang', name: 'Lễ hoa đăng', desc: 'Cả tuần thả hoa đăng ở hồ Ngự hoa viên cầu may, mỗi ngày một lần.', loc: 'hoavien', act: '🏮 Thả hoa đăng', sub: 'Miễn phí · mỗi ngày 1 lần · cầu may' },
+    { id: 'disan', name: 'Hoàng thượng đi săn', desc: 'Thắng yến tiệc được thưởng gấp đôi. Ra Dưỡng Tâm điện tiễn giá mỗi ngày.', loc: 'duongtam', act: '🏹 Tiễn giá Hoàng thượng', sub: 'Miễn phí · mỗi ngày 1 lần · sủng ái +5' },
+    { id: 'phatdan', name: 'Lễ Phật đản', desc: 'Thỉnh an được gấp đôi hài lòng. Chép kinh ở Từ Ninh cung dâng Thái hậu.', loc: 'tuninh', act: '📿 Chép kinh dâng Thái hậu', sub: '1 lượt · mỗi ngày 1 lần · hài lòng +5' },
+    { id: 'dichbenh', name: 'Dịch bệnh trong cung', desc: 'Thuốc an thai miễn phí. Phát thuốc cho cung nhân ở Ngự hoa viên để lập công.', loc: 'hoavien', act: '🌿 Phát thuốc cho cung nhân', sub: '20 bạc · mỗi ngày 1 lần · công trạng +12' },
+    { id: 'hoica', name: 'Hội câu cá mùa thu', desc: 'Cá chép vàng xuất hiện nhiều gấp 3, cá bán đắt hơn. Ai câu nhiều nhất tuần được Hoàng thượng thưởng.', loc: null },
+  ],
   // đặc điểm để loại trừ nghi phạm
   TRAITS: {
     cung: ['Đông lục cung', 'Tây lục cung', 'Ngự hoa viên lâu các'],
