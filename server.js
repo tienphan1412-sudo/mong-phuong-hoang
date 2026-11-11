@@ -351,9 +351,9 @@ function feastView() {
   const f = DB.state.feast; if (!f || f.done || now() > f.end + 5000) return null;
   return { id: f.id, end: f.end, n: Object.keys(f.entries).length, names: Object.values(f.entries).map(e => e.name) };
 }
-function startFeast(min = C.FEAST_MIN) {
-  DB.state.feast = { id: 'yt' + now(), start: now(), end: now() + min * 60e3, entries: {}, done: false };
-  news(`🎎 Yến tiệc ở Ngự hoa viên bắt đầu! Hoàng thượng ngự giá, ai dâng tiết mục hay nhất sẽ được trọng thưởng (${min} phút).`, 'yentiec');
+function startFeast(min = C.FEAST_MIN, venue = 'out') {
+  DB.state.feast = { id: 'yt' + now(), start: now(), end: now() + min * 60e3, entries: {}, done: false, venue };
+  news(`🎎 Yến tiệc ${venue === 'in' ? 'trong điện' : 'ngoài trời ở Ngự hoa viên'} bắt đầu! Hoàng thượng ngự giá, ai dâng tiết mục hay nhất sẽ được trọng thưởng (${min} phút).`, 'yentiec');
   io.emit('feast', feastView()); save();
 }
 function endFeast() {
@@ -365,13 +365,14 @@ function endFeast() {
     for (const e of list.slice(1)) { const q = P(e.id); if (q) { q.silver += 20; push(q); } }
     news(`🏮 Yến tiệc tàn. Hoàng thượng khen tiết mục ${list[0].tai} của ${list[0].name} xuất sắc nhất, ban thưởng sủng ái, 80 lượng bạc.`, 'phong');
   } else news('Yến tiệc tàn mà không ai dâng tiết mục, Hoàng thượng phẩy tay hồi cung.', 'yentiec');
+  setTimeout(() => { for (const [id, sk] of online) { const q = P(id); if (q && q.loc === 'yentiec') { enter(q, 'hoavien', sk); push(q); } } }, 6000);
   io.emit('feastEnd', { winner: list[0] ? { id: list[0].id, name: list[0].name, tai: list[0].tai } : null }); save();
 }
 function feastTick(mins, k) {
   const f = DB.state.feast;
   if (f && !f.done && now() > f.end) endFeast();
   DB.state.feastDone = DB.state.feastDone || {};
-  C.FEAST_SLOTS.forEach(([h, m], i) => { const key = k + ':' + i, st = h * 60 + m; if (mins >= st && mins < st + C.FEAST_MIN && !DB.state.feastDone[key]) { DB.state.feastDone[key] = 1; startFeast(C.FEAST_MIN - (mins - st)); } });
+  C.FEAST_SLOTS.forEach(([h, m, venue], i) => { const key = k + ':' + i, st = h * 60 + m; if (mins >= st && mins < st + C.FEAST_MIN && !DB.state.feastDone[key]) { DB.state.feastDone[key] = 1; startFeast(C.FEAST_MIN - (mins - st), venue); } });
 }
 // hầu chuyện Hoàng thượng trong tẩm cung: điểm mỗi lựa chọn theo tâm trạng [vui, mệt, buồn]
 const HT_TALK = [
@@ -404,16 +405,22 @@ function nightTick() {
 }
 
 // ---------------- vị trí, phòng ----------------
-const LOCS = ['tuninh', 'hoavien', 'duongtam', 'phong', 'tamcung', 'lanhcung'];
+const LOCS = ['tuninh', 'hoavien', 'duongtam', 'phong', 'tamcung', 'lanhcung', 'yentiec'];
+// ghế ngồi: loc -> { seatId: playerId }
+const SEATS = {}; const SEAT_IDS = { hoavien: ['hv0', 'hv1', 'hv2'], yentiec: ['f0', 'f1', 'f2', 'f3', 'f4', 'f5', 'f6', 'f7'] };
+function freeSeat(p) { for (const loc in SEATS) for (const k in SEATS[loc]) if (SEATS[loc][k] === p.id) delete SEATS[loc][k]; p.seat = null; }
+function takeSeat(p, id) { const L = (SEATS[p.loc] = SEATS[p.loc] || {}); if (!(SEAT_IDS[p.loc] || []).includes(id)) return false; if (L[id] && L[id] !== p.id && online.has(L[id])) return false; freeSeat(p); L[id] = p.id; p.seat = id; p.anim = 'sit:' + id; return true; }
 function roomOf(p) { return p.loc === 'phong' ? 'phong:' + p.id : p.loc; }
 function enter(p, loc, sock) {
-  const old = roomOf(p);
+  const old = roomOf(p); freeSeat(p);
   sock.leave(old); sock.to(old).emit('pleave', p.id);
   p.loc = loc; p.x = 0; p.z = loc === 'tuninh' ? 3.5 : 2; p.ry = Math.PI; p.anim = 'dung_cho';
   const room = roomOf(p);
   sock.join(room);
   const others = [...online.keys()].map(P).filter(q => q && q.id !== p.id && roomOf(q) === room).map(publicView);
-  sock.emit('scene', { loc, players: others });
+  let seat = null;
+  if (loc === 'yentiec') { const free = SEAT_IDS.yentiec.find(id => !(SEATS.yentiec || {})[id] || !online.has(SEATS.yentiec[id])); if (free) { takeSeat(p, free); seat = free; } }
+  sock.emit('scene', { loc, players: others, venue: DB.state.feast?.venue || 'out', seat });
   sock.to(room).emit('pjoin', publicView(p));
 }
 
@@ -433,7 +440,7 @@ io.on('connection', sock => {
       setTimeout(() => sock.emit('cutscene', { type: 'phatgiac', caseId: c.id, method: c.method, methodName: c.methodName, crime: c.crime, hours: c.hours }), 2500);
     }
     push(p);
-    const back = p.lanh ? 'lanhcung' : (p.loc === 'tamcung' && p.tamCungUntil > now() ? 'tamcung' : (p.loc && p.loc !== 'tamcung' ? p.loc : 'hoavien'));
+    const back = p.lanh ? 'lanhcung' : (p.loc === 'tamcung' && p.tamCungUntil > now() ? 'tamcung' : (p.loc && p.loc !== 'tamcung' && !(p.loc === 'yentiec' && !(DB.state.feast && !DB.state.feast.done)) ? p.loc : 'hoavien'));
     if (p.outfit === 'aongu' && back !== 'tamcung' && back !== 'phong') p.outfit = p.lanh ? 'tunu' : C.RANKS[p.rank].outfit;
     enter(p, back, sock);
     tryPromote(p); save();
@@ -475,15 +482,18 @@ io.on('connection', sock => {
     if (me.lanh && loc !== 'lanhcung') return toast(me, 'Người ở lãnh cung không được ra ngoài.', 'bad');
     if (!me.lanh && loc === 'lanhcung') return toast(me, 'Lãnh cung không phải nơi tùy tiện lui tới.');
     if (loc === 'tamcung' && !(me.tamCungUntil > now())) return toast(me, 'Chỉ người được lật thẻ mới vào tẩm cung đêm nay.');
+    if (loc === 'yentiec' && !(DB.state.feast && !DB.state.feast.done)) return toast(me, 'Hiện không có yến tiệc.');
     if (loc === 'tamcung') me.outfit = 'aongu';
     else if (me.outfit === 'aongu' && loc !== 'phong') me.outfit = me.lanh ? 'tunu' : C.RANKS[me.rank].outfit;
     enter(me, loc, sock); push(me);
   });
   sock.on('move', d => {
     if (!me) return;
-    me.x = +d.x || 0; me.z = +d.z || 0; me.ry = +d.ry || 0; me.anim = String(d.anim || 'dung_cho').slice(0, 20);
+    me.x = +d.x || 0; me.z = +d.z || 0; me.ry = +d.ry || 0; me.anim = String(d.anim || 'dung_cho').slice(0, 20); if (me.seat) freeSeat(me);
     sock.to(roomOf(me)).emit('pmove', { id: me.id, x: me.x, z: me.z, ry: me.ry, anim: me.anim });
   });
+  sock.on('sit', d => { if (!me) return; if (!takeSeat(me, String(d?.seat || ''))) return toast(me, 'Ghế này đã có người ngồi.'); sock.emit('sitOk', { seat: me.seat }); sock.to(roomOf(me)).emit('pmove', { id: me.id, x: me.x, z: me.z, ry: me.ry, anim: me.anim }); });
+  sock.on('stand', () => { if (!me || !me.seat) return; freeSeat(me); me.anim = 'dung_cho'; sock.to(roomOf(me)).emit('pmove', { id: me.id, x: me.x, z: me.z, ry: me.ry, anim: 'dung_cho' }); });
   sock.on('emote', a => { if (me) { me.anim = String(a).slice(0, 20); sock.to(roomOf(me)).emit('pmove', { id: me.id, x: me.x, z: me.z, ry: me.ry, anim: me.anim, once: true }); } });
   sock.on('chat', t => {
     if (!me) return;
@@ -588,12 +598,12 @@ io.on('connection', sock => {
       } else return;
     } else if (a === 'yentiec') {
       const f = DB.state.feast; if (!f || f.done || now() > f.end) return toast(me, 'Hiện không có yến tiệc.');
-      if (me.loc !== 'hoavien') return toast(me, 'Yến tiệc ở Ngự hoa viên.');
+      if (me.loc !== 'yentiec') return toast(me, 'Vào yến tiệc mới dâng tiết mục được.');
       if (f.entries[me.id]) return toast(me, 'Bổn cung đã dâng tiết mục rồi.');
       const q = Math.max(0, Math.min(1, +d.q || 0)), tai = C.HT.tai.includes(d.tai) ? d.tai : 'múa';
       f.entries[me.id] = { name: title(me), q, tai, color: colorMatch(me) };
       addPts(me, 5); toast(me, `Đã dâng tiết mục ${tai}. Chờ Hoàng thượng ban thưởng khi tiệc tàn.`, 'good');
-      io.to('hoavien').emit('feastUpdate', feastView());
+      io.emit('feastUpdate', feastView());
     } else if (a === 'phephi') {
       if (!me.lanh) return; if (me.phephiToday) return toast(me, 'Phế phi đã ngủ thiếp đi, mai hãy hỏi.');
       me.phephiToday = true; const s = sockOf(me.id);
@@ -654,7 +664,7 @@ io.on('connection', sock => {
   });
   sock.on('disconnect', () => {
     if (!me) return;
-    if (online.get(me.id) === sock) { online.delete(me.id); sock.to(roomOf(me)).emit('pleave', me.id); }
+    if (online.get(me.id) === sock) { freeSeat(me); online.delete(me.id); sock.to(roomOf(me)).emit('pleave', me.id); }
     me.lastSeen = now(); save();
   });
 });
@@ -662,7 +672,7 @@ io.on('connection', sock => {
 function admin(p, text) {
   const [cmd, arg, ...rest] = text.split(/\s+/);
   if (cmd === '/latthe') latThe(arg ? 'Trưa nay' : 'Đêm nay');
-  else if (cmd === '/yentiec') { if (DB.state.feast && !DB.state.feast.done) endFeast(); else startFeast(+arg || 3); }
+  else if (cmd === '/yentiec') { if (DB.state.feast && !DB.state.feast.done) endFeast(); else startFeast(+arg || 3, (rest[0] || '') === 'trong' ? 'in' : 'out'); }
   else if (cmd === '/diemcho') {
     const who = rest.join(' ').toLowerCase(); const q = Object.values(DB.players).find(x => x.name.toLowerCase() === who || x.user === who);
     if (!q) return toast(p, 'Không tìm thấy người tên ' + who, 'bad'); addPts(q, +arg || 100); push(q);

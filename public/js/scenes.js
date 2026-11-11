@@ -187,7 +187,9 @@ function garden(o) {
   const fin = new THREE.Mesh(new THREE.SphereGeometry(.15, 12, 8), m.gold); fin.position.y = 3.4; pv.add(fin);
   box(pv, 2.9, .06, .06, m.gold, 0, 2.25, 0).rotation.y = 0;
   const tb = DECOR.banTra.make(); tb.position.set(0, .25, 0); pv.add(tb);
-  for (const a of [0, 2.1, 4.2]) { const s = DECOR.ghedon.make(); s.position.set(Math.cos(a) * .7, .25, Math.sin(a) * .7); pv.add(s); }
+  o.seats = [];
+  [0, 2.1, 4.2].forEach((a, i) => { const s = DECOR.ghedon.make(); s.position.set(Math.cos(a) * .72, .25, Math.sin(a) * .72); pv.add(s);
+    o.seats.push({ id: 'hv' + i, x: 4 + Math.cos(a) * .72, z: -3 + Math.sin(a) * .72, ry: Math.atan2(-Math.cos(a), -Math.sin(a)), top: .65, kind: 'chair', obj: s }); });
   // cây hoa đào
   const tree = (x, z, s = 1, pink = true) => { const tg = new THREE.Group(); tg.position.set(x, 0, z); tg.scale.setScalar(s); g.add(tg); const tr = cyl(tg, .08, .14, 1.6, m.trunk, 0, .8, 0, 8); tr.rotation.z = rnd(-.15, .15); for (let k = 0; k < 7; k++) { const f = new THREE.Mesh(new THREE.IcosahedronGeometry(rnd(.45, .7), 1), pink ? m.blossom : m.leaf); f.position.set(rnd(-.6, .6), rnd(1.5, 2.3), rnd(-.6, .6)); tg.add(f); } };
   for (const [x, z, s, p] of [[-2, 4, 1, true], [2.5, 4.5, .9, true], [-7, 3, 1.2, false], [7, 2, 1.1, true], [-1.8, -5, 1, false], [2.2, -6, 1.2, true], [8, -6, 1.1, false], [-8, -5, 1, true], [5, 6, 1, false]]) tree(x, z, s, p);
@@ -201,7 +203,8 @@ function garden(o) {
   const sun = new THREE.DirectionalLight(0xfff2d8, 3); sun.position.set(6, 10, 5); sun.castShadow = true; sun.shadow.mapSize.set(2048, 2048); Object.assign(sun.shadow.camera, { left: -12, right: 12, top: 12, bottom: -12 }); g.add(sun);
   o.lights = { hemi: [0xdff0ff, 0x6a7a4a, 1.8], bg: 0xa9d3ea, fog: [0xcfe3ea, .02], exposure: 1.2 };
   o.bounds = { minX: -9, maxX: 9, minZ: -9, maxZ: 9 };
-  o.blocks = [{ x: -4.5, z: -1, r: 3.1 }, { x: 4, z: -3, r: 1.9 }];
+  o.blocks = [{ x: -4.5, z: -1, r: 3.1 }, { x: 4, z: -3, r: .55 }, ...o.seats.map(s => ({ x: s.x, z: s.z, r: .2 }))];
+  o.floorAt = (x, z) => Math.hypot(x - 4, z + 3) < 1.72 ? .25 : 0;
   o.spawn = { x: 0, z: 2 };
   o.cam = { dist: 4, height: 2.2 };
 }
@@ -270,6 +273,108 @@ function coldPalace(o) {
   o.cam = { dist: 3.6, height: 2 };
 }
 
+// ---------- yến tiệc: ngoài trời (Ngự hoa viên trang hoàng) hoặc trong điện ----------
+const FEAST_NPC = [['Lệ Tần', 'tan'], ['Hân Quý nhân', 'quynhan'], ['Uyển Quý nhân', 'quynhan_lam'], ['Mai Đáp ứng', 'thuongtai']];
+function lowTable(m) {
+  const g = new THREE.Group();
+  box(g, .46, .05, .78, m.red, 0, .27, 0); box(g, .48, .02, .8, m.gold, 0, .30, 0);
+  for (const [x, z] of [[-.19, -.34], [.19, -.34], [-.19, .34], [.19, .34]]) box(g, .05, .25, .05, m.darkRed, x, .125, z);
+  const dish = (x, z, c, r = .07) => { cyl(g, r, r * .7, .025, m.porcelain, x, .325, z, 16); for (let k = 0; k < 4; k++) { const f = new THREE.Mesh(new THREE.SphereGeometry(r * .32, 8, 6), new THREE.MeshStandardMaterial({ color: c, roughness: .6 })); f.position.set(x + (k % 2 - .5) * r * .5, .35, z + (k > 1 ? .5 : -.5) * r * .5); g.add(f); } };
+  dish(0, -.22, 0xd9452a); dish(-.05, .05, 0xf2c94c); dish(.05, .26, 0x8bc34a, .06);
+  cyl(g, .025, .03, .1, m.gold, .14, .36, -.02, 12); cyl(g, .025, .03, .1, m.gold, .14, .36, .1, 12);
+  return shade(g);
+}
+function feastVenue(o, outdoor) {
+  const m = mats(), t = textures(), g = o.group;
+  const throneZ = -4.3;
+  if (outdoor) {
+    const gr = new THREE.Mesh(new THREE.PlaneGeometry(40, 40), new THREE.MeshStandardMaterial({ map: t.grass, roughness: 1 })); gr.rotation.x = -Math.PI / 2; gr.receiveShadow = true; g.add(gr);
+    const yard = new THREE.Mesh(new THREE.PlaneGeometry(8, 11), new THREE.MeshStandardMaterial({ map: t.stone, roughness: .8 })); yard.rotation.x = -Math.PI / 2; yard.position.set(0, .01, -.3); yard.receiveShadow = true; yard.name = 'ground'; g.add(yard);
+    // tường + mái
+    for (const [x, z, w, ry] of [[0, -7, 20, 0], [-8, 0, 20, Math.PI / 2], [8, 0, 20, Math.PI / 2]]) { const wall = new THREE.Group(); wall.position.set(x, 0, z); wall.rotation.y = ry; g.add(wall); box(wall, w, 2.4, .4, m.wall, 0, 1.2, 0); box(wall, w, .18, .8, m.roofTile, 0, 2.5, 0); }
+    // lọng che ngai
+    const cv = new THREE.Group(); cv.position.set(0, 0, throneZ); g.add(cv);
+    for (const x of [-1.3, 1.3]) for (const z of [-.6, .9]) cyl(cv, .06, .06, 2.4, m.red, x, 1.2, z, 12);
+    box(cv, 3, .06, 1.8, m.red, 0, 2.45, .15); box(cv, 3.1, .18, .06, m.gold, 0, 2.35, 1.05);
+    for (let k = 0; k < 9; k++) { const tas = new THREE.Mesh(new THREE.ConeGeometry(.04, .22, 6), m.gold); tas.rotation.x = Math.PI; tas.position.set(-1.4 + k * .35, 2.15, 1.06); cv.add(tas); }
+    // cây đào hai bên
+    const tree = (x, z, sc) => { const tg = new THREE.Group(); tg.position.set(x, 0, z); tg.scale.setScalar(sc); g.add(tg); cyl(tg, .08, .14, 1.6, m.trunk, 0, .8, 0, 8); for (let k = 0; k < 7; k++) { const f = new THREE.Mesh(new THREE.IcosahedronGeometry(rnd(.45, .7), 1), m.blossom); f.position.set(rnd(-.6, .6), rnd(1.5, 2.3), rnd(-.6, .6)); tg.add(f); } };
+    for (const [x, z, sc] of [[-5, -4, 1.2], [5, -4, 1.1], [-5.5, 1, 1], [5.5, 1.5, 1.2], [-5, 4.5, 1], [5, 5, 1.1]]) tree(x, z, sc);
+    const sun = new THREE.DirectionalLight(0xfff2d8, 2.6); sun.position.set(5, 10, 6); sun.castShadow = true; sun.shadow.mapSize.set(2048, 2048); Object.assign(sun.shadow.camera, { left: -9, right: 9, top: 9, bottom: -9 }); g.add(sun);
+    o.lights = { hemi: [0xfff0dc, 0x7a6a4a, 1.9], bg: 0xa9d3ea, fog: [0xd8e6ea, .018], exposure: 1.25 };
+  } else {
+    const W = 8.4, D = 11.6, H = 3.8;
+    const fl = new THREE.Mesh(new THREE.PlaneGeometry(W, D), m.floor); fl.rotation.x = -Math.PI / 2; fl.position.z = -.3; fl.receiveShadow = true; fl.name = 'ground'; g.add(fl);
+    const ce = new THREE.Mesh(new THREE.PlaneGeometry(W, D), m.ceil); ce.rotation.x = Math.PI / 2; ce.position.set(0, H, -.3); g.add(ce);
+    for (const s of [-1, 1]) { box(g, .08, H, D, m.wall, s * (W / 2 + .04), H / 2, -.3); for (let k = 0; k < 5; k++) { const p = new THREE.Mesh(new THREE.PlaneGeometry(1.9, H - .4), m.lattice); p.position.set(s * (W / 2 - .02), (H - .4) / 2, -5 + k * 2.3); p.rotation.y = -s * Math.PI / 2; g.add(p); } }
+    box(g, W, H, .1, m.wall, 0, H / 2, -6.15); box(g, W, H, .1, m.wall, 0, H / 2, 5.55);
+    for (const x of [-3.4, 3.4]) for (const z of [-4.6, -2.3, 0, 2.3, 4.6]) { cyl(g, .2, .2, H, m.red, x, H / 2, z, 24); cyl(g, .3, .32, .12, m.stone, x, .06, z, 24); cyl(g, .215, .215, .05, m.gold, x, H - .35, z, 24); }
+    for (const x of [-3.4, 3.4]) box(g, .22, .32, D, m.beam, x, H - .16, -.3);
+    const pl = new THREE.Mesh(new THREE.PlaneGeometry(2, .7), new THREE.MeshStandardMaterial({ map: plaqueTex('御花宴'), roughness: .5 })); pl.position.set(0, H - .7, -6.08); g.add(pl);
+    const scr = DECOR.binhphong.make(); scr.scale.set(2.2, 2, 2); scr.position.set(0, .37, throneZ - .75); g.add(scr);
+    for (const x of [-2.6, -1, 1, 2.6]) for (const z of [-3.5, -1, 1.5, 4]) lanternHang(g, x, H - .9, z, (x === -1 || x === 1));
+    const key = new THREE.SpotLight(0xfff0d8, 14, 14, Math.PI / 4, .6, 1.2); key.position.set(0, H - .2, 2.5); key.target.position.set(0, .4, -2); key.castShadow = true; key.shadow.mapSize.set(1024, 1024); g.add(key, key.target);
+    o.lights = { hemi: [0xfff0dc, 0x6a3a2a, 1.7], bg: 0x3a1c18, fog: [0x4a2a22, .018], exposure: 1.45 };
+  }
+  // bục + ngai Hoàng thượng
+  box(g, 3.2, .12, 1.8, m.stone, 0, .06, throneZ); box(g, 2.8, .12, 1.5, m.darkRed, 0, .18, throneZ - .06); box(g, 2.4, .12, 1.2, m.darkRed, 0, .3, throneZ - .1);
+  const th = new THREE.Group(); g.add(th);
+  box(th, .8, .08, .55, m.red, 0, 0, 0); box(th, .72, .05, .48, m.cloth, 0, .06, .02); box(th, .8, .62, .07, m.red, 0, .33, -.25); box(th, .84, .06, .1, m.gold, 0, .66, -.25);
+  for (const sd of [-1, 1]) box(th, .07, .28, .5, m.red, sd * .39, .16, 0);
+  th.userData.legs = []; for (const sd of [-1, 1]) for (const z of [-.22, .22]) th.userData.legs.push(box(th, .06, 1, .06, m.red, sd * .35, -.5, z));
+  shade(th); o.throne = th; o.dais = { y: .37, z: throneZ };
+  const ht = lowTable(m); ht.scale.set(1.5, 1, 1.4); ht.rotation.y = Math.PI / 2; ht.position.set(0, .37, throneZ + .75); g.add(ht);
+  // thảm giữa
+  const cp = new THREE.Mesh(new THREE.PlaneGeometry(1.6, 7.6), m.carpet); cp.rotation.x = -Math.PI / 2; cp.position.set(0, .02, -.1); cp.receiveShadow = true; g.add(cp);
+  // hai dãy bàn thấp + đệm ngồi
+  const cushion = new THREE.MeshStandardMaterial({ color: 0xc9a23a, roughness: .7 });
+  const rows = [-2.6, -1.55, -.5, .55, 1.6, 2.65];
+  o.seats = []; o.npcSeats = [];
+  let npcI = 0;
+  for (const sd of [-1, 1]) rows.forEach((z, i) => {
+    const tb = lowTable(m); tb.position.set(sd * 1.45, 0, z); g.add(tb);
+    const cu = new THREE.Mesh(new THREE.BoxGeometry(.48, .07, .48), cushion); cu.position.set(sd * 1.98, .035, z); cu.castShadow = cu.receiveShadow = true; g.add(cu);
+    const seat = { x: sd * 1.98, z, ry: sd < 0 ? Math.PI / 2 : -Math.PI / 2, top: .07, kind: 'floor', obj: cu };
+    if ((i === 0 || i === 3) && npcI < FEAST_NPC.length) { const [name, model] = FEAST_NPC[npcI++]; o.npcSeats.push({ ...seat, name, model }); }
+    else { seat.id = 'f' + o.seats.length; o.seats.push(seat); }
+    if (outdoor) { const pole = new THREE.Group(); pole.position.set(sd * 3.3, 0, z); g.add(pole); cyl(pole, .025, .03, 1.6, m.red, 0, .8, 0, 8); const ln = lanternHang(pole, 0, 1.6, 0, i % 2 === 0); ln.scale.setScalar(.55); }
+  });
+  for (const sd of [-1, 1]) { const lh = DECOR.luhuong.make(); lh.scale.setScalar(1.5); lh.position.set(sd * 1.5, 0, throneZ + .9); g.add(lh); }
+  shade(g);
+  o.stage = { x: 0, z: -2.6, ry: Math.PI }; // chỗ dâng tiết mục, quay mặt về Hoàng thượng
+  o.bounds = { minX: -3.1, maxX: 3.1, minZ: throneZ + 1.3, maxZ: 4.6 };
+  o.blocks = [...rows.flatMap(z => [{ x: -1.45, z, r: .32 }, { x: 1.45, z, r: .32 }])];
+  o.spawn = { x: 0, z: 3.8 };
+  o.cam = { dist: 3.4, height: 1.8 };
+}
+// đạo cụ biểu diễn
+export function makeGuzheng() {
+  const m = mats(), g = new THREE.Group();
+  const body = new THREE.Mesh(new THREE.CylinderGeometry(.55, .55, 1.05, 24, 1, false, Math.PI / 2 - .22, .44), m.wood); body.rotation.z = Math.PI / 2; body.position.y = -.5; body.scale.set(1, 1, 1); g.add(body);
+  const strMat = new THREE.MeshStandardMaterial({ color: 0xf6efe0, roughness: .3, metalness: .4 });
+  for (let k = 0; k < 13; k++) { const z = -.1 + k * .0165; const st = box(g, 1.0, .004, .003, strMat, 0, .063, z); const br = box(g, .012, .03, .012, m.porcelain, -.25 + k * .035, .05, z); }
+  box(g, .05, .03, .26, m.gold, -.48, .055, .006); box(g, .05, .03, .26, m.gold, .48, .055, .006);
+  for (const x of [-.36, .36]) { box(g, .04, .3, .2, m.darkRed, x, -.13, 0); }
+  return shade(g);
+}
+export function makeFan() {
+  const g = new THREE.Group();
+  const tex = (() => { const c = document.createElement('canvas'); c.width = 256; c.height = 128; const x = c.getContext('2d'); const gr = x.createRadialGradient(128, 128, 20, 128, 128, 128); gr.addColorStop(0, '#f6d8d0'); gr.addColorStop(.6, '#d23a3a'); gr.addColorStop(1, '#8a1010'); x.fillStyle = gr; x.fillRect(0, 0, 256, 128); x.strokeStyle = '#f3d27a'; x.lineWidth = 3; for (let k = 0; k <= 12; k++) { const a = Math.PI + k / 12 * Math.PI; x.beginPath(); x.moveTo(128, 128); x.lineTo(128 + Math.cos(a) * 128, 128 + Math.sin(a) * 128); x.stroke(); } x.fillStyle = '#f3d27a'; x.beginPath(); x.arc(70, 70, 10, 0, 7); x.arc(175, 60, 7, 0, 7); x.fill(); return new THREE.CanvasTexture(c); })();
+  tex.colorSpace = THREE.SRGBColorSpace;
+  const fan = new THREE.Mesh(new THREE.CircleGeometry(.2, 24, 0, Math.PI), new THREE.MeshStandardMaterial({ map: tex, side: THREE.DoubleSide, roughness: .6 }));
+  fan.geometry.attributes.uv.array.forEach((v, i, a) => {}); g.add(fan);
+  const rim = new THREE.Mesh(new THREE.RingGeometry(.195, .205, 24, 1, 0, Math.PI), new THREE.MeshStandardMaterial({ color: 0xd9a845, metalness: .8, roughness: .3, side: THREE.DoubleSide })); g.add(rim);
+  return g;
+}
+export function makeScroll() {
+  const m = mats(), g = new THREE.Group();
+  const c = document.createElement('canvas'); c.width = 256; c.height = 160; const x = c.getContext('2d'); x.fillStyle = '#f3e7c8'; x.fillRect(0, 0, 256, 160); x.fillStyle = '#3a1408'; x.font = '26px serif'; for (let col = 0; col < 6; col++) for (let r = 0; r < 4; r++) x.fillText('詩月花風山水'[(col + r) % 7], 210 - col * 36, 36 + r * 34);
+  const tx = new THREE.CanvasTexture(c); tx.colorSpace = THREE.SRGBColorSpace;
+  const p = new THREE.Mesh(new THREE.PlaneGeometry(.3, .19), new THREE.MeshStandardMaterial({ map: tx, side: THREE.DoubleSide, roughness: .8 })); g.add(p);
+  for (const sd of [-1, 1]) { const r = cyl(g, .012, .012, .22, m.wood, sd * .155, 0, 0, 8); r.rotation.x = 0; }
+  return g;
+}
+
 export function buildLocation(loc, opts = {}) {
   const o = { group: new THREE.Group(), npcs: [], lights: null };
   if (loc === 'tuninh') { hall(o, { plaque: '慈寧宮' }); o.npcs = [{ model: 'thaihau', sit: true, name: 'Thái hậu', talk: 'thinhan' }, { model: 'thaiy', x: 2.4, z: 0, ry: -Math.PI / 2, name: 'Thái y', talk: 'thaiy' }, { model: 'mama', x: -2.4, z: 0.4, ry: Math.PI / 2, name: 'Quế ma ma', talk: 'mama' }]; }
@@ -277,6 +382,7 @@ export function buildLocation(loc, opts = {}) {
   else if (loc === 'hoavien') { garden(o); o.npcs = [{ model: 'cungnu', x: 3, z: -1.2, ry: -1, name: 'Cung nữ Tiểu Thúy', talk: 'dotin' }, { model: 'thive', x: 0, z: 8.6, ry: Math.PI, male: true, name: 'Thị vệ' }]; }
   else if (loc === 'phong') { room(o, { big: !!opts.palace, palaceName: opts.palace ? opts.palaceName : null }); o.npcs = [{ model: 'cungnu', x: (o.roomSize.W / 2 - .8), z: -o.roomSize.D / 2 + 1, ry: -2.3, name: 'Cung nữ thân tín', talk: 'cungnu' }]; o.decorable = true; }
   else if (loc === 'tamcung') { bedroom(o); o.npcs = [{ model: 'hoangthuong_dem', x: -.5, z: -.4, ry: .4, male: true, name: 'Hoàng thượng', idle: 'khoanh_tay' }]; }
+  else if (loc === 'yentiec') { feastVenue(o, opts.venue !== 'in'); o.npcs = [{ model: 'hoangthuong', sit: true, male: true, name: 'Hoàng thượng' }, ...o.npcSeats.map(s => ({ model: s.model, x: s.x, z: s.z, ry: s.ry, name: s.name, kneel: s.top })), { model: 'thaigiam', x: -1.6, z: -3.6, ry: .6, male: true, name: 'Tổng quản Lý Đức Toàn' }, { model: 'cungnu', x: 1.6, z: -3.6, ry: -.6, name: 'Cung nữ dâng rượu' }]; }
   else if (loc === 'lanhcung') { coldPalace(o); o.npcs = [{ model: 'mama', x: 2, z: -2.2, ry: -2.5, name: 'Lão ma ma lãnh cung', talk: 'lanh' }, { model: 'aongu', x: -1.8, z: -1.6, ry: 2.2, name: 'Phế phi Trần thị', talk: 'phephi', idle: 'khoc' }]; }
   return o;
 }

@@ -38,6 +38,13 @@ function aim(root, bone, child, dir) {
   bone.parent.getWorldQuaternion(_pq); bone.quaternion.copy(_pq.invert().multiply(_wq)); bone.updateWorldMatrix(false, true);
 }
 const POSES = {
+  // ngồi quỳ trên đệm (kiểu yến tiệc trong phim): đùi ngang về trước, cẳng chân gập dưới đùi, lưng thẳng, tay đặt lên đùi
+  seiza: (c) => { const r = c.root, B = c.B;
+    aim(r, B.spine, B.spine1, v3([0, 1, .02])); aim(r, B.spine2, B.neck, v3([0, 1, .05])); aim(r, B.neck, B.head, v3([0, 1, .08]));
+    aim(r, B.hipL, B.kneeL, v3([.1, -.12, 1])); aim(r, B.hipR, B.kneeR, v3([-.1, -.12, 1]));
+    aim(r, B.kneeL, B.footL, v3([.02, -.18, -1])); aim(r, B.kneeR, B.footR, v3([-.02, -.18, -1]));
+    aim(r, B.lArm, B.lFore, v3([.2, -.85, .45])); aim(r, B.lFore, B.lHand, v3([-.3, -.3, .9]));
+    aim(r, B.rArm, B.rFore, v3([-.2, -.85, .45])); aim(r, B.rFore, B.rHand, v3([.3, -.3, .9])); },
   chap_tay: (c) => { aim(c.root, c.B.lArm, c.B.lFore, v3([.12, -.92, .3])); aim(c.root, c.B.lFore, c.B.lHand, v3([-.62, -.15, .75])); aim(c.root, c.B.rArm, c.B.rFore, v3([-.12, -.92, .3])); aim(c.root, c.B.rFore, c.B.rHand, v3([.62, -.15, .75])); },
   che_mieng: (c, t) => { const sh = Math.sin(t * 14) * .04; aim(c.root, c.B.rArm, c.B.rFore, v3([-.25, -.55, .8])); aim(c.root, c.B.rFore, c.B.rHand, v3([.35, .88 + sh, .3])); aim(c.root, c.B.lArm, c.B.lFore, v3([.12, -.92, .3])); aim(c.root, c.B.lFore, c.B.lHand, v3([-.45, -.35, .8])); },
   doc_chi: (c) => { aim(c.root, c.B.lArm, c.B.lFore, v3([.35, -.45, .8])); aim(c.root, c.B.lFore, c.B.lHand, v3([-.2, .15, 1])); aim(c.root, c.B.rArm, c.B.rFore, v3([-.35, -.45, .8])); aim(c.root, c.B.rFore, c.B.rHand, v3([.2, .15, 1])); },
@@ -179,4 +186,13 @@ function makeBraid(c) {
     tassel.position.copy(e).addScaledVector(dir, L * .035); tassel.quaternion.copy(q); tassel.scale.set(r * .8, L * .08, r * .8);
     tie.position.copy(e).addScaledVector(dir, -L * .005); tie.quaternion.copy(q); tie.scale.set(r * .55, L * .02, r * .55);
   };
+}
+
+// đặt nhân vật ngồi quỳ trên đệm: hạ người cho đầu gối chạm mặt đệm
+export function kneelOn(c, x, top, z, ry) {
+  c.play('dung_cho'); c.pose = 'seiza'; c.root.position.set(x, 0, z); c.root.rotation.y = ry; c.update(.02); c.root.updateMatrixWorld(true);
+  const a = new THREE.Vector3(), b = new THREE.Vector3(), h = new THREE.Vector3(); c.B.kneeL.getWorldPosition(a); c.B.footL.getWorldPosition(b); c.B.hips.getWorldPosition(h);
+  const low = Math.min(a.y, b.y);
+  // kéo hông về đúng tâm đệm
+  c.root.position.set(x - (h.x - x) * 0 , top - low + .03, z);
 }

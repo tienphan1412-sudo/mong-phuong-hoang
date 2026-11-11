@@ -1,8 +1,8 @@
 // MỘNG PHƯỢNG HOÀNG – phía người chơi
 import * as THREE from 'three';
 import { CSS2DRenderer, CSS2DObject } from 'three/addons/renderers/CSS2DRenderer.js';
-import { buildLocation, DECOR } from './scenes.js';
-import { spawn, seatPlacement, ready, loadModel, aim, v3 } from './chars.js';
+import { buildLocation, DECOR, makeGuzheng, makeFan, makeScroll } from './scenes.js';
+import { spawn, seatPlacement, ready, loadModel, aim, v3, kneelOn } from './chars.js';
 import * as music from './music.js';
 
 const $ = id => document.getElementById(id);
@@ -66,13 +66,13 @@ function clearWorld() {
   $('labels').innerHTML = '';
   world = null;
 }
-async function enterScene(loc, players) {
+async function enterScene(loc, players, venue, seatId) {
   const tok = ++loadToken;
   closeDecor(); seated = null;
   music.setMode(loc);
   // dựng cảnh mới ở hậu trường, cảnh cũ vẫn hiện cho tới khi xong
-  const o = buildLocation(loc, { palace: me?.hasPalace, palaceName: me ? (me.name.split(' ').pop() + ' cung') : '' });
-  o.loc = loc;
+  const o = buildLocation(loc, { palace: me?.hasPalace, palaceName: me ? (me.name.split(' ').pop() + ' cung') : '', venue });
+  o.loc = loc; chairSeat = null;
   await ready();
   await Promise.all([...o.npcs.map(n => loadModel(n.model)), loadModel(me.outfit), ...(players || []).map(p => loadModel(p.outfit))]).catch(() => {});
   if (tok !== loadToken) return;
@@ -86,7 +86,7 @@ async function enterScene(loc, players) {
       c.play('ngoi');
     } else {
       c.root.position.set(n.x, 0, n.z); c.root.rotation.y = n.ry || 0;
-      c.play(n.idle || (n.model === 'cungnu' || n.model === 'mama' ? 'chap_tay' : 'dung_cho'));
+      if (n.kneel) kneelOn(c, n.x, n.kneel, n.z, n.ry); else c.play(n.idle || (n.model === 'cungnu' || n.model === 'mama' ? 'chap_tay' : 'dung_cho'));
     }
     const lb = makeLabel(n.name, '', true, n.talk ? () => talk(n) : null); c.root.add(lb); n.label = lb;
   }
@@ -103,7 +103,8 @@ async function enterScene(loc, players) {
   const sp = clampPos(o.spawn.x + (Math.random() - .5) * 1.4, o.spawn.z + (Math.random() - .5) * .6);
   await respawnSelf(sp.x, sp.z, Math.PI);
   if (tok !== loadToken) return;
-  sendMove('dung_cho'); snapCam = true; refreshClueMarkers(); if (nb) renderNotebook(); syncFeastHT(); hideLoading();
+  if (seatId) sitSelfAt(seatId); else sendMove('dung_cho');
+  snapCam = true; refreshClueMarkers(); if (nb) renderNotebook(); syncFeastHT(); hideLoading();
   if (loc === 'tamcung' && !me.htTalked) setTimeout(() => { if (world?.loc === 'tamcung') startHtTalk(); }, 2500);
   for (const p of players || []) addOther(p);
   renderMap(); renderActs();
@@ -125,7 +126,7 @@ async function addOther(p) {
   if (others.get(p.id) !== holder || !world) return c.dispose();
   holder.c = c; c.root.position.set(p.x, 0, p.z); c.root.rotation.y = p.ry; world.group.add(c.root);
   c.label = makeLabel(p.name, p.rankName); c.root.add(c.label);
-  c.play(p.anim || 'dung_cho');
+  applyAnim(holder, p.anim || 'dung_cho', false);
 }
 function removeOther(id) { const o = others.get(id); if (!o) return; if (o.c) { o.c.root.remove(o.c.label); o.c.label.element.remove(); o.c.dispose(); } others.delete(id); }
 
@@ -142,6 +143,9 @@ function clickWorld(e) {
   if (decor.on) return decorClick();
   if (world.bed && ray.intersectObject(world.bed, true).length) return openBed();
   if (world.brazier && ray.intersectObject(world.brazier, true).length) return clueTro();
+  if (taiOn) return;
+  if (world.seats && world.loc !== 'yentiec') { const hs = world.seats.find(st => ray.intersectObject(st.obj, true).length); if (hs) return socket.emit('sit', { seat: hs.id }); }
+  if (chairSeat) { if (world.loc === 'yentiec') return; standChair(); }
   if (seated) standUp();
   const ground = []; world.group.traverse(o => { if (o.name === 'ground') ground.push(o); });
   const hit = ray.intersectObjects(ground, false)[0]; if (!hit) return;
@@ -156,12 +160,13 @@ let lastSend = 0, wasMoving = false;
 function stepSelf(dt) {
   if (!selfC) return;
   const r = selfC.root;
+  if (chairSeat || taiOn) return;
   if (selfC.target) {
     const dx = selfC.target.x - r.position.x, dz = selfC.target.z - r.position.z, d = Math.hypot(dx, dz);
     if (d < 0.05) { selfC.target = null; }
     else {
       const sp = 1.35 * dt, k = Math.min(1, sp / d);
-      const np = clampPos(r.position.x + dx * k, r.position.z + dz * k); r.position.x = np.x; r.position.z = np.z;
+      const np = clampPos(r.position.x + dx * k, r.position.z + dz * k); r.position.x = np.x; r.position.z = np.z; r.position.y = world.floorAt ? world.floorAt(np.x, np.z) : 0;
       const want = Math.atan2(dx, dz); let diff = want - r.rotation.y; diff = Math.atan2(Math.sin(diff), Math.cos(diff)); r.rotation.y += diff * Math.min(1, dt * 10);
       if (selfC.curName !== 'di') selfC.play('di');
     }
@@ -172,7 +177,7 @@ function stepSelf(dt) {
   wasMoving = moving;
 }
 function sendMove(anim) { lastSend = performance.now(); const r = selfC.root; socket.emit('move', { x: r.position.x, z: r.position.z, ry: r.rotation.y, anim }); }
-function emote(a) { if (!selfC) return; if (seated) standUp(); selfC.target = null; selfC.play(a, { restart: true }); socket.emit('emote', a); }
+function emote(a) { if (!selfC) return; if (seated) standUp(); if (chairSeat && world.loc !== 'yentiec') standChair(); selfC.target = null; selfC.play(a, { restart: true }); socket.emit('emote', a); }
 
 // ---------------- vòng lặp ----------------
 const clock = new THREE.Clock(); let T = 0;
@@ -182,7 +187,7 @@ renderer.setAnimationLoop(() => {
   if (world) {
     stepSelf(dt);
     for (const n of world.npcs) if (n.c) n.c.update(dt);
-    for (const [, o] of others) if (o.c) { const r = o.c.root; r.position.x += (o.tx - r.position.x) * Math.min(1, dt * 8); r.position.z += (o.tz - r.position.z) * Math.min(1, dt * 8); let diff = o.try - r.rotation.y; diff = Math.atan2(Math.sin(diff), Math.cos(diff)); r.rotation.y += diff * Math.min(1, dt * 8); o.c.update(dt); }
+    for (const [, o] of others) if (o.c && o.seated) o.c.update(dt); else if (o.c) { const r = o.c.root; r.position.y = world.floorAt ? world.floorAt(r.position.x, r.position.z) : 0; r.position.x += (o.tx - r.position.x) * Math.min(1, dt * 8); r.position.z += (o.tz - r.position.z) * Math.min(1, dt * 8); let diff = o.try - r.rotation.y; diff = Math.atan2(Math.sin(diff), Math.cos(diff)); r.rotation.y += diff * Math.min(1, dt * 8); o.c.update(dt); }
     if (selfC) selfC.update(dt);
     if (world.flicker) for (const L of world.flicker) L.intensity = 2 + Math.sin(T * 9 + L.id) * .25 + Math.random() * .2;
     if (stage) stage.update(dt);
@@ -246,11 +251,11 @@ socket.on('me', async m => {
   if (!caseOpenId && me.cases?.length && !me.lanh) { caseOpenId = me.cases[0].id; nbMin = true; }
   if (caseOpenId) socket.emit('caseDetail', caseOpenId);
 });
-socket.on('scene', async d => { pendingScene = d; if (!stage) { await enterScene(d.loc, d.players); pendingScene = null; setTimeout(() => startTour(), 1200); } });
+socket.on('scene', async d => { pendingScene = d; if (!stage) { await enterScene(d.loc, d.players, d.venue, d.seat); pendingScene = null; setTimeout(() => startTour(), 1200); } });
 let pendingScene = null;
 socket.on('pjoin', p => addOther(p));
 socket.on('pleave', id => removeOther(id));
-socket.on('pmove', d => { const o = others.get(d.id); if (!o) return; o.tx = d.x; o.tz = d.z; o.try = d.ry; if (o.c) o.c.play(d.anim, { restart: !!d.once }); });
+socket.on('pmove', d => { const o = others.get(d.id); if (!o) return; o.tx = d.x; o.tz = d.z; o.try = d.ry; o.p.x = d.x; o.p.z = d.z; if (o.c) applyAnim(o, d.anim, !!d.once); });
 socket.on('poutfit', async d => { const o = others.get(d.id); if (!o) return; o.p.outfit = d.outfit; const p = { ...o.p, x: o.tx, z: o.tz, ry: o.try }; removeOther(d.id); addOther(p); });
 socket.on('chat', m => {
   const log = $('chatlog'); const div = document.createElement('div'); div.innerHTML = `<b>${esc(m.name)}:</b> ${esc(m.text)}`; log.appendChild(div); log.scrollTop = 1e6;
@@ -275,12 +280,13 @@ function renderHud() {
   $('stats').innerHTML = `<span class="pill">💰 Bạc <b>${me.silver}</b></span><span class="pill">⏳ Lượt <b>${me.turns}</b></span><span class="pill">💗 Sủng ái <b>${me.sung}</b></span><span class="pill">🍵 Thái hậu <b>${me.haiLong}</b></span><span class="pill">Nhiệm vụ: ${t.thinhan ? '✅' : '⬜'} thỉnh an ${t.luyen ? '✅' : '⬜'} luyện ${t.dotin ? '✅' : '⬜'} dò tin</span>${htPill()}${feast ? `<span class="pill feast">🎎 Yến tiệc · <b id="feastT"></b> · ${feast.n} tiết mục</span>` : ''}${me.cases.length ? `<button class="pill" id="caseBtn" style="border-color:#c0503a">⚖️ Vụ án đang mở (${me.cases.length})</button>` : ''}`;
   const cb = $('caseBtn'); if (cb) cb.onclick = () => openCase(me.cases[0].id);
 }
-const LOCNAMES = { hoavien: 'Ngự hoa viên', tuninh: 'Từ Ninh cung', duongtam: 'Dưỡng Tâm điện', phong: 'Phòng riêng', tamcung: 'Tẩm cung', lanhcung: 'Lãnh cung' };
+const LOCNAMES = { yentiec: '🎎 Yến tiệc', hoavien: 'Ngự hoa viên', tuninh: 'Từ Ninh cung', duongtam: 'Dưỡng Tâm điện', phong: 'Phòng riêng', tamcung: 'Tẩm cung', lanhcung: 'Lãnh cung' };
 function renderMap() {
   if (!me) return;
   const m = $('map'); m.innerHTML = '';
   const list = me.lanh ? ['lanhcung'] : ['hoavien', 'tuninh', 'duongtam', 'phong'];
   if (latTheMe && !me.lanh) list.push('tamcung');
+  if (feast && !me.lanh) list.push('yentiec');
   for (const l of list) { const b = document.createElement('button'); b.textContent = l === 'phong' && me.hasPalace ? 'Cung riêng' : LOCNAMES[l]; b.classList.toggle('on', world?.loc === l); b.onclick = () => socket.emit('goto', l); m.appendChild(b); }
 }
 function act(type, extra = {}) { socket.emit('action', { type, ...extra }); }
@@ -291,7 +297,8 @@ function renderActs() {
   const L = world.loc;
   if (L === 'tuninh') { add('🙇 Thỉnh an Thái hậu', me.thinhAn ? 'Hôm nay đã thỉnh an' : 'Miễn phí, mỗi sáng 1 lần', () => { emote('hanh_le'); act('thinhan'); }, me.thinhAn); }
   if (L === 'duongtam') add('🍲 Dâng canh Hoàng thượng', '1 lượt · 30 bạc · nấu đúng món người thèm được sủng nhiều', gameCanh);
-  if (L === 'hoavien') { if (feast && !feast.mine) add('🎎 Dâng tiết mục yến tiệc', 'Đàn, múa hay ngâm thơ cho Hoàng thượng', () => chooseTai(t => gameRhythm(t, q => act('yentiec', { tai: t, q })))); add('👂 Dò tin', '1 lượt · nghe sở thích Hoàng thượng, chuyện trong cung', () => act('dotin')); add('🎐 Luyện tài nghệ', '1 lượt · chơi càng hay càng nhiều điểm', () => chooseTai(t => gameRhythm(t, q => act('luyen', { tai: t, q })))); }
+  if (L === 'yentiec') { if (!feast?.mine) add('🎎 Dâng tiết mục', 'Bước ra giữa, đàn, múa hay ngâm thơ cho Hoàng thượng', performFeast); add('🚪 Rời yến tiệc', '', () => socket.emit('goto', 'hoavien')); }
+  if (L === 'hoavien') { if (feast) add('🎎 Dự yến tiệc', 'Đang có yến tiệc, vào ngồi cùng mọi người', () => socket.emit('goto', 'yentiec')); add('👂 Dò tin', '1 lượt · nghe sở thích Hoàng thượng, chuyện trong cung', () => act('dotin')); add('🎐 Luyện tài nghệ', '1 lượt · chơi càng hay càng nhiều điểm', () => chooseTai(t => gameRhythm(t, q => act('luyen', { tai: t, q })))); }
   if (L === 'phong') { add('🎐 Luyện tài nghệ', '1 lượt · chơi càng hay càng nhiều điểm', () => chooseTai(t => gameRhythm(t, q => act('luyen', { tai: t, q })))); add('👘 Thay trang phục', '', openWardrobe); add('🏮 Bài trí ' + (me.hasPalace ? 'cung' : 'phòng'), 'Đặt, xoay đồ nội thất', openDecor); }
   if (L === 'tamcung') { add('🛏 Lên giường', 'Ngồi cùng Hoàng thượng', openBed); add('🌙 Rời tẩm cung', 'Trời sắp sáng', () => socket.emit('goto', 'phong')); }
   if (L === 'lanhcung') { add('🧹 Làm việc lãnh cung', `Phục vị ${me.lanh?.tasks || 0}/3 · mỗi ngày 1 lần`, gameLanh); add('🕯 Hỏi chuyện phế phi', 'Mỗi ngày một lần · bà biết nhiều bí mật', () => act('phephi')); if (me.lanh?.caseId) add('📜 Kêu oan', 'Điều tra lại vụ án cũ', () => openCase(me.lanh.caseId)); }
@@ -461,7 +468,7 @@ async function runSacPhong(d) {
       hideCut(); await fade(true);
       [tg, pc, ...maids].forEach(c => c.dispose()); scene.remove(o.group); stage = null;
       scene.add(saved.group); applyLights(saved.lights); world = saved;
-      if (pendingScene) { const ps = pendingScene; pendingScene = null; await enterScene(ps.loc, ps.players); }
+      if (pendingScene) { const ps = pendingScene; pendingScene = null; await enterScene(ps.loc, ps.players, ps.venue, ps.seat); }
       else if (selfC && selfC.outfit !== me.outfit) { const r = selfC.root; await respawnSelf(r.position.x, r.position.z, r.rotation.y); }
       document.body.classList.remove('staging'); cutActive = false; await fade(false); sacBusy = false; { const f = cutDone; cutDone = () => {}; f(); }
       if (d.palace || d.type === 'phucvi') socket.emit('goto', 'phong');
@@ -717,7 +724,7 @@ async function stageEnd(S, queued) {
   await fade(true);
   S.chars.forEach(c => c.dispose()); scene.remove(S.o.group); stage = null;
   scene.add(S.saved.group); applyLights(S.saved.lights); world = S.saved;
-  if (pendingScene) { const ps = pendingScene; pendingScene = null; await enterScene(ps.loc, ps.players); }
+  if (pendingScene) { const ps = pendingScene; pendingScene = null; await enterScene(ps.loc, ps.players, ps.venue, ps.seat); }
   else if (selfC && selfC.outfit !== me.outfit) { const r = selfC.root; await respawnSelf(r.position.x, r.position.z, r.rotation.y); }
   document.body.classList.remove('staging'); cutActive = false; snapCam = true;
   await fade(false); sacBusy = false;
@@ -963,9 +970,9 @@ socket.on('witnessAsk', d => {
 // MÀN CHỜ, CHỮ BAY, GỢI Ý HOÀNG THƯỢNG
 // =====================================================================
 function hideLoading() { const l = $('loading'); if (l && !l.classList.contains('gone')) { l.classList.add('gone'); setTimeout(() => l.remove(), 900); } }
-setTimeout(hideLoading, 25000);
-socket.on('connect', () => { const l = $('loading'); if (l) l.querySelector('.st').textContent = localStorage.getItem('mph_token') ? 'Đang vào cung…' : 'Cung môn đã mở'; if (!localStorage.getItem('mph_token')) setTimeout(hideLoading, 600); });
-socket.on('needLogin', () => setTimeout(hideLoading, 300));
+// màn chờ cổng cung chỉ hiện khi máy chủ đang thức dậy (chưa kết nối được sau 1,2 giây)
+setTimeout(() => { if (!socket.connected) $('loading')?.classList.remove('hidden'); }, 1200);
+socket.on('connect', hideLoading);
 function floatDeltas(a, b) {
   const D = [['silver', '💰', 'bạc'], ['sung', '💗', 'sủng ái'], ['pts', '⭐', 'công trạng'], ['haiLong', '🍵', 'Thái hậu'], ['turns', '⏳', 'lượt']];
   let i = 0;
@@ -989,7 +996,7 @@ let camDistSaved = null;
 function mgClose() { mgOn = false; mgEl.classList.add('hidden'); document.body.classList.remove('mgopen'); if (camDistSaved) camDist = camDistSaved; camDistSaved = null; }
 function chooseTai(cb) {
   if (mgOn) return;
-  if (me.turns < 1 && !(feast && world?.loc === 'hoavien')) return toast('Hết lượt hôm nay.', 'bad');
+  if (me.turns < 1 && world?.loc !== 'yentiec') return toast('Hết lượt hôm nay.', 'bad');
   const fav = me.htKnown?.tai;
   mgOpen(`<div class="mgt">Chọn tài nghệ</div><div class="row">${[['đàn', '🎵 Đàn tranh'], ['múa', '💃 Múa quạt'], ['thơ', '📜 Ngâm thơ']].map(([k, n]) => `<button data-t="${k}" class="${fav === k ? 'gold' : ''}">${n}${fav === k ? ' ★' : ''}</button>`).join('')}<button data-x>✕</button></div>`);
   mgEl.querySelectorAll('[data-t]').forEach(b => b.onclick = () => cb(b.dataset.t));
@@ -997,22 +1004,22 @@ function chooseTai(cb) {
 }
 // nhịp phách: nốt chạy sang phải, bấm khi nốt vào ô vàng
 function gameRhythm(tai, done) {
-  const anim = tai === 'múa' ? 'mua' : tai === 'thơ' ? 'chap_tay' : 'hanh_le';
-  if (selfC) { selfC.target = null; selfC.play(anim); socket.emit('emote', anim); camYaw = selfC.root.rotation.y; }
+  if (selfC) { selfC.target = null; taiStart(selfC, tai); socket.emit('emote', 'tai:' + tai); camYaw = selfC.root.rotation.y + (tai === 'đàn' ? .5 : 0); }
+  if (tai === 'thơ') poemShow();
   const N = 8, notes = []; let t0 = performance.now() + 900, hits = 0, judged = 0, raf;
   for (let i = 0; i < N; i++) notes.push({ t: t0 + i * (520 + Math.random() * 380), st: 0 });
   mgOpen(`<div class="mgt">${tai === 'đàn' ? '🎵 Gảy đàn' : tai === 'múa' ? '💃 Múa quạt' : '📜 Ngâm thơ'} · bấm khi nốt chạm ô vàng <small>(phím cách hoặc chạm)</small></div><div class="lane"><div class="zone"></div></div><div class="mgs">Trúng <b id="mgHit">0</b>/${N}</div>`);
   const lane = mgEl.querySelector('.lane'); const els = notes.map(() => { const d = document.createElement('div'); d.className = 'note'; d.textContent = tai === 'đàn' ? '♪' : tai === 'múa' ? '❀' : '字'; lane.appendChild(d); return d; });
   const W = () => lane.clientWidth, ZX = () => W() * .82, SPEED = .32; // px/ms
-  const hit = () => { const now2 = performance.now(); let best = null; for (const n of notes) if (!n.st) { const dt = Math.abs(now2 - n.t); if (dt < 170 && (!best || dt < Math.abs(now2 - best.t))) best = n; } if (best) { best.st = 1; hits++; judged++; els[notes.indexOf(best)].className = 'note ok'; $('mgHit').textContent = hits; } else { lane.classList.add('miss'); setTimeout(() => lane.classList.remove('miss'), 150); } };
+  const hit = () => { const now2 = performance.now(); let best = null; for (const n of notes) if (!n.st) { const dt = Math.abs(now2 - n.t); if (dt < 170 && (!best || dt < Math.abs(now2 - best.t))) best = n; } if (best) { best.st = 1; hits++; judged++; poemStep(); els[notes.indexOf(best)].className = 'note ok'; $('mgHit').textContent = hits; } else { lane.classList.add('miss'); setTimeout(() => lane.classList.remove('miss'), 150); } };
   const key = e => { if (e.code === 'Space') { e.preventDefault(); hit(); } };
   addEventListener('keydown', key); lane.onpointerdown = hit;
-  const loop = () => { const now2 = performance.now(); notes.forEach((n, i) => { const x = ZX() - (n.t - now2) * SPEED; els[i].style.transform = `translateX(${x}px)`; if (!n.st && now2 - n.t > 170) { n.st = 2; judged++; els[i].className = 'note miss'; } });
+  const loop = () => { const now2 = performance.now(); notes.forEach((n, i) => { const x = ZX() - (n.t - now2) * SPEED; els[i].style.transform = `translateX(${x}px)`; if (!n.st && now2 - n.t > 170) { n.st = 2; judged++; poemStep(); els[i].className = 'note miss'; } });
     if (judged >= N) { finish(); return; } raf = requestAnimationFrame(loop); };
   const finish = () => { cancelAnimationFrame(raf); removeEventListener('keydown', key); const q = hits / N;
     mgEl.querySelector('.mgs').innerHTML = `${q > .8 ? '🌟 Xuất sắc!' : q > .5 ? '👏 Khá lắm' : '😅 Còn vụng'} · trúng ${hits}/${N}`;
-    if (selfC) { selfC.play(q > .5 ? 'hanh_le' : 'dung_cho'); }
-    setTimeout(() => { mgClose(); done(q); if (selfC) selfC.play('dung_cho'); }, 1300); };
+    poemHide();
+    setTimeout(() => { mgClose(); if (selfC) { taiEnd(selfC); selfC.play(q > .5 ? 'hanh_le' : 'dung_cho'); socket.emit('emote', q > .5 ? 'hanh_le' : 'dung_cho'); } done(q); }, 1300); };
   raf = requestAnimationFrame(loop);
 }
 // nấu canh: chọn món rồi canh lửa
@@ -1060,7 +1067,7 @@ socket.on('feast', f => { feast = f ? { ...f, mine: feast?.id === f?.id ? feast.
 socket.on('feastUpdate', f => { if (feast && f) { feast.n = f.n; renderHud(); } });
 socket.on('feastEnd', d => { feast = null; renderHud(); renderActs(); syncFeastHT(); if (d.winner) toast(`🏮 ${d.winner.name} thắng yến tiệc với tiết mục ${d.winner.tai}!`, d.winner.id === me?.id ? 'good' : 'info'); });
 setInterval(() => { const el = $('feastT'); if (el && feast) { const l = Math.max(0, feast.end - Date.now()); el.textContent = `${Math.floor(l / 60e3)}:${String(Math.floor(l % 60e3 / 1000)).padStart(2, '0')}`; } }, 1000);
-async function syncFeastHT() {
+async function syncFeastHT() { return;
   const want = !!(feast && world?.loc === 'hoavien');
   if (!want && feastHT) { feastHT.label?.element.remove(); feastHT.root.parent?.remove(feastHT.root); feastHT.dispose(); feastHT = null; }
   if (want && !feastHT) { const w = world; const c = await spawn('hoangthuong'); if (world !== w || feastHT) return c.dispose(); c.root.position.set(2.4, 0, -1.4); c.root.rotation.y = -.9; c.play('dung_cho'); world.group.add(c.root); const lb = makeLabel('Hoàng thượng', '', true); c.root.add(lb); c.label = lb; feastHT = c; world.npcs.push({ c, name: 'Hoàng thượng', model: 'hoangthuong', label: lb, feast: true }); }
@@ -1091,4 +1098,91 @@ function openShop() {
   <div class="shop">${Object.entries(SHOP).map(([k, [n, d, p]]) => `<div class="it"><b>${n}</b><small>${d}${k === 'huong' && me.huong ? ' · <i>đang có</i>' : ''}</small><button data-b="${k}" ${me.silver < p ? 'disabled' : ''}>${p} bạc</button></div>`).join('')}
   ${Object.entries(DECOR_PRICE).map(([k, p]) => `<div class="it"><b>🏮 ${DECOR[k].name}</b><small>Đồ bài trí phòng</small>${me.decorOwned?.includes(k) ? '<button disabled>Đã có</button>' : `<button data-b="${k}" ${me.silver < p ? 'disabled' : ''}>${p} bạc</button>`}</div>`).join('')}</div>`);
   $('mcard').querySelectorAll('[data-b]').forEach(b => b.onclick = () => { act('shop', { item: b.dataset.b }); setTimeout(openShop, 500); });
+}
+
+// =====================================================================
+// GHẾ NGỒI (đình Ngự hoa viên, yến tiệc)
+// =====================================================================
+let chairSeat = null, taiOn = false;
+function seatPose(c, st) {
+  const r = c.root; r.rotation.y = st.ry;
+  if (st.kind === 'floor') { kneelOn(c, st.x, st.top, st.z, st.ry); return; }
+  r.position.set(st.x, 0, st.z); r.updateMatrixWorld(true); const sp = seatPlacement(c);
+  r.position.x += st.x - sp.x; r.position.z += st.z - sp.z; r.position.y = st.top - sp.y; c.play('ngoi');
+}
+function sitSelfAt(id) { const st = world?.seats?.find(x => x.id === id); if (!st || !selfC) return; selfC.target = null; chairSeat = st; seatPose(selfC, st); }
+socket.on('sitOk', d => { sitSelfAt(d.seat); });
+function standChair() { if (!chairSeat || !selfC) return; const st = chairSeat; chairSeat = null; const r = selfC.root; const bx = st.x - Math.sin(st.ry) * .45, bz = st.z - Math.cos(st.ry) * .45; r.position.set(bx, world.floorAt ? world.floorAt(bx, bz) : 0, bz); selfC.pose = null; selfC.play('dung_cho'); socket.emit('stand'); sendMove('dung_cho'); }
+// hiển thị động tác của người khác (ngồi ghế, biểu diễn)
+function applyAnim(o, anim, once) {
+  const c = o.c; if (!c) return;
+  if (o.taiK && !String(anim).startsWith('tai:')) { taiEnd(c); o.taiK = null; c.root.position.set(o.tx, world?.floorAt ? world.floorAt(o.tx, o.tz) : 0, o.tz); }
+  if (String(anim).startsWith('sit:')) { const st = world?.seats?.find(x => x.id === anim.slice(4)); if (st) { o.seated = st; seatPose(c, st); return; } }
+  if (o.seated) { o.seated = null; c.pose = null; c.root.position.set(o.tx, world?.floorAt ? world.floorAt(o.tx, o.tz) : 0, o.tz); c.root.rotation.y = o.try; }
+  if (String(anim).startsWith('tai:')) { o.taiK = anim.slice(4); c.root.position.set(o.tx, 0, o.tz); c.root.rotation.y = o.try; taiStart(c, o.taiK); return; }
+  c.play(anim, { restart: once });
+}
+// =====================================================================
+// ĐẠO CỤ BIỂU DIỄN
+// =====================================================================
+function taiStart(c, tai) {
+  taiEnd(c); if (c === selfC) taiOn = true;
+  const r = c.root, P = r.position.clone(), ry = r.rotation.y, fx = Math.sin(ry), fz = Math.cos(ry);
+  c._taiHome = { x: P.x, z: P.z, y: P.y, ry };
+  if (tai === 'đàn') {
+    const g = new THREE.Group(); world.group.add(g); c._taiProp = g;
+    const stool = DECOR.ghedon.make(); stool.position.set(P.x, P.y, P.z); stool.scale.y = .95; g.add(stool);
+    seatPose(c, { x: P.x, z: P.z, ry, top: P.y + .38, kind: 'chair' });
+    c.update(.05); c.root.updateMatrixWorld(true);
+    const kn = new THREE.Vector3(); c.B.kneeL.getWorldPosition(kn); const kr = new THREE.Vector3(); c.B.kneeR.getWorldPosition(kr); kn.add(kr).multiplyScalar(.5);
+    const zh = makeGuzheng(); zh.position.set(P.x + fx * .3, kn.y + .04, P.z + fz * .3); zh.rotation.y = ry + .1; g.add(zh);
+    c.post = (cc, t) => { // tay gảy dây
+      aim(cc.root, cc.B.lArm, cc.B.lFore, v3([.25, -.55, .75])); aim(cc.root, cc.B.lFore, cc.B.lHand, v3([-.35 + Math.sin(t * 7) * .12, -.2, .9]));
+      aim(cc.root, cc.B.rArm, cc.B.rFore, v3([-.25, -.55, .75])); aim(cc.root, cc.B.rFore, cc.B.rHand, v3([.35 + Math.sin(t * 9 + 1) * .15, -.2, .9]));
+    };
+  } else if (tai === 'múa') {
+    c.play('mua', { restart: true });
+    const fan = makeFan(); world.group.add(fan); c._taiProp = fan;
+    const hp = new THREE.Vector3(), q = new THREE.Quaternion();
+    c.post = (cc, t) => { cc.B.rHand.getWorldPosition(hp); cc.B.rHand.getWorldQuaternion(q); fan.position.copy(hp); fan.quaternion.copy(q); fan.rotateX(-Math.PI / 2); fan.rotateZ(Math.PI / 2 + Math.sin(t * 3) * .3); fan.translateY(.02); };
+  } else {
+    c.play('dung_cho'); c.pose = 'doc_chi';
+    const sc = makeScroll(); world.group.add(sc); c._taiProp = sc;
+    const a = new THREE.Vector3(), b = new THREE.Vector3();
+    c.post = (cc) => { cc.B.lHand.getWorldPosition(a); cc.B.rHand.getWorldPosition(b); sc.position.copy(a).add(b).multiplyScalar(.5); sc.position.y += .06; sc.rotation.set(-.5, cc.root.rotation.y + Math.PI, 0, 'YXZ'); sc.position.x += Math.sin(cc.root.rotation.y) * .04; sc.position.z += Math.cos(cc.root.rotation.y) * .04; };
+  }
+}
+function taiEnd(c) {
+  if (c === selfC) taiOn = false;
+  if (c._taiProp) { c._taiProp.parent?.remove(c._taiProp); c._taiProp = null; }
+  c.post = null; c.pose = null;
+  if (c._taiHome) { const h = c._taiHome; c._taiHome = null; c.root.position.set(h.x, h.y, h.z); c.root.rotation.y = h.ry; c.play('dung_cho'); }
+}
+// thơ Đường (Hán Việt) chạy trên màn hình khi ngâm thơ
+const POEMS = [
+  ['Tĩnh dạ tứ · Lý Bạch', ['Sàng tiền minh nguyệt quang', 'Nghi thị địa thượng sương', 'Cử đầu vọng minh nguyệt', 'Đê đầu tư cố hương']],
+  ['Xuân hiểu · Mạnh Hạo Nhiên', ['Xuân miên bất giác hiểu', 'Xứ xứ văn đề điểu', 'Dạ lai phong vũ thanh', 'Hoa lạc tri đa thiểu']],
+  ['Phong Kiều dạ bạc · Trương Kế', ['Nguyệt lạc ô đề sương mãn thiên', 'Giang phong ngư hỏa đối sầu miên', 'Cô Tô thành ngoại Hàn San tự', 'Dạ bán chung thanh đáo khách thuyền']],
+  ['Lộc sài · Vương Duy', ['Không sơn bất kiến nhân', 'Đãn văn nhân ngữ hưởng', 'Phản cảnh nhập thâm lâm', 'Phục chiếu thanh đài thượng']],
+  ['Đăng Quán Tước lâu · Vương Chi Hoán', ['Bạch nhật y sơn tận', 'Hoàng Hà nhập hải lưu', 'Dục cùng thiên lý mục', 'Cánh thượng nhất tầng lâu']],
+];
+const poemEl = document.createElement('div'); poemEl.id = 'poem'; poemEl.className = 'hidden'; document.body.appendChild(poemEl);
+let poemN = 0;
+function poemShow() { const [t, lines] = POEMS[Math.floor(Math.random() * POEMS.length)]; poemN = 0; poemEl.innerHTML = `<div class="pt">${esc(t)}</div>${lines.map(l => `<div class="pl">${esc(l)}</div>`).join('')}`; poemEl.classList.remove('hidden'); poemStep(true); }
+function poemStep(first) { if (poemEl.classList.contains('hidden')) return; if (!first) poemN++; const ls = poemEl.querySelectorAll('.pl'); ls.forEach((l, i) => l.classList.toggle('on', i <= Math.floor(poemN / 2))); }
+function poemHide() { setTimeout(() => poemEl.classList.add('hidden'), 1200); }
+// =====================================================================
+// YẾN TIỆC: bước ra giữa biểu diễn rồi về chỗ
+// =====================================================================
+async function performFeast() {
+  if (mgOn || !world?.stage || taiOn) return;
+  if (feast?.mine) return toast('Bổn cung đã dâng tiết mục rồi.');
+  const home = chairSeat; chairSeat = null; socket.emit('stand');
+  const r = selfC.root; r.position.y = 0; selfC.pose = null; selfC.play('dung_cho');
+  if (home) { r.position.x = home.x - Math.sin(home.ry) * .45; r.position.z = home.z - Math.cos(home.ry) * .45; }
+  const walk = (x, z) => new Promise(res => { selfC.target = { x, z }; let n = 0; const iv = setInterval(() => { if (!selfC?.target || ++n > 80) { selfC && (selfC.target = null); clearInterval(iv); res(); } }, 100); });
+  r.position.x = Math.sign(r.position.x || 1) * .55; r.rotation.y = Math.PI; await walk(world.stage.x, world.stage.z);
+  r.rotation.y = world.stage.ry; sendMove('dung_cho');
+  chooseTai(t => gameRhythm(t, q => { act('yentiec', { tai: t, q }); if (feast) feast.mine = true; renderActs();
+    setTimeout(async () => { if (world?.loc === 'yentiec' && home) { await walk(Math.sign(home.x) * .55, home.z); socket.emit('sit', { seat: home.id }); } }, 1500); }));
 }
