@@ -494,6 +494,7 @@ const ACH = [
   { id: 'chuyencan', name: 'Chuyên cần', desc: 'Điểm danh 7 ngày liền', need: 7, cur: p => p.cnt?.streakMax || 0 },
   { id: 'hoadong', name: 'Trên thuận dưới hòa', desc: 'Thân thiết với cả 4 người: Thái hậu, Quế ma ma, Thái y, Tổng quản', need: 4, cur: p => ['thaihau', 'mama', 'thaiy', 'tonggiam'].filter(n => rel(p, n) >= 30).length },
   { id: 'thantham', name: 'Thần thám hậu cung', desc: 'Giúp Quế ma ma phá 5 vụ án', need: 5, cur: p => p.cnt?.det || 0 },
+  { id: 'tuuluong', name: 'Tửu lượng hơn người', desc: 'Thắng tửu lệnh 5 lần', need: 5, cur: p => p.cnt?.tuulenh || 0 },
   { id: 'thanco', name: 'Thần cơ diệu toán', desc: 'Bỏ phiếu đúng thủ phạm một đại án', need: 1, cur: p => p.cnt?.bigRight || 0 },
   { id: 'hieutam', name: 'Hiếu tâm cảm động', desc: 'Góp sức nhiều nhất một kỳ đại lễ', need: 1, cur: p => p.cnt?.festTop || 0 },
   { id: 'mau', name: 'Mẫu bằng tử quý', desc: 'Hạ sinh hoàng tự', need: 1, cur: p => (p.children || []).length },
@@ -851,22 +852,49 @@ function startFeast(min = C.FEAST_MIN, venue = 'out') {
 function endFeast() {
   const f = DB.state.feast; if (!f || f.done) return; f.done = true; const h = ht();
   const ids = Object.keys(f.entries); const duet = id => { const q = P(id); return q && q.sis && ids.some(x => x !== id && P(x)?.sis === q.sis); };
-  const list = Object.entries(f.entries).map(([id, e]) => ({ id, ...e, duet: duet(id), score: e.q * 100 + (e.tai === C.HT.tai[h.tai] ? 25 : 0) + (e.color ? 15 : 0) + (duet(id) ? 15 : 0) + (P(id)?.jewels?.includes('tramphuong') ? 10 : 0) + Math.random() * 10 }));
+  const list = Object.entries(f.entries).map(([id, e]) => ({ id, ...e, duet: duet(id), score: e.q * 100 + (TM_CAT(e.tai) === C.HT.tai[h.tai] ? 25 : 0) + (e.color ? 15 : 0) + (duet(id) ? 15 : 0) + (P(id)?.jewels?.includes('tramphuong') ? 10 : 0) + Math.random() * 10 }));
   const gs = new Set(list.filter(e => e.duet).map(e => P(e.id).sis)); for (const gid of gs) { const g = DB.state.groups[gid]; if (g) news(`🎶 Tỷ muội "${g.name}" cùng dâng tiết mục hợp tấu, Hoàng thượng vỗ tay khen hay.`); }
   list.sort((a, b) => b.score - a.score);
+  const kinds = new Set(list.map(e => e.tai)); if (kinds.size >= 3) { for (const e of list) { const q = P(e.id); if (q) q.sung += 5; } news(`🎊 Yến tiệc phong phú ${kinds.size} loại tiết mục (${[...kinds].map(TM_NAME).join(', ')}), Hoàng thượng thưởng mọi người dâng tiết mục thêm 5 sủng ái.`); }
   if (list.length) {
     const w = P(list[0].id), x2 = evOn('disan') ? 2 : 1; if (w) { w.sung += 12 * x2; w.silver += 80 * x2; w.turns += 2; addPts(w, 20 * x2); cnt(w, 'feastWin'); push(w); }
     for (const e of list.slice(1)) { const q = P(e.id); if (q) { q.silver += 20; q.turns += 1; push(q); } }
-    news(`🏮 Yến tiệc tàn. Hoàng thượng khen tiết mục ${list[0].tai} của ${list[0].name} xuất sắc nhất, ban thưởng sủng ái, 80 lượng bạc, 2 lượt.`, 'phong');
+    news(`🏮 Yến tiệc tàn. Hoàng thượng khen tiết mục ${TM_NAME(list[0].tai)} của ${list[0].name} xuất sắc nhất, ban thưởng sủng ái, 80 lượng bạc, 2 lượt.`, 'phong');
   } else news('Yến tiệc tàn mà không ai dâng tiết mục, Hoàng thượng phẩy tay hồi cung.', 'yentiec');
   setTimeout(() => { for (const [id, sk] of online) { const q = P(id); if (q && q.loc === 'yentiec') { enter(q, 'hoavien', sk); push(q); } } }, 6000);
-  io.emit('feastEnd', { winner: list[0] ? { id: list[0].id, name: list[0].name, tai: list[0].tai } : null }); save();
+  io.emit('feastEnd', { winner: list[0] ? { id: list[0].id, name: list[0].name, tai: TM_NAME(list[0].tai) } : null }); save();
 }
 function feastTick(mins, k) {
   const f = DB.state.feast;
-  if (f && !f.done && now() > f.end) endFeast();
+  if (f && !f.done && now() > f.end) endFeast(); else feastLive();
   DB.state.feastDone = DB.state.feastDone || {};
   C.FEAST_SLOTS.forEach(([h, m, venue], i) => { const key = k + ':' + i, st = h * 60 + m; if (mins >= st && mins < st + C.FEAST_MIN && !DB.state.feastDone[key]) { DB.state.feastDone[key] = 1; startFeast(C.FEAST_MIN - (mins - st), venue); } });
+}
+// ---------- yến tiệc sôi động: tiết mục, kính rượu, tửu lệnh, cùng múa ----------
+const TIET_MUC = { 'đàn': ['Đàn tranh', 'đàn'], 'múa': ['Múa quạt', 'múa'], 'lụa': ['Múa lụa', 'múa'], 'kiếm': ['Kiếm vũ', 'múa'], 'thơ': ['Ngâm thơ', 'thơ'], 'hát': ['Hát khúc Giang Nam', 'đàn'] };
+const TM_NAME = t => TIET_MUC[t]?.[0] || t, TM_CAT = t => TIET_MUC[t]?.[1] || t;
+const THANH_NGU = ['Hoa nhường|nguyệt thẹn', 'Chim sa|cá lặn', 'Nghiêng nước|nghiêng thành', 'Tài sắc|vẹn toàn', 'Mẹ tròn|con vuông', 'An cư|lạc nghiệp', 'Thuận buồm|xuôi gió', 'Vạn sự|như ý', 'Phúc như|Đông Hải', 'Thọ tỷ|Nam Sơn', 'Mưa thuận|gió hòa', 'Quốc thái|dân an', 'Môn đăng|hộ đối', 'Tâm đầu|ý hợp', 'Đồng cam|cộng khổ', 'Kề vai|sát cánh', 'Nước chảy|đá mòn', 'Mật ngọt|chết ruồi', 'Khẩu Phật|tâm xà', 'Ăn cháo|đá bát', 'Tai vách|mạch rừng', 'Bán tín|bán nghi', 'Lá ngọc|cành vàng', 'Mắt phượng|mày ngài', 'Liễu yếu|đào tơ', 'Tài hoa|bạc mệnh', 'Cầm kỳ|thi họa', 'Trăng thanh|gió mát', 'Non xanh|nước biếc', 'Cá chậu|chim lồng', 'Oan gia|ngõ hẹp', 'Gần mực thì đen|gần đèn thì sáng', 'Ăn quả|nhớ kẻ trồng cây', 'Uống nước|nhớ nguồn', 'Có công mài sắt|có ngày nên kim', 'Một cây làm chẳng nên non|ba cây chụm lại nên hòn núi cao', 'Lời nói chẳng mất tiền mua|lựa lời mà nói cho vừa lòng nhau', 'Thương người|như thể thương thân', 'Kính trên|nhường dưới'];
+const norm = t => String(t || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/đ/gi, 'd').toLowerCase().replace(/[^a-z0-9 ]/g, ' ').replace(/\s+/g, ' ').trim();
+const HT_FEAST = ['Rót rượu cho trẫm!', 'Hôm nay vui quá, các ái phi cứ tự nhiên.', 'Ai dâng tiết mục tiếp theo nào?', 'Nhạc công tấu khúc nào rộn ràng lên!', 'Trẫm uống một chén, các nàng cũng phải uống một chén!', 'Tửu lệnh đâu? Trẫm muốn xem ai nhanh trí nhất.'];
+const roomSay = (text, who = '🏮 Yến tiệc') => io.to('yentiec').emit('chat', { id: null, name: who, text });
+const htSay = text => io.to('yentiec').emit('npcSay', { who: 'Hoàng thượng', text });
+function feastLive() {
+  const f = DB.state.feast; if (!f || f.done) return;
+  if (!f.tlNext) f.tlNext = f.start + 90e3;
+  const t = f.tl;
+  if (t && !t.done && now() > t.end) { t.done = true; roomSay(`Hết giờ! Không ai đối được. Đáp án: "${t.a}". Hoàng thượng cười phạt cả bàn một chén rượu.`, '🍶 Tửu lệnh'); htSay('Ha ha, phạt! Cả bàn uống!'); io.to('yentiec').emit('tuulenh', null); }
+  if ((!t || t.done) && now() >= f.tlNext && now() < f.end - 60e3) {
+    const [q, a] = pick(THANH_NGU).split('|'); f.tl = { q, a, end: now() + 45e3, done: false }; f.tlNext = now() + 4 * 60e3;
+    roomSay(`TỬU LỆNH! Nối tiếp câu: "${q} …" Ai gõ đúng vào ô chat trước được Hoàng thượng thưởng rượu!`, '🍶 Tửu lệnh'); io.to('yentiec').emit('tuulenh', { q, end: f.tl.end });
+  }
+  if (!f.htNext) f.htNext = now() + 60e3;
+  if (now() >= f.htNext) { f.htNext = now() + (70 + rnd(50)) * 1000; htSay(pick(HT_FEAST)); }
+}
+function tuuLenhAnswer(p, text) {
+  const f = DB.state.feast, t = f?.tl; if (!t || t.done || p.loc !== 'yentiec') return;
+  if (!norm(text).includes(norm(t.a))) return;
+  t.done = true; p.sung += 3; p.silver += 15; cnt(p, 'tuulenh'); festAdd(p, 5, 'tửu lệnh'); push(p);
+  setTimeout(() => { roomSay(`${p.name} đối nhanh nhất: "${t.q} ${t.a}"! Được Hoàng thượng ban một chén ngự tửu (+3 sủng ái, +15 bạc). Những người còn lại phạt một chén!`, '🍶 Tửu lệnh'); htSay(pick(['Nhanh trí lắm! Thưởng!', 'Hay! Rót rượu cho nàng!', 'Giỏi, trẫm uống mừng nàng một chén.'])); io.to('yentiec').emit('tuulenh', null); }, 300);
 }
 // hầu chuyện Hoàng thượng trong tẩm cung: điểm mỗi lựa chọn theo tâm trạng [vui, mệt, buồn]
 const HT_TALK = [
@@ -922,6 +950,7 @@ function enter(p, loc, sock) {
   let seat = null;
   if (loc === 'yentiec') { const free = SEAT_IDS.yentiec.find(id => !(SEATS.yentiec || {})[id] || !online.has(SEATS.yentiec[id])); if (free) { takeSeat(p, free); seat = free; } }
   sock.emit('scene', { loc, players: others, venue: DB.state.feast?.venue || 'out', seat });
+  if (loc === 'yentiec') { const t = DB.state.feast?.tl; setTimeout(() => sock.emit('tuulenh', t && !t.done ? { q: t.q, end: t.end } : null), 1500); }
   sock.to(room).emit('pjoin', publicView(p));
 }
 
@@ -1010,6 +1039,7 @@ io.on('connection', sock => {
                .replace(/(^|[\s,.!?;:"'(])(bà|mày)(?=$|[\s,.!?;:"')])/giu, (m, a) => a + 'tỷ tỷ');
     if (d_ch === 'tm') { const g = grp(me); if (!g) return toast(me, 'Chưa kết nghĩa tỷ muội.'); for (const id of g.members) { const sk = sockOf(id); if (sk) sk.emit('chat', { id: me.id, name: title(me), text, ch: 'tm' }); } return; }
     io.to(roomOf(me)).emit('chat', { id: me.id, name: title(me), text });
+    if (me.loc === 'yentiec') tuuLenhAnswer(me, text);
   });
 
   sock.on('action', d => {
@@ -1039,11 +1069,11 @@ io.on('connection', sock => {
       const s = sockOf(me.id); if (s) s.emit('npcSay', { who: 'Thái hậu', text: o ? o.r : 'Đứng lên đi.' });
     } else if (a === 'luyen') {
       if (!useTurn(1)) return;
-      const q = Math.max(0, Math.min(1, +d.q || 0)), tai = C.HT.tai.includes(d.tai) ? d.tai : 'múa';
+      const q = Math.max(0, Math.min(1, +d.q || 0)), tai = TIET_MUC[d.tai] ? d.tai : 'múa';
       me.stats.tai += 1 + (q > .8 ? 1 : 0) + (me.path === 'tainghe' ? 1 : 0);
       const pts = Math.round(C.ACTIONS.luyen.pts * (0.5 + q) * (me.path === 'tainghe' ? 1.5 : 1));
       taskDone('luyen'); cnt(me, 'luyen'); addPts(me, pts); if (q > .8) me.silver += 10;
-      toast(me, `${q > .8 ? 'Xuất sắc! ' : q > .5 ? '' : 'Còn vụng… '}Luyện ${tai === 'đàn' ? 'đàn tranh' : tai === 'thơ' ? 'ngâm thơ' : 'múa quạt'} xong. Công trạng +${pts}${q > .8 ? ', thưởng 10 bạc' : ''}.`, 'good');
+      toast(me, `${q > .8 ? 'Xuất sắc! ' : q > .5 ? '' : 'Còn vụng… '}Luyện ${TM_NAME(tai).toLowerCase()} xong. Công trạng +${pts}${q > .8 ? ', thưởng 10 bạc' : ''}.`, 'good');
     } else if (a === 'dangcanh') {
       if (me.loc !== 'duongtam') return toast(me, 'Phải đến Dưỡng Tâm điện mới dâng canh được.');
       if (!useTurn(1, C.ACTIONS.dangcanh.silver)) return;
@@ -1164,10 +1194,38 @@ io.on('connection', sock => {
       const f = DB.state.feast; if (!f || f.done || now() > f.end) return toast(me, 'Hiện không có yến tiệc.');
       if (me.loc !== 'yentiec') return toast(me, 'Vào yến tiệc mới dâng tiết mục được.');
       if (f.entries[me.id]) return toast(me, 'Bổn cung đã dâng tiết mục rồi.');
-      const q = Math.max(0, Math.min(1, +d.q || 0)), tai = C.HT.tai.includes(d.tai) ? d.tai : 'múa';
+      const q = Math.max(0, Math.min(1, +d.q || 0)), tai = TIET_MUC[d.tai] ? d.tai : 'múa';
+      htSay(q > .8 ? pick(['Tuyệt diệu! Thưởng rượu!', 'Hay! Trẫm chưa từng thấy ai ' + TM_NAME(tai).toLowerCase() + ' đẹp như vậy.', 'Xuất sắc!']) : q > .5 ? pick(['Khá lắm.', 'Cũng được, uống một chén nào.']) : pick(['Hơi vụng… nhưng có lòng là được.', 'Lần sau tập thêm nhé.']));
       f.entries[me.id] = { name: title(me), q, tai, color: colorMatch(me) }; cnt(me, 'feast'); festAdd(me, 20, 'dâng tiết mục');
-      addPts(me, 5); toast(me, `Đã dâng tiết mục ${tai}. Chờ Hoàng thượng ban thưởng khi tiệc tàn.`, 'good');
+      addPts(me, 5); toast(me, `Đã dâng tiết mục ${TM_NAME(tai)}. Chờ Hoàng thượng ban thưởng khi tiệc tàn.`, 'good');
       io.emit('feastUpdate', feastView());
+    } else if (a === 'ruou' || a === 'dance') {
+      const f = DB.state.feast; if (!f || f.done || now() > f.end || me.loc !== 'yentiec') return toast(me, 'Chỉ làm được trong yến tiệc.');
+      if (a === 'ruou') {
+        f.toasts = f.toasts || {}; const n = f.toasts[me.id] || 0;
+        if (d.to === 'ht') {
+          f.htToast = f.htToast || {}; if (f.htToast[me.id]) return toast(me, 'Buổi tiệc này đã kính rượu Hoàng thượng rồi.');
+          f.htToast[me.id] = 1; me.sung += 3; addPts(me, 3); roomSay(`${me.name} nâng chén kính Hoàng thượng: "Chúc Hoàng thượng vạn tuế vạn vạn tuế!"`);
+          htSay(pick(['Nàng có lòng. Cạn chén!', 'Tốt! Trẫm uống cạn.', 'Ha ha, uống!']));
+        } else {
+          const t = P(d.to); if (!t || t.id === me.id || t.loc !== 'yentiec' || !online.has(t.id)) return toast(me, 'Người này không có ở yến tiệc.');
+          if (n >= 3) return toast(me, 'Đã kính đủ 3 chén, uống nữa say mất.');
+          f.toasts[me.id] = n + 1; addPts(me, 2); addPts(t, 2); me.rel = me.rel || {}; me.rel[t.id] = (me.rel[t.id] || 0) + 1; t.rel = t.rel || {}; t.rel[me.id] = (t.rel[me.id] || 0) + 1;
+          roomSay(`${me.name} nâng chén kính ${t.name}: "${pick(['Chúc tỷ tỷ ngày càng xinh đẹp!', 'Muội kính tỷ một chén, mong tỷ chiếu cố!', 'Cạn chén vì tình tỷ muội!', 'Chúc tỷ sớm được thăng cấp!'])}" 🍶`);
+          toast(t, `🍶 ${me.name} nâng chén kính bổn cung. Bấm Kính rượu để đáp lễ!`, 'good'); push(t);
+        }
+        io.to('yentiec').emit('pmove', { id: me.id, x: me.x, z: me.z, ry: me.ry, anim: 'tai:rượu', once: true });
+      } else {
+        f.dancers = f.dancers || {}; const first = !f.dancers[me.id]; f.dancers[me.id] = now(); if (first) { me.sung += 1; addPts(me, 2); }
+        const live = Object.entries(f.dancers).filter(([, t]) => now() - t < 40e3).map(([id]) => id);
+        const present = [...online.keys()].filter(id => P(id)?.loc === 'yentiec').length, need = present <= 3 ? 2 : 3;
+        roomSay(`${me.name} bước ra giữa điện múa cùng mọi người 💃`);
+        if (!f.danceBonus && live.length >= need) {
+          f.danceBonus = true; const names = live.map(id => P(id)?.name).filter(Boolean);
+          for (const id of live) { const q = P(id); if (q) { q.sung += 4; addPts(q, 5); toast(q, '💃 Cả điện cùng múa, Hoàng thượng vỗ tay khen: sủng ái +4.', 'good'); push(q); } }
+          htSay('Đẹp quá! Các ái phi múa cùng nhau thật rộn ràng!'); news(`💃 ${names.join(', ')} cùng múa giữa yến tiệc, Hoàng thượng vỗ tay tán thưởng.`);
+        } else if (!f.danceBonus) toast(me, `Cần ${need} người cùng múa trong 40 giây để được Hoàng thượng thưởng (đang có ${live.length}). Rủ mọi người ra múa!`);
+      }
     } else if (a === 'phephi') {
       if (!me.lanh) return; if (me.phephiToday) return toast(me, 'Phế phi đã ngủ thiếp đi, mai hãy hỏi.');
       me.phephiToday = true; const s = sockOf(me.id);
@@ -1429,6 +1487,7 @@ function admin(p, text) {
   else if (cmd === '/cothai') { const who = [arg, ...rest].filter(Boolean).join(' ').toLowerCase(); const q = who ? findP(who) : p; if (!q) return toast(p, 'Không tìm thấy.', 'bad'); q.thai = { since: now() - 1000, known: false }; revealThai(q, 'mach'); }
   else if (cmd === '/sinh') { const who = [arg, ...rest].filter(Boolean).join(' ').toLowerCase(); const q = who ? findP(who) : p; if (!q?.thai) return toast(p, 'Người này không mang thai.', 'bad'); if (!q.thai.known) revealThai(q); birth(q); }
   else if (cmd === '/baucu') { if (DB.state.hhVote) endHHVote(); else { DB.state.hhNext = 0; if (!hhEligible().length) return toast(p, `Chưa có ai từ ${C.RANKS[C.HH_MIN_RANK].name} trở lên để ứng cử.`, 'bad'); startHHVote(); } }
+  else if (cmd === '/tuulenh') { const f = DB.state.feast; if (!f || f.done) return toast(p, 'Chưa có yến tiệc.'); if (f.tl) f.tl.done = true; f.tlNext = 0; feastLive(); }
   else if (cmd === '/daian') { const B = DB.state.bigCase; if (B && !B.done) { B.end = now(); endBigCase(); } else startBigCase(+arg || C.BIG_HOURS); }
   else if (cmd === '/daile') { const F = DB.state.fest; if (F && !F.done) festFinish(F.pts >= F.goal); else startFest(+arg || C.FEST_HOURS); }
   else if (cmd === '/dailediem') { if (!DB.state.fest || DB.state.fest.done) return toast(p, 'Chưa có đại lễ.'); festAdd(p, +arg || 100, 'quản trị'); }
@@ -1448,7 +1507,7 @@ function admin(p, text) {
     if (rest[0] !== 'xacnhan') return toast(p, `Khôi phục sẽ đưa cả cung về ngày ${arg}, mất mọi thứ sau đó. Gõ: /khoiphuc ${arg} xacnhan`, 'bad');
     restore(arg).then(ok => { if (!ok) toast(p, 'Không có bản sao lưu ngày ' + arg, 'bad'); else console.log('restored', arg); }); return;
   }
-  else return toast(p, 'Lệnh: /latthe [trua] /yentiec [phút] /diem N /diemcho N tên /bac N /ngay /vuan /hethan /lanhcung /rakhoi [tên] /cothai [tên] /sinh [tên] /baucu /sukien [hoadang|disan|phatdan|dichbenh|hoica] /daian [giờ] /daile [giờ] /dailediem N /xoaacc tên /saoluu /khoiphuc [ngày xacnhan]');
+  else return toast(p, 'Lệnh: /latthe [trua] /yentiec [phút] /diem N /diemcho N tên /bac N /ngay /vuan /hethan /lanhcung /rakhoi [tên] /cothai [tên] /sinh [tên] /baucu /sukien [hoadang|disan|phatdan|dichbenh|hoica] /tuulenh /daian [giờ] /daile [giờ] /dailediem N /xoaacc tên /saoluu /khoiphuc [ngày xacnhan]');
   toast(p, 'Đã chạy ' + cmd); push(p); save();
 }
 

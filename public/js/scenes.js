@@ -386,3 +386,36 @@ export function buildLocation(loc, opts = {}) {
   else if (loc === 'lanhcung') { coldPalace(o); o.npcs = [{ model: 'mama', x: 2, z: -2.2, ry: -2.5, name: 'Lão ma ma lãnh cung', talk: 'lanh' }, { model: 'aongu', x: -1.8, z: -1.6, ry: 2.2, name: 'Phế phi Trần thị', talk: 'phephi', idle: 'khoc' }]; }
   return o;
 }
+
+// ---------- đạo cụ yến tiệc ----------
+export function makeSword() {
+  const g = new THREE.Group();
+  const blade = new THREE.Mesh(new THREE.BoxGeometry(.018, .62, .004), new THREE.MeshStandardMaterial({ color: 0xdfe6ee, metalness: .9, roughness: .2 })); blade.position.y = .38; g.add(blade);
+  const guard = new THREE.Mesh(new THREE.BoxGeometry(.07, .015, .02), new THREE.MeshStandardMaterial({ color: 0xd9a845, metalness: .8, roughness: .3 })); guard.position.y = .065; g.add(guard);
+  const hilt = new THREE.Mesh(new THREE.CylinderGeometry(.01, .01, .11, 8), new THREE.MeshStandardMaterial({ color: 0x7a1210, roughness: .6 })); g.add(hilt);
+  const tassel = new THREE.Mesh(new THREE.ConeGeometry(.015, .08, 6), new THREE.MeshStandardMaterial({ color: 0xd23a3a, roughness: .8 })); tassel.position.y = -.09; tassel.rotation.x = Math.PI; g.add(tassel);
+  return g;
+}
+export function makeCup() {
+  const g = new THREE.Group();
+  const cup = new THREE.Mesh(new THREE.CylinderGeometry(.028, .018, .035, 12, 1, true), new THREE.MeshStandardMaterial({ color: 0xe8c25a, metalness: .85, roughness: .25, side: THREE.DoubleSide })); g.add(cup);
+  const wine = new THREE.Mesh(new THREE.CircleGeometry(.026, 12), new THREE.MeshStandardMaterial({ color: 0x8a2a14, roughness: .2 })); wine.rotation.x = -Math.PI / 2; wine.position.y = .012; g.add(wine);
+  return g;
+}
+// dải lụa: dải mỏng uốn lượn, cập nhật từng khung hình
+export function makeRibbon(color = 0xe0457b) {
+  const N = 24, geo = new THREE.BufferGeometry(), pos = new Float32Array((N + 1) * 2 * 3), idx = [];
+  for (let i = 0; i < N; i++) { const a = i * 2; idx.push(a, a + 1, a + 2, a + 1, a + 3, a + 2); }
+  geo.setAttribute('position', new THREE.BufferAttribute(pos, 3)); geo.setIndex(idx);
+  const mesh = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({ color, side: THREE.DoubleSide, roughness: .5, transparent: true, opacity: .92 }));
+  mesh.frustumCulled = false; mesh.userData.N = N;
+  mesh.userData.update = (start, t, side) => {
+    const p = geo.attributes.position.array, L = 1.3;
+    for (let i = 0; i <= N; i++) {
+      const u = i / N, x = start.x + side * u * L * .55 + Math.sin(t * 4 + u * 6) * .18 * u, y = start.y - u * .35 + Math.sin(t * 5 - u * 8) * .22 * u + .05, z = start.z + Math.cos(t * 3 + u * 5) * .25 * u;
+      p.set([x, y, z], i * 6); p.set([x, y + .045, z], i * 6 + 3);
+    }
+    geo.attributes.position.needsUpdate = true; geo.computeVertexNormals();
+  };
+  return mesh;
+}

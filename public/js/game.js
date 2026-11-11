@@ -1,7 +1,7 @@
 // MỘNG PHƯỢNG HOÀNG – phía người chơi
 import * as THREE from 'three';
 import { CSS2DRenderer, CSS2DObject } from 'three/addons/renderers/CSS2DRenderer.js';
-import { buildLocation, DECOR, makeGuzheng, makeFan, makeScroll } from './scenes.js';
+import { buildLocation, DECOR, makeGuzheng, makeFan, makeScroll, makeSword, makeCup, makeRibbon } from './scenes.js';
 import { spawn, seatPlacement, ready, loadModel, aim, v3, kneelOn } from './chars.js';
 import * as music from './music.js';
 
@@ -315,7 +315,7 @@ function renderActs() {
   if (L === 'tuninh') { add('🙇 Thỉnh an Thái hậu', me.thinhAn ? 'Hôm nay đã thỉnh an' : 'Miễn phí, mỗi ngày 1 lần · trả lời khéo được thêm điểm', thinhAn, me.thinhAn); if (me.group) for (const m of me.group.members) if (m.id !== me.id && (m.lanh || m.camTuc)) add(`🙏 Cầu tình cho ${esc(m.name)}`, `1 lượt · 50 bạc · ${m.lanh ? 'giúp tiến độ phục vị' : 'giảm 8 giờ cấm túc'}`, () => socket.emit('sis', { op: 'cautinh', who: m.id })); }
   if (L === 'duongtam' && me.goldFish > 0) add(`🐟 Dâng cá chép vàng (${me.goldFish})`, 'Điềm lành · sủng ái +10', () => { emote('cui_chao'); act('dangca'); });
   if (L === 'duongtam') add('🍲 Dâng canh Hoàng thượng', '1 lượt · 30 bạc · nấu đúng món người thèm được sủng nhiều', gameCanh);
-  if (L === 'yentiec') { if (!feast?.mine) add('🎎 Dâng tiết mục', 'Bước ra giữa, đàn, múa hay ngâm thơ cho Hoàng thượng', performFeast); add('🚪 Rời yến tiệc', '', () => socket.emit('goto', 'hoavien')); }
+  if (L === 'yentiec') { if (!feast?.mine) add('🎎 Dâng tiết mục', 'Đàn, múa quạt, múa lụa, kiếm vũ, ngâm thơ, hát', performFeast); add('🍶 Kính rượu', 'Kính Hoàng thượng hoặc các tỷ muội trong tiệc', openRuou); add('💃 Ra múa cùng mọi người', 'Đủ người cùng múa thì Hoàng thượng thưởng', danceTogether); add('🍶 Tửu lệnh', 'Mỗi 4 phút một câu: gõ vế sau thành ngữ vào chat, ai nhanh nhất thắng', () => toast('Chờ Tửu lệnh hiện ở trên màn hình rồi gõ đáp án vào ô chat.')); add('🚪 Rời yến tiệc', '', () => socket.emit('goto', 'hoavien')); }
   if (L === 'hoavien') { if (feast) add('🎎 Dự yến tiệc', 'Đang có yến tiệc, vào ngồi cùng mọi người', () => socket.emit('goto', 'yentiec')); add('🎣 Câu cá ở hồ', `Miễn phí · cá bán lấy bạc${me.fishN >= 15 ? ' (hôm nay đã bán đủ)' : ''}, hiếm khi gặp cá chép vàng`, gameFish); add('👂 Dò tin', '1 lượt · nghe sở thích Hoàng thượng, chuyện trong cung', () => act('dotin')); add('🎐 Luyện tài nghệ', '1 lượt · chơi càng hay càng nhiều điểm', () => chooseTai(t => gameRhythm(t, q => act('luyen', { tai: t, q })))); }
   if (L === 'phong') { add('🎐 Luyện tài nghệ', '1 lượt · chơi càng hay càng nhiều điểm', () => chooseTai(t => gameRhythm(t, q => act('luyen', { tai: t, q })))); add('🎁 Ban thưởng cung nữ', `20 bạc · trung thành ${me.loyal ?? 50}/100 · mỗi ngày 1 lần`, () => act('thuongcn')); add('👘 Thay trang phục', '', openWardrobe); add('🏮 Bài trí ' + (me.hasPalace ? 'cung' : 'phòng'), 'Đặt, xoay đồ nội thất', openDecor); }
   if (L === 'tamcung') { add('🛏 Lên giường', 'Ngồi cùng Hoàng thượng', openBed); add('🌙 Rời tẩm cung', 'Trời sắp sáng', () => socket.emit('goto', 'phong')); }
@@ -1060,11 +1060,13 @@ let mgOn = false;
 function mgOpen(html) { mgOn = true; mgEl.innerHTML = html; mgEl.classList.remove('hidden'); document.body.classList.add('mgopen'); camDistSaved = camDist; camDist = Math.max(2.2, camDist * .8); }
 let camDistSaved = null;
 function mgClose() { mgOn = false; mgEl.classList.add('hidden'); document.body.classList.remove('mgopen'); if (camDistSaved) camDist = camDistSaved; camDistSaved = null; }
+const TMS = [['đàn', '🎵 Đàn tranh'], ['múa', '🪭 Múa quạt'], ['lụa', '🎀 Múa lụa'], ['kiếm', '⚔️ Kiếm vũ'], ['thơ', '📜 Ngâm thơ'], ['hát', '🎶 Hát khúc Giang Nam']];
+const TMCAT = t => ({ 'lụa': 'múa', 'kiếm': 'múa', 'hát': 'đàn' })[t] || t;
 function chooseTai(cb) {
   if (mgOn) return;
   if (me.turns < 1 && world?.loc !== 'yentiec') return toast('Hết lượt hôm nay.', 'bad');
   const fav = me.htKnown?.tai;
-  mgOpen(`<div class="mgt">Chọn tài nghệ</div><div class="row">${[['đàn', '🎵 Đàn tranh'], ['múa', '💃 Múa quạt'], ['thơ', '📜 Ngâm thơ']].map(([k, n]) => `<button data-t="${k}" class="${fav === k ? 'gold' : ''}">${n}${fav === k ? ' ★' : ''}</button>`).join('')}<button data-x>✕</button></div>`);
+  mgOpen(`<div class="mgt">Chọn tài nghệ</div><div class="row">${TMS.map(([k, n]) => `<button data-t="${k}" class="${fav === TMCAT(k) ? 'gold' : ''}">${n}${fav === TMCAT(k) ? ' ★' : ''}</button>`).join('')}<button data-x>✕</button></div>`);
   mgEl.querySelectorAll('[data-t]').forEach(b => b.onclick = () => cb(b.dataset.t));
   mgEl.querySelector('[data-x]').onclick = mgClose;
 }
@@ -1074,8 +1076,8 @@ function gameRhythm(tai, done) {
   if (tai === 'thơ') poemShow();
   const N = 8, notes = []; let t0 = performance.now() + 900, hits = 0, judged = 0, raf;
   for (let i = 0; i < N; i++) notes.push({ t: t0 + i * (520 + Math.random() * 380), st: 0 });
-  mgOpen(`<div class="mgt">${tai === 'đàn' ? '🎵 Gảy đàn' : tai === 'múa' ? '💃 Múa quạt' : '📜 Ngâm thơ'} · bấm khi nốt chạm ô vàng <small>(phím cách hoặc chạm)</small></div><div class="lane"><div class="zone"></div></div><div class="mgs">Trúng <b id="mgHit">0</b>/${N}</div>`);
-  const lane = mgEl.querySelector('.lane'); const els = notes.map(() => { const d = document.createElement('div'); d.className = 'note'; d.textContent = tai === 'đàn' ? '♪' : tai === 'múa' ? '❀' : '字'; lane.appendChild(d); return d; });
+  mgOpen(`<div class="mgt">${(TMS.find(x => x[0] === tai) || ['', '💃 Múa'])[1]} · bấm khi nốt chạm ô vàng <small>(phím cách hoặc chạm)</small></div><div class="lane"><div class="zone"></div></div><div class="mgs">Trúng <b id="mgHit">0</b>/${N}</div>`);
+  const lane = mgEl.querySelector('.lane'); const els = notes.map(() => { const d = document.createElement('div'); d.className = 'note'; d.textContent = { 'đàn': '♪', 'hát': '♫', 'thơ': '字', 'kiếm': '⚔', 'lụa': '〰' }[tai] || '❀'; lane.appendChild(d); return d; });
   const W = () => lane.clientWidth, ZX = () => W() * .82, SPEED = .32; // px/ms
   const hit = () => { const now2 = performance.now(); let best = null; for (const n of notes) if (!n.st) { const dt = Math.abs(now2 - n.t); if (dt < 170 && (!best || dt < Math.abs(now2 - best.t))) best = n; } if (best) { best.st = 1; hits++; judged++; poemStep(); els[notes.indexOf(best)].className = 'note ok'; $('mgHit').textContent = hits; } else { lane.classList.add('miss'); setTimeout(() => lane.classList.remove('miss'), 150); } };
   const key = e => { if (e.code === 'Space') { e.preventDefault(); hit(); } };
@@ -1186,6 +1188,7 @@ function standChair() { if (!chairSeat || !selfC) return; const st = chairSeat; 
 function applyAnim(o, anim, once) {
   const c = o.c; if (!c) return;
   if (o.taiK && !String(anim).startsWith('tai:')) { taiEnd(c); o.taiK = null; c.root.position.set(o.tx, world?.floorAt ? world.floorAt(o.tx, o.tz) : 0, o.tz); }
+  if (anim === 'tai:rượu') { cheers(c); return; }
   if (String(anim).startsWith('sit:')) { const st = world?.seats?.find(x => x.id === anim.slice(4)); if (st) { o.seated = st; seatPose(c, st); return; } }
   if (o.seated) { o.seated = null; c.pose = null; c.root.position.set(o.tx, world?.floorAt ? world.floorAt(o.tx, o.tz) : 0, o.tz); c.root.rotation.y = o.try; }
   if (String(anim).startsWith('tai:')) { o.taiK = anim.slice(4); c.root.position.set(o.tx, 0, o.tz); c.root.rotation.y = o.try; taiStart(c, o.taiK); return; }
@@ -1214,6 +1217,25 @@ function taiStart(c, tai) {
     const fan = makeFan(); world.group.add(fan); c._taiProp = fan;
     const hp = new THREE.Vector3(), q = new THREE.Quaternion();
     c.post = (cc, t) => { cc.B.rHand.getWorldPosition(hp); cc.B.rHand.getWorldQuaternion(q); fan.position.copy(hp); fan.quaternion.copy(q); fan.rotateX(-Math.PI / 2); fan.rotateZ(Math.PI / 2 + Math.sin(t * 3) * .3); fan.translateY(.02); };
+  } else if (tai === 'lụa') {
+    c.play('mua', { restart: true });
+    const g = new THREE.Group(); world.group.add(g); c._taiProp = g;
+    const r1 = makeRibbon(0xe0457b), r2 = makeRibbon(0xf2c14e); g.add(r1, r2); const a = new THREE.Vector3(), b = new THREE.Vector3();
+    c.post = (cc, t) => { cc.B.rHand.getWorldPosition(a); cc.B.lHand.getWorldPosition(b); r1.userData.update(a, t, 1); r2.userData.update(b, t + 1.3, -1); };
+  } else if (tai === 'kiếm') {
+    c.play('mua', { restart: true });
+    const sw = makeSword(); world.group.add(sw); c._taiProp = sw;
+    const hp = new THREE.Vector3(), q = new THREE.Quaternion();
+    c.post = (cc, t) => { cc.B.rHand.getWorldPosition(hp); cc.B.rHand.getWorldQuaternion(q); sw.position.copy(hp); sw.quaternion.copy(q); sw.rotateZ(Math.PI / 2 + Math.sin(t * 4) * .5); };
+  } else if (tai === 'hát') {
+    c.play('dung_cho');
+    const LY = ['♪ Giang Nam mưa bụi bay ngang cửa…', '♪ Sen nở hồ thu, thuyền ai qua…', '♪ Trăng soi lầu ngọc, gió đưa hương…', '♪ Chúc người trường thọ tựa non xanh…'];
+    let k = -1;
+    c.post = (cc, t) => {
+      aim(cc.root, cc.B.rArm, cc.B.rFore, v3([-.3, -.3, .8])); aim(cc.root, cc.B.rFore, cc.B.rHand, v3([.3, .2, .9]));
+      aim(cc.root, cc.B.lArm, cc.B.lFore, v3([.7, -.1 + Math.sin(t * 1.5) * .15, .6])); aim(cc.root, cc.B.lFore, cc.B.lHand, v3([.8, .1, .5]));
+      const n = Math.floor(t / 1.6) % LY.length; if (n !== k && cc.label) { k = n; bubble(cc.label, LY[n]); }
+    };
   } else if (tai === 'câu') {
     c.play('dung_cho');
     const g = new THREE.Group(); world.group.add(g); c._taiProp = g;
@@ -1546,7 +1568,7 @@ async function openPush() {
 const CAMNANG = [
   ['🌱 Bắt đầu', 'Làm theo dòng <b>🎯 nhiệm vụ tân thủ</b> dưới tên nhân vật. Mỗi ngày: thỉnh an Thái hậu, luyện tài nghệ, dò tin là 3 nhiệm vụ ngày, làm đủ được thêm lượt. Lượt hồi 1 mỗi 30 phút. 3 ngày đầu mỗi ngày được thêm 2 lượt, người từ Thường tại trở xuống được thêm 30% công trạng.'],
   ['👑 Hoàng thượng', 'Mỗi ngày Hoàng thượng thèm một món canh, thích một màu áo, muốn xem một tài nghệ. Dò tin ở Ngự hoa viên để biết. Dâng đúng canh được nhiều sủng ái. Hoàng thượng <b>lật thẻ mỗi 2 tiếng từ 8h tới 22h</b>: mặc đúng màu, dâng hương mê điệp, đeo trâm phỉ thúy để dễ được chọn. Được lật thẻ thì vào tẩm cung trong 2 giờ, hầu chuyện khéo được thêm sủng.'],
-  ['🎎 Yến tiệc', 'Mỗi ngày 9h, 11h (ngoài trời ở Ngự hoa viên), 15h, 17h (trong điện), mỗi buổi 20 phút. Vào ngồi, bước ra dâng tiết mục: tiết mục hay nhất được thưởng lớn, mọi người dâng đều có quà. Tỷ muội cùng diễn được cộng điểm.'],
+  ['🎎 Yến tiệc', 'Mỗi ngày 9h, 11h (ngoài trời ở Ngự hoa viên), 15h, 17h (trong điện), mỗi buổi 20 phút. Vào ngồi, bước ra dâng tiết mục (đàn tranh, múa quạt, múa lụa, kiếm vũ, ngâm thơ, hát): hay nhất được thưởng lớn, tiệc có từ 3 loại tiết mục trở lên thì mọi người diễn được thêm sủng ái. <b>Kính rượu</b> Hoàng thượng và các tỷ muội. <b>Ra múa cùng mọi người</b>: đủ người múa cùng lúc thì Hoàng thượng thưởng. <b>Tửu lệnh</b> mỗi 4 phút: Hoàng thượng ra nửa câu thành ngữ, ai gõ vế sau vào chat nhanh nhất được thưởng rượu.'],
   ['🔍 Phá án', 'Ở Từ Ninh cung, mỗi ngày <b>nhận tra án giúp Quế ma ma</b>. Mỗi manh mối cho biết một đặc điểm thật của thủ phạm, ai không khớp bị đóng dấu LOẠI. Còn một người thì ra phiên xử. Từ Quý nhân, bổn cung có thể bị người khác vu oan: khi đó phải tự điều tra để minh oan, sai là bị giáng cấp.'],
   ['📜 Đại án (cả cung cùng tra)', 'Mỗi tuần một vụ án lớn cho cả cung. Mỗi ngày tra 2 lần ở Ngự hoa viên, Từ Ninh cung, Dưỡng Tâm điện: mỗi người nhận <b>manh mối khác nhau, chỉ mình thấy</b>. Công bố cho cả cung hoặc kể trong chat (người khác có thể nói dối!). Tin đồn ⚠️ có thể sai. Cuối hạn người bị nhiều phiếu nhất bị xử: đúng thì ai góp sức cũng được 100 bạc, 40 công trạng (bỏ phiếu đúng thêm 20).'],
   ['🏮 Đại lễ (cả cung góp sức)', '2 tuần một lần, 5 ngày. Góp bạc, thêu gấm ở phòng, chép kinh ở Từ Ninh cung, câu cá, dâng tiết mục ở yến tiệc đều cộng vào thanh tiến độ chung. Đạt 25%, 50%, 75%, 100% thì cả cung có quà (người đã góp nhận đủ, chưa góp nhận một nửa). Đủ 100% Hoàng thượng mở đại yến.'],
@@ -1616,3 +1638,42 @@ function openFest() {
   <div class="today"><b>🏅 Góp sức nhiều nhất</b>${F.top.map((t, i) => `${i + 1}. ${esc(t.name)} · ${Math.floor(t.n)}`).join('<br>') || 'Chưa ai góp.'}</div>`);
   $('mcard').querySelectorAll('[data-g]').forEach(b => b.onclick = () => { socket.emit('fest', { op: 'silver', amount: +b.dataset.g }); setTimeout(openFest, 400); });
 }
+
+// ---------------- YẾN TIỆC SÔI ĐỘNG ----------------
+function cheers(c) {
+  if (!c || c._cheer) return; const cup = makeCup(); world?.group.add(cup); c._cheer = cup; const prev = c.post, hp = new THREE.Vector3();
+  c.post = (cc, t) => { if (prev) prev(cc, t); aim(cc.root, cc.B.rArm, cc.B.rFore, v3([-.1, .15, 1])); aim(cc.root, cc.B.rFore, cc.B.rHand, v3([0, .6, .8])); cc.root.updateMatrixWorld(true); cc.B.rHand.getWorldPosition(hp); cup.position.copy(hp); cup.position.y += .04; };
+  setTimeout(() => { cup.parent?.remove(cup); c._cheer = null; if (c.post !== prev) c.post = prev; }, 2600);
+}
+function openRuou() {
+  const ppl = [...others.values()].filter(o => o.p && o.c).map(o => o.p);
+  modal(`<button class="close" onclick="window._close()">✕</button><h3>🍶 Kính rượu</h3>
+  <div style="color:var(--muted);font-size:12.5px">Kính Hoàng thượng 1 lần mỗi buổi tiệc (sủng ái +3). Kính người khác tối đa 3 chén: cả hai cùng được công trạng và thân nhau hơn.</div>
+  <div class="btns" style="flex-direction:column;align-items:stretch"><button class="gold" data-to="ht">👑 Kính Hoàng thượng</button>${ppl.map(p => `<button data-to="${p.id}">🍶 Kính ${esc(p.name)}</button>`).join('') || '<div style="color:var(--muted);font-size:13px;padding:6px">Chưa có ai khác trong tiệc.</div>'}</div>`);
+  $('mcard').querySelectorAll('[data-to]').forEach(b => b.onclick = () => { act('ruou', { to: b.dataset.to }); cheers(selfC); closeModal(); });
+}
+let dancing = false;
+async function danceTogether() {
+  if (dancing || mgOn || taiOn || !world?.stage || !selfC) return; dancing = true;
+  const home = chairSeat; chairSeat = null; socket.emit('stand');
+  const r = selfC.root; r.position.y = 0; selfC.pose = null; selfC.play('dung_cho');
+  if (home) { r.position.x = home.x - Math.sin(home.ry) * .45; r.position.z = home.z - Math.cos(home.ry) * .45; }
+  const walk = (x, z) => new Promise(res => { selfC.target = { x, z }; let n = 0; const iv = setInterval(() => { if (!selfC?.target || ++n > 80) { selfC && (selfC.target = null); clearInterval(iv); res(); } }, 100); });
+  const S = world.stage; await walk(S.x + (Math.random() - .5) * 1.6, S.z + (Math.random() - .5) * .8);
+  selfC.root.rotation.y = S.ry; const tai = ['múa', 'lụa', 'kiếm', 'lụa'][Math.floor(Math.random() * 4)];
+  taiStart(selfC, tai); socket.emit('emote', 'tai:' + tai); act('dance');
+  setTimeout(async () => {
+    taiEnd(selfC); socket.emit('emote', 'dung_cho'); dancing = false;
+    if (world?.loc === 'yentiec' && home) { await walk(Math.sign(home.x) * .55, home.z); socket.emit('sit', { seat: home.id }); }
+  }, 14000);
+}
+// khung tửu lệnh
+const tlEl = document.createElement('div'); tlEl.id = 'tuulenh'; tlEl.className = 'hidden'; document.body.appendChild(tlEl);
+let tl = null;
+socket.on('tuulenh', d => { tl = d; renderTL(); });
+function renderTL() {
+  if (!tl || world?.loc !== 'yentiec' || Date.now() > tl.end) { tlEl.classList.add('hidden'); return; }
+  tlEl.classList.remove('hidden');
+  tlEl.innerHTML = `<div class="tt">🍶 TỬU LỆNH · còn <b>${Math.max(0, Math.ceil((tl.end - Date.now()) / 1000))}</b> giây</div><div class="tq">${esc(tl.q)} <span>…?</span></div><div class="th">Gõ vế còn lại vào ô chat rồi Enter. Ai nhanh nhất được Hoàng thượng thưởng rượu!</div>`;
+}
+setInterval(() => { if (tl) renderTL(); }, 1000);
