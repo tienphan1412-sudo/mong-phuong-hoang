@@ -752,6 +752,6 @@ io.on('connection', s => s.emit('top5', top5()));
 
 const PORT = process.env.PORT || 3000;
 loadDB().then(() => {
-  setInterval(nightTick, 30e3);
+  setInterval(nightTick, 5e3);
   server.listen(PORT, () => console.log('MỘNG PHƯỢNG HOÀNG chạy ở cổng ' + PORT));
 }).catch(e => { console.error(e); process.exit(1); });
