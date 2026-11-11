@@ -4,7 +4,8 @@ module.exports = {
   NIGHT_HOUR: 21,              // (cũ) giờ lật thẻ mỗi tối
   LAT_THE_SLOTS: [[11, 30, 'Trưa nay'], [21, 0, 'Đêm nay']], // giờ:phút lật thẻ mỗi ngày (giờ VN)
   FEAST_SLOTS: [[9, 30, 'out'], [12, 30, 'out'], [17, 0, 'in'], [20, 0, 'in']], // giờ bắt đầu yến tiệc; out = ngoài trời, in = trong điện
-  FEAST_MIN: 20,               // yến tiệc kéo dài (phút)
+  FEAST_MIN: 20,
+  NOTICE_LEAD_MIN: 15,         // báo trước sự kiện bao nhiêu phút               // yến tiệc kéo dài (phút)
   TURNS_PER_DAY: 5,           // lượt đầu ngày
   TURN_REGEN_MIN: 90,         // cứ 90 phút hồi 1 lượt
   TURN_CAP: 10,               // hồi tối đa tới 10 lượt

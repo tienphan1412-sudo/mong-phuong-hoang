@@ -1264,3 +1264,25 @@ async function runDonCung(d) {
   showBar('Tổng quản thái giám', `Từ nay nơi này là cung riêng của ${esc(d.rankName)} ${esc(d.name)}. Nội vụ phủ đã chuẩn bị đầy đủ, nương nương cứ tùy ý bài trí.`,
     [['Vào cung', async () => { await stageEnd(S, true); socket.emit('goto', 'phong'); }, 'gold']]);
 }
+
+// =====================================================================
+// THÔNG BÁO SỰ KIỆN SẮP DIỄN RA (hiện trước 15 phút, mất khi tới giờ)
+// =====================================================================
+let sched = null; const noticeEl = document.createElement('div'); noticeEl.id = 'notice'; noticeEl.className = 'hidden'; document.body.appendChild(noticeEl);
+const announced = new Set();
+socket.on('schedule', d => { sched = d; tickNotice(); });
+function tickNotice() {
+  if (!sched || !me) { noticeEl.classList.add('hidden'); return; }
+  const tz = (sched.tz ?? 7) * 3600e3, nowVN = Date.now() + tz, dayStart = Math.floor(nowVN / 864e5) * 864e5;
+  const ev = [];
+  for (const [h, m, when] of sched.latThe) ev.push({ t: dayStart + (h * 60 + m) * 60e3, icon: '🏮', text: `${when} Hoàng thượng lật thẻ bài`, hint: me.lanh ? '' : 'Mặc đúng màu áo người thích, dâng hương mê điệp để dễ được chọn' });
+  for (const [h, m, venue] of sched.feast) ev.push({ t: dayStart + (h * 60 + m) * 60e3, icon: '🎎', text: `Yến tiệc ${venue === 'in' ? 'trong điện' : 'ngoài trời'}`, hint: 'Chuẩn bị tiết mục đàn, múa hoặc thơ' });
+  const lead = (sched.lead || 15) * 60e3;
+  const up = ev.filter(e => e.t > nowVN && e.t - nowVN <= lead).sort((a, b) => a.t - b.t);
+  if (!up.length || stage) { noticeEl.classList.add('hidden'); return; }
+  noticeEl.classList.remove('hidden');
+  noticeEl.innerHTML = up.map(e => { const l = e.t - nowVN, hh = new Date(e.t).toISOString().slice(11, 16);
+    const key = e.text + e.t; if (!announced.has(key)) { announced.add(key); try { music.gong(); } catch {} }
+    return `<div class="nt"><span class="ic">${e.icon}</span><div><b>${esc(e.text)}</b> lúc ${hh} · còn <b class="cd">${Math.floor(l / 60e3)}:${String(Math.floor(l % 60e3 / 1000)).padStart(2, '0')}</b>${e.hint ? `<small>${esc(e.hint)}</small>` : ''}</div></div>`; }).join('');
+}
+setInterval(tickNotice, 1000);

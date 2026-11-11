@@ -468,6 +468,7 @@ io.on('connection', sock => {
     sock.emit('auth', { token: p.token });
     sock.emit('newsAll', DB.state.news.slice(0, 30));
     sock.emit('feast', feastView());
+    sock.emit('schedule', { latThe: C.LAT_THE_SLOTS, feast: C.FEAST_SLOTS, tz: C.TZ_OFFSET_H ?? 7, lead: C.NOTICE_LEAD_MIN });
     for (const c of Object.values(DB.state.cases)) if (c.victim === p.id && c.status === 'open' && !c.deadline) {
       c.deadline = now() + c.hours * 3600e3;
       setTimeout(() => sock.emit('cutscene', { type: 'phatgiac', caseId: c.id, method: c.method, methodName: c.methodName, crime: c.crime, hours: c.hours }), 2500);
