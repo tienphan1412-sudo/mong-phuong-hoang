@@ -239,7 +239,9 @@ socket.on('me', async m => {
   me = m;
   if (first) {
     $('gate').classList.add('hidden'); $('game').classList.remove('hidden'); gateSpin = false;
-    setTimeout(() => { for (const m of ['thaihau', 'cungnu', 'thaigiam', 'mama', 'thaiy', 'thive', 'hoangthuong_dem', 'tunu', 'thuongtai_hong', 'quynhan', 'tan', 'phi', 'quyphi', 'hoangquyphi', 'hoanghau', 'aongu']) loadModel(m).catch(() => {}); }, 1500);
+    const PRE = ['cungnu', 'thive', 'thaihau', 'mama', 'thaiy', 'thaigiam', 'hoangthuong'], PRE_PC = ['hoangthuong_dem', 'aongu', 'tunu', 'thuongtai_hong', 'quynhan', 'tan'];
+    const slow = innerWidth < 760 || navigator.connection?.saveData || /2g|3g/.test(navigator.connection?.effectiveType || '');
+    (async () => { await new Promise(r => setTimeout(r, slow ? 6000 : 1500)); for (const m of slow ? PRE : [...PRE, ...PRE_PC]) { await loadModel(m).catch(() => {}); } })();
     musicBtn();
   }
   if (me.latThe) latTheMe = true;
@@ -277,7 +279,7 @@ function renderHud() {
   const lo = me.nextPts ? (me.pts / me.nextPts) : 1; $('hBar').style.width = Math.min(100, lo * 100) + '%';
   $('hPts').textContent = me.nextPts ? `Công trạng ${me.pts}/${me.nextPts}` : `Công trạng ${me.pts}`;
   const t = me.tasks || {};
-  $('stats').innerHTML = `<span class="pill">💰 Bạc <b>${me.silver}</b></span><span class="pill">⏳ Lượt <b>${me.turns}</b></span><span class="pill">💗 Sủng ái <b>${me.sung}</b></span><span class="pill">🍵 Thái hậu <b>${me.haiLong}</b></span><span class="pill">Nhiệm vụ: ${t.thinhan ? '✅' : '⬜'} thỉnh an ${t.luyen ? '✅' : '⬜'} luyện ${t.dotin ? '✅' : '⬜'} dò tin</span>${htPill()}${feast ? `<span class="pill feast">🎎 Yến tiệc · <b id="feastT"></b> · ${feast.n} tiết mục</span>` : ''}${me.cases.length ? `<button class="pill" id="caseBtn" style="border-color:#c0503a">⚖️ Vụ án đang mở (${me.cases.length})</button>` : ''}`;
+  $('stats').innerHTML = `<span class="pill">💰 Bạc <b>${me.silver}</b></span><span class="pill" title="Cứ 90 phút hồi 1 lượt (tối đa ${me.turnCap}). Làm đủ 3 nhiệm vụ ngày, dự yến tiệc, được lật thẻ cũng được thêm lượt.">⏳ Lượt <b>${me.turns}</b>${me.nextTurn ? ` <small id="turnT" style="opacity:.75"></small>` : ''}</span><span class="pill">💗 Sủng ái <b>${me.sung}</b></span><span class="pill">🍵 Thái hậu <b>${me.haiLong}</b></span><span class="pill">Nhiệm vụ: ${t.thinhan ? '✅' : '⬜'} thỉnh an ${t.luyen ? '✅' : '⬜'} luyện ${t.dotin ? '✅' : '⬜'} dò tin</span>${htPill()}${feast ? `<span class="pill feast">🎎 Yến tiệc · <b id="feastT"></b> · ${feast.n} tiết mục</span>` : ''}${me.cases.length ? `<button class="pill" id="caseBtn" style="border-color:#c0503a">⚖️ Vụ án đang mở (${me.cases.length})</button>` : ''}`;
   const cb = $('caseBtn'); if (cb) cb.onclick = () => openCase(me.cases[0].id);
 }
 const LOCNAMES = { yentiec: '🎎 Yến tiệc', hoavien: 'Ngự hoa viên', tuninh: 'Từ Ninh cung', duongtam: 'Dưỡng Tâm điện', phong: 'Phòng riêng', tamcung: 'Tẩm cung', lanhcung: 'Lãnh cung' };
@@ -508,12 +510,16 @@ function holdEdict(c, m) {
 // ---------------- hướng dẫn người chơi mới ----------------
 const TOUR = [
   { el: '#who', title: 'Thân phận của bổn cung', text: 'Tên, chức vị và lối sống. Thanh vàng là <b>công trạng</b>: đầy thanh sẽ được Hoàng thượng tấn phong lên bậc tiếp theo, từ Tú nữ cho tới Hoàng quý phi.' },
-  { el: '#stats', title: 'Bạc, lượt và nhiệm vụ', text: '<b>Bạc</b> để tặng quà, dâng canh, điều tra. <b>Lượt</b>: mỗi ngày 5 lượt, làm việc sẽ tốn lượt, sang ngày mới được hồi lại. <b>Sủng ái</b> càng cao càng dễ được lật thẻ bài. <b>Thái hậu</b> là độ hài lòng của Thái hậu.<br>Làm đủ 3 <b>nhiệm vụ</b> thỉnh an, luyện, dò tin mỗi ngày được thưởng thêm công trạng.' },
+  { el: '#stats', title: 'Bạc, lượt và nhiệm vụ', text: '<b>Bạc</b> để tặng quà, dâng canh, mua đồ ở Nội vụ phủ. <b>Lượt</b>: đầu ngày có 5, cứ 90 phút hồi thêm 1 (tối đa 10). Làm đủ 3 nhiệm vụ ngày được thêm 2 lượt, dự yến tiệc và được lật thẻ cũng được thêm. <b>Sủng ái</b> càng cao càng dễ được lật thẻ bài. <b>Thái hậu</b> là độ hài lòng của Thái hậu.<br>Làm đủ 3 <b>nhiệm vụ</b> thỉnh an, luyện, dò tin mỗi ngày được thưởng thêm công trạng.' },
   { el: '#top5', title: 'Bảng xếp hạng', text: 'Top 5 phi tần cao nhất hậu cung, cập nhật liên tục. <b style="color:#2e9d4f">▲ xanh</b> là vừa thăng cấp, <b style="color:#c0392b">▼ đỏ</b> là vừa bị giáng cấp trong 24 giờ qua. Chấm xanh là đang online.<br>Bấm vào tiêu đề để thu gọn.' },
   { el: '#map', title: 'Đi lại trong cung', text: 'Bấm để đến <b>Ngự hoa viên</b>, <b>Từ Ninh cung</b> (Thái hậu), <b>Dưỡng Tâm điện</b> (Hoàng thượng) và <b>phòng riêng</b>. Đêm nào được lật thẻ bài sẽ hiện thêm <b>Tẩm cung</b>.' },
   { el: '#acts', title: 'Việc làm ở nơi đang đứng', text: 'Mỗi nơi có việc riêng: thỉnh an ở Từ Ninh cung, dâng canh ở Dưỡng Tâm điện, luyện tài nghệ và dò tin ở Ngự hoa viên, thay đồ và bài trí ở phòng riêng.' },
   { el: 'center', title: 'Di chuyển và nói chuyện', text: '<b>Bấm xuống đất</b> để đi tới đó. <b>Kéo chuột</b> để xoay góc nhìn, <b>lăn chuột</b> để phóng to thu nhỏ. Bấm vào <b>tên NPC</b> màu vàng để nói chuyện, cung nữ và thái y còn giúp điều tra vụ án.' },
   { el: () => [...document.querySelectorAll('#acts button')].find(b => b.textContent.includes('Danh sách')), title: 'Tranh sủng', text: 'Xem các phi tần đang ở trong cung. <b>Tặng quà</b> để kết thân. Từ <b>Quý nhân</b> trở lên được <b>ra tay</b> hãm hại người khác.<br>Bị hại sẽ có 24 giờ <b>điều tra lật án</b>: tìm manh mối, nhờ nhân chứng, chỉ đích danh thủ phạm. Thua thì vào lãnh cung, nhưng vẫn có đường phục vị.' },
+  { el: () => document.querySelector('.pill.ht'), title: 'Sở thích Hoàng thượng hôm nay', text: 'Mỗi ngày Hoàng thượng thèm một món canh, thích một màu áo, muốn xem một tài nghệ và có một tâm trạng. Ra <b>Ngự hoa viên dò tin</b> để biết dần. Dâng đúng món, mặc đúng màu, diễn đúng tài nghệ sẽ được sủng ái hơn hẳn.' },
+  { el: 'center', title: 'Yến tiệc và lật thẻ', text: '<b>Yến tiệc</b> mỗi ngày lúc <b>9h30, 12h30</b> (ngoài trời) và <b>17h, 20h</b> (trong điện), mỗi tiệc 20 phút. Vào ngồi cùng mọi người, bước ra dâng tiết mục, ai hay nhất được trọng thưởng.<br><b>Lật thẻ</b> lúc <b>11h30 trưa</b> và <b>21h tối</b>. Được chọn thì vào tẩm cung hầu chuyện Hoàng thượng; không được chọn cũng có quà an ủi.' },
+  { el: () => [...document.querySelectorAll('#acts button')].find(b => b.textContent.includes('Nội vụ phủ')), title: 'Nội vụ phủ', text: 'Tiệm trong cung: nhân sâm thêm lượt, hương mê điệp dễ được lật thẻ, lễ vật cho Thái hậu, và đồ bài trí phòng.' },
+  { el: 'center', title: 'Ngồi ở đình Ngự hoa viên', text: 'Trong đình bát giác ở Ngự hoa viên có 3 đôn sứ. Bấm vào đôn để ngồi, bấm xuống đất để đứng dậy nhường chỗ. Chỗ tụ tập tán gẫu của các tỷ muội.' },
   { el: '#chat', title: 'Trò chuyện', text: 'Gõ rồi nhấn Enter để nói với mọi người cùng chỗ. Xưng "tui", gọi "bà" sẽ tự đổi thành <b>thần thiếp</b>, <b>bổn cung</b>, <b>tỷ tỷ</b>.' },
   { el: '#newsbtn', title: 'Bảng tin hậu cung', text: 'Tin mới trong cung: ai vừa được tấn phong, đêm nay ai được lật thẻ, vụ án nào bị lật.' },
   { el: '#musicbtn', title: 'Nhạc nền', text: 'Bật hoặc tắt nhạc. Mỗi nơi có nhạc riêng.' },
@@ -522,7 +528,7 @@ const TOUR = [
 let tourOn = false;
 function startTour(force) {
   if (tourOn || !me || !world) return;
-  const key = 'mph_tour_' + me.id;
+  const key = 'mph_tour2_' + me.id;
   try { if (!force && localStorage.getItem(key)) return; } catch {}
   if (cutActive || stage || !$('modal').classList.contains('hidden')) { if (!force) setTimeout(() => startTour(), 1500); return; }
   tourOn = true; let i = 0;
@@ -1186,3 +1192,6 @@ async function performFeast() {
   chooseTai(t => gameRhythm(t, q => { act('yentiec', { tai: t, q }); if (feast) feast.mine = true; renderActs();
     setTimeout(async () => { if (world?.loc === 'yentiec' && home) { await walk(Math.sign(home.x) * .55, home.z); socket.emit('sit', { seat: home.id }); } }, 1500); }));
 }
+
+// đồng hồ hồi lượt
+setInterval(() => { const el = $('turnT'); if (!el || !me?.nextTurn) return; const l = me.nextTurn - Date.now(); if (l <= 0) { el.textContent = ''; me.nextTurn = null; socket.emit('refresh'); return; } el.textContent = `+1 sau ${Math.floor(l / 3600e3) ? Math.floor(l / 3600e3) + 'g' : ''}${Math.floor(l % 3600e3 / 60e3)}p`; }, 1000);

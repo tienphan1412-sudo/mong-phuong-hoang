@@ -67,11 +67,18 @@ function ht() {
 function htKnown(p) { if (!p.htk || p.htk.day !== dayKey()) p.htk = { day: dayKey(), keys: [] }; return p.htk; }
 function htKnownView(p) { const h = ht(), k = htKnown(p); const o = {}; for (const key of k.keys) o[key] = key === 'canh' ? C.HT.canh[h.canh] : key === 'mau' ? C.HT.mau[h.mau] : key === 'tai' ? C.HT.tai[h.tai] : C.HT.mood[h.mood]; return o; }
 const colorMatch = p => C.OUTFIT_COLOR[p.outfit] && C.OUTFIT_COLOR[p.outfit] === C.HT.mau[ht().mau];
+// hồi lượt theo thời gian: +1 lượt mỗi TURN_REGEN_MIN phút, tối đa TURN_CAP
+function regen(p) {
+  if (!p.turnAt) p.turnAt = now();
+  if (p.turns >= C.TURN_CAP) { p.turnAt = now(); return; }
+  const step = C.TURN_REGEN_MIN * 60e3, k = Math.floor((now() - p.turnAt) / step);
+  if (k > 0) { p.turns = Math.min(C.TURN_CAP, p.turns + k); p.turnAt += k * step; if (p.turns >= C.TURN_CAP) p.turnAt = now(); }
+}
 function freshDay(p) {
   const k = dayKey();
   if (p.day === k) return;
   p.day = k;
-  p.turns = C.TURNS_PER_DAY + (p.path === 'giaote' ? 1 : 0);
+  p.turns = Math.max(p.turns || 0, C.TURNS_PER_DAY + (p.path === 'giaote' ? 1 : 0)); p.turnAt = now();
   p.thinhAn = false;
   p.attacks = 0; p.targeted = 0;
   p.tasks = { thinhan: false, luyen: false, dotin: false };
@@ -91,7 +98,7 @@ function selfView(p) {
   const open = Object.values(DB.state.cases).filter(c => c.victim === p.id && c.status === 'open').map(c => caseView(c, p));
   return {
     ...publicView(p), path: p.path, pathName: C.PATHS[p.path].name, origin: C.ORIGINS[p.origin].name,
-    pts: p.pts, nextPts: C.RANKS[p.rank + 1]?.pts ?? null, silver: p.silver, turns: p.turns, sung: p.sung, haiLong: p.haiLong,
+    pts: p.pts, nextPts: C.RANKS[p.rank + 1]?.pts ?? null, silver: p.silver, turns: (regen(p), p.turns), turnCap: C.TURN_CAP, nextTurn: p.turns >= C.TURN_CAP ? null : p.turnAt + C.TURN_REGEN_MIN * 60e3, sung: p.sung, haiLong: p.haiLong,
     stats: p.stats, tasks: p.tasks, thinhAn: p.thinhAn, waiting: p.waiting || false, lanh: p.lanh || null,
     outfits: allowedOutfits(p), decor: p.decor || [], hasPalace: p.rank >= C.PALACE_RANK, cases: open,
     protectedUntil: p.protectUntil || 0, admin: !!p.admin, canFight: !p.lanh && p.rank >= C.FIGHT_RANK,
@@ -325,26 +332,35 @@ function checkDeadlines() {
 function latThe(when = 'Đêm nay') {
   const pool = Object.values(DB.players).filter(p => !p.lanh && p.rank >= 1 && (online.has(p.id) || now() - (p.lastSeen || p.created || 0) < 3 * 864e5));
   if (!pool.length) return null;
-  const w = pool.map(p => {
+  const weight = p => {
     let m = 1;
     if (p.picked1 === 1) m = 0.4; if (p.picked1 >= 2) m = 0.15;
     if ((p.notPicked || 0) >= 5) m = 1.5;
     if (colorMatch(p)) m *= 1.4;
     if (p.huong) m *= 1.6;
     return Math.max(0.05, (10 + p.sung + p.stats.tai * 0.5) * m);
-  });
-  let r = Math.random() * w.reduce((a, b) => a + b, 0), chosen = pool[0];
-  for (let i = 0; i < pool.length; i++) { r -= w.at(i); if (r <= 0) { chosen = pool.at(i); break; } }
-  const longAbsent = (chosen.notPicked || 0) >= 5;
+  };
+  const n = pool.length > C.LAT_THE_CROWD ? 2 : 1, left = [...pool], picked = [];
+  for (let k = 0; k < n && left.length; k++) {
+    const w = left.map(weight); let r = Math.random() * w.reduce((a, b) => a + b, 0), i = 0;
+    for (; i < left.length - 1; i++) { r -= w[i]; if (r <= 0) break; }
+    picked.push(left.splice(i, 1)[0]);
+  }
   for (const p of pool) p.huong = false;
-  for (const p of pool) { if (p === chosen) { p.picked1 = (p.picked1 || 0) + 1; p.notPicked = 0; } else { p.picked1 = 0; p.notPicked = (p.notPicked || 0) + 1; } }
-  chosen.sung += C.LAT_THE.sung;
-  chosen.tamCungUntil = now() + 3 * 3600e3;
-  news(longAbsent ? `Hoàng thượng chợt nhớ người cũ: ${when.toLowerCase()} lật thẻ bài của ${title(chosen)}.` : `${when} Hoàng thượng lật thẻ bài của ${title(chosen)}.`, 'latthe');
-  io.emit('latthe', { id: chosen.id, name: title(chosen), when });
-  addPts(chosen, C.LAT_THE.pts);
-  push(chosen); save();
-  return chosen;
+  for (const p of pool) { if (picked.includes(p)) { p.picked1 = (p.picked1 || 0) + 1; p.notPicked = 0; } else { p.picked1 = 0; p.notPicked = (p.notPicked || 0) + 1; } }
+  for (const chosen of picked) {
+    const longAbsent = (chosen.notPicked || 0) >= 5;
+    chosen.sung += C.LAT_THE.sung; chosen.turns += C.LAT_THE.turns;
+    chosen.tamCungUntil = now() + 3 * 3600e3;
+    news(longAbsent ? `Hoàng thượng chợt nhớ người cũ: ${when.toLowerCase()} lật thẻ bài của ${title(chosen)}.` : `${when} Hoàng thượng lật thẻ bài của ${title(chosen)}.`, 'latthe');
+    io.emit('latthe', { id: chosen.id, name: title(chosen), when });
+    addPts(chosen, C.LAT_THE.pts); push(chosen);
+  }
+  // an ủi: người không được chọn nhận quà Hoàng thượng ban
+  const G = C.LAT_THE_GIFT;
+  for (const p of pool) if (!picked.includes(p)) { p.silver += G.silver; p.sung += G.sung; toast(p, `🎁 Hoàng thượng ban ${pick(['một hộp điểm tâm', 'một xấp lụa', 'một cây trâm bạc', 'một bình trà ngon'])} an ủi: +${G.silver} bạc, +${G.sung} sủng ái.`, 'good'); push(p); }
+  save();
+  return picked[0];
 }
 // ---------------- yến tiệc ----------------
 function feastView() {
@@ -361,9 +377,9 @@ function endFeast() {
   const list = Object.entries(f.entries).map(([id, e]) => ({ id, ...e, score: e.q * 100 + (e.tai === C.HT.tai[h.tai] ? 25 : 0) + (e.color ? 15 : 0) + Math.random() * 10 }));
   list.sort((a, b) => b.score - a.score);
   if (list.length) {
-    const w = P(list[0].id); if (w) { w.sung += 12; w.silver += 80; addPts(w, 20); push(w); }
-    for (const e of list.slice(1)) { const q = P(e.id); if (q) { q.silver += 20; push(q); } }
-    news(`🏮 Yến tiệc tàn. Hoàng thượng khen tiết mục ${list[0].tai} của ${list[0].name} xuất sắc nhất, ban thưởng sủng ái, 80 lượng bạc.`, 'phong');
+    const w = P(list[0].id); if (w) { w.sung += 12; w.silver += 80; w.turns += 2; addPts(w, 20); push(w); }
+    for (const e of list.slice(1)) { const q = P(e.id); if (q) { q.silver += 20; q.turns += 1; push(q); } }
+    news(`🏮 Yến tiệc tàn. Hoàng thượng khen tiết mục ${list[0].tai} của ${list[0].name} xuất sắc nhất, ban thưởng sủng ái, 80 lượng bạc, 2 lượt.`, 'phong');
   } else news('Yến tiệc tàn mà không ai dâng tiết mục, Hoàng thượng phẩy tay hồi cung.', 'yentiec');
   setTimeout(() => { for (const [id, sk] of online) { const q = P(id); if (q && q.loc === 'yentiec') { enter(q, 'hoavien', sk); push(q); } } }, 6000);
   io.emit('feastEnd', { winner: list[0] ? { id: list[0].id, name: list[0].name, tai: list[0].tai } : null }); save();
@@ -410,7 +426,7 @@ const LOCS = ['tuninh', 'hoavien', 'duongtam', 'phong', 'tamcung', 'lanhcung', '
 const SEATS = {}; const SEAT_IDS = { hoavien: ['hv0', 'hv1', 'hv2'], yentiec: ['f0', 'f1', 'f2', 'f3', 'f4', 'f5', 'f6', 'f7'] };
 function freeSeat(p) { for (const loc in SEATS) for (const k in SEATS[loc]) if (SEATS[loc][k] === p.id) delete SEATS[loc][k]; p.seat = null; }
 function takeSeat(p, id) { const L = (SEATS[p.loc] = SEATS[p.loc] || {}); if (!(SEAT_IDS[p.loc] || []).includes(id)) return false; if (L[id] && L[id] !== p.id && online.has(L[id])) return false; freeSeat(p); L[id] = p.id; p.seat = id; p.anim = 'sit:' + id; return true; }
-function roomOf(p) { return p.loc === 'phong' ? 'phong:' + p.id : p.loc; }
+function roomOf(p) { return p.loc === 'phong' || p.loc === 'tamcung' ? p.loc + ':' + p.id : p.loc; }
 function enter(p, loc, sock) {
   const old = roomOf(p); freeSeat(p);
   sock.leave(old); sock.to(old).emit('pleave', p.id);
@@ -511,6 +527,7 @@ io.on('connection', sock => {
     freshDay(me);
     const a = d.type;
     if (me.lanh && !['lanh', 'tangqua', 'phephi'].includes(a)) return toast(me, 'Ở lãnh cung chỉ có thể làm nhiệm vụ lãnh cung.', 'bad');
+    regen(me);
     const useTurn = (n, silver = 0) => {
       if (me.turns < n) { toast(me, 'Hết lượt hôm nay. Mai quay lại nhé.', 'bad'); return false; }
       if (me.silver < silver) { toast(me, 'Không đủ bạc.', 'bad'); return false; }
@@ -518,7 +535,7 @@ io.on('connection', sock => {
     };
     const taskDone = k => {
       if (me.tasks[k] === false) { me.tasks[k] = true; }
-      if (!me.taskBonus && Object.values(me.tasks).every(Boolean)) { me.taskBonus = true; addPts(me, 15); toast(me, 'Hoàn thành nhiệm vụ hằng ngày: +15 công trạng.', 'good'); }
+      if (!me.taskBonus && Object.values(me.tasks).every(Boolean)) { me.taskBonus = true; me.turns += C.TASK_TURNS; addPts(me, 15); toast(me, `Hoàn thành nhiệm vụ hằng ngày: +15 công trạng, +${C.TASK_TURNS} lượt.`, 'good'); }
     };
     if (a === 'thinhan') {
       if (me.loc !== 'tuninh') return toast(me, 'Phải đến Từ Ninh cung mới thỉnh an được.');
@@ -635,6 +652,7 @@ io.on('connection', sock => {
     save(); push(me);
   });
   sock.on('case', d => { if (me) caseOp(me, d); });
+  sock.on('refresh', () => { if (me) push(me); });
   sock.on('htTalkQ', () => { if (me) sock.emit('htTalkQ', { mood: C.HT.mood[ht().mood], qs: HT_TALK.map(q => ({ q: q.q, opts: q.opts.map(o => o.t) })) }); });
   sock.on('witnessAnswer', d => {
     if (!me || !d) return; const c = DB.state.cases[d.caseId]; if (!c || !c.witnessReq || c.witnessReq.who !== me.id) return;

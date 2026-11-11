@@ -5,7 +5,10 @@ module.exports = {
   LAT_THE_SLOTS: [[11, 30, 'Trưa nay'], [21, 0, 'Đêm nay']], // giờ:phút lật thẻ mỗi ngày (giờ VN)
   FEAST_SLOTS: [[9, 30, 'out'], [12, 30, 'out'], [17, 0, 'in'], [20, 0, 'in']], // giờ bắt đầu yến tiệc; out = ngoài trời, in = trong điện
   FEAST_MIN: 20,               // yến tiệc kéo dài (phút)
-  TURNS_PER_DAY: 5,
+  TURNS_PER_DAY: 5,           // lượt đầu ngày
+  TURN_REGEN_MIN: 90,         // cứ 90 phút hồi 1 lượt
+  TURN_CAP: 10,               // hồi tối đa tới 10 lượt
+  TASK_TURNS: 2,              // làm đủ 3 nhiệm vụ ngày được thêm 2 lượt
   CASE_HOURS: 24,              // thời hạn điều tra trước khi xử án
   PROTECT_HOURS: 24,           // bảo hộ sau khi bị giáng cấp
   ATTACK_PER_DAY: 2,           // số lần được ra tay / ngày
@@ -73,7 +76,9 @@ module.exports = {
     le:    { name: 'Lễ vật tiến Thái hậu', desc: 'Thái hậu hài lòng +8', price: 60 },
   },
   DECOR_PRICE: { denlong: 60, binhsu: 80, luhuong: 100, tham: 40, giuong: 200 }, // món không có tên ở đây là miễn phí
-  LAT_THE: { pts: 25, sung: 20 },
+  LAT_THE: { pts: 25, sung: 20, turns: 2 },
+  LAT_THE_CROWD: 10,          // cung đông hơn số này thì mỗi lần lật 2 thẻ
+  LAT_THE_GIFT: { silver: 15, sung: 2 }, // quà an ủi cho người không được lật thẻ
 
   WITNESS_WAIT_MS: 5 * 60e3, // chờ nhân chứng khai tối đa 5 phút, quá hạn thì tự khai
   METHODS: [
