@@ -3,7 +3,7 @@ module.exports = {
   TZ_OFFSET_H: 7,              // giờ Việt Nam
   NIGHT_HOUR: 21,              // (cũ) giờ lật thẻ mỗi tối
   LAT_THE_SLOTS: [[8, 0, 'Sáng nay'], [10, 0, 'Sáng nay'], [12, 0, 'Trưa nay'], [14, 0, 'Chiều nay'], [16, 0, 'Chiều nay'], [18, 0, 'Tối nay'], [20, 0, 'Tối nay'], [22, 0, 'Đêm nay']], // giờ:phút lật thẻ mỗi ngày (giờ VN)
-  FEAST_SLOTS: [[9, 30, 'out'], [12, 30, 'out'], [17, 0, 'in'], [20, 0, 'in']], // giờ bắt đầu yến tiệc; out = ngoài trời, in = trong điện
+  FEAST_SLOTS: [[9, 0, 'out'], [11, 0, 'out'], [15, 0, 'in'], [17, 0, 'in']], // giờ bắt đầu yến tiệc; out = ngoài trời, in = trong điện
   FEAST_MIN: 20,
   FISH_PAID: 15,                // mỗi ngày bán được 15 con cá lấy bạc
   NOTICE_LEAD_MIN: 15,         // báo trước sự kiện bao nhiêu phút               // yến tiệc kéo dài (phút)
