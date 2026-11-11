@@ -8,7 +8,7 @@ module.exports = {
   FISH_PAID: 15,                // mỗi ngày bán được 15 con cá lấy bạc
   NOTICE_LEAD_MIN: 15,         // báo trước sự kiện bao nhiêu phút               // yến tiệc kéo dài (phút)
   TURNS_PER_DAY: 5,           // lượt đầu ngày
-  TURN_REGEN_MIN: 90,         // cứ 90 phút hồi 1 lượt
+  TURN_REGEN_MIN: 30,         // cứ 30 phút hồi 1 lượt
   TURN_CAP: 10,               // hồi tối đa tới 10 lượt
   TASK_TURNS: 2,              // làm đủ 3 nhiệm vụ ngày được thêm 2 lượt
   CASE_HOURS: 24,              // thời hạn điều tra trước khi xử án
