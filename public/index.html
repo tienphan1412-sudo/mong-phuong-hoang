@@ -354,6 +354,10 @@ body.staging #cookbar { display:none !important; }
 .bkt { font-style:italic; font-size:13px; text-align:center; margin:4px 0 8px; } .bknl { display:flex; gap:8px; justify-content:center; flex-wrap:wrap; } .bknl span { background:rgba(120,70,20,.12); border-radius:8px; padding:2px 8px; font-size:13px; }
 .bkp ol { font-size:13px; line-height:1.6; margin:8px 0 4px; padding-left:20px; }
 @media (max-width:760px) { .bk { flex-direction:column; } .bkl { flex-direction:row; flex-wrap:wrap; min-width:0; } #cookbar { bottom:52px; } }
+
+.tvgrid { display:grid; grid-template-columns:repeat(4,1fr); gap:8px; margin-top:10px; } .tv { text-align:center; border:1px solid var(--line); border-radius:10px; padding:8px 4px; font-size:12px; background:rgba(255,255,255,.04); } .tv span { display:block; font-size:28px; } .tv.no { opacity:.4; } .tv small { display:block; color:var(--gold2); }
+.diary { max-height:60vh; overflow-y:auto; margin-top:8px; background:linear-gradient(#f8ecd2,#ecd7a6); color:#3a1408; border-radius:10px; padding:8px 14px; font-family:'Noto Serif',serif; } .diary .dl { padding:6px 0; border-bottom:1px dashed #c9a46a; font-size:14px; line-height:1.5; } .diary .dl small { display:block; color:#8a5a2a; font-family:sans-serif; font-size:11px; }
+@media (max-width:760px) { .tvgrid { grid-template-columns:repeat(2,1fr); } }
 </style>
 </head>
 <body>

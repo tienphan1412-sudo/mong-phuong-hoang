@@ -330,7 +330,16 @@ function renderActs() {
   if (L === 'yentiec') { if (!feast?.mine) add('🎎 Dâng tiết mục', 'Đàn, múa quạt, múa lụa, kiếm vũ, ngâm thơ, hát', performFeast); add('🍶 Kính rượu', 'Kính Hoàng thượng hoặc các tỷ muội trong tiệc', openRuou); add('💃 Ra múa cùng mọi người', 'Đủ người cùng múa thì Hoàng thượng thưởng', danceTogether); add('🍶 Tửu lệnh', 'Mỗi 4 phút một câu: gõ vế sau thành ngữ vào chat, ai nhanh nhất thắng', () => toast('Chờ Tửu lệnh hiện ở trên màn hình rồi gõ đáp án vào ô chat.')); add('🚪 Rời yến tiệc', '', () => socket.emit('goto', 'hoavien')); }
   if (L === 'hoavien') { if (feast) add('🎎 Dự yến tiệc', 'Đang có yến tiệc, vào ngồi cùng mọi người', () => socket.emit('goto', 'yentiec')); add('🎣 Câu cá ở hồ', `Miễn phí · cá bán lấy bạc${me.fishN >= 15 ? ' (hôm nay đã bán đủ)' : ''}, hiếm khi gặp cá chép vàng`, gameFish); add('👂 Dò tin', '1 lượt · nghe sở thích Hoàng thượng, chuyện trong cung', () => act('dotin')); add('🎐 Luyện tài nghệ', '1 lượt · chơi càng hay càng nhiều điểm', () => chooseTai(t => gameRhythm(t, q => act('luyen', { tai: t, q })))); }
   if (L === 'phong') { add('🎐 Luyện tài nghệ', '1 lượt · chơi càng hay càng nhiều điểm', () => chooseTai(t => gameRhythm(t, q => act('luyen', { tai: t, q })))); add('🎁 Ban thưởng cung nữ', `20 bạc · trung thành ${me.loyal ?? 50}/100 · mỗi ngày 1 lần`, () => act('thuongcn')); add('👘 Thay trang phục', '', openWardrobe); add('🏮 Bài trí ' + (me.hasPalace ? 'cung' : 'phòng'), 'Đặt, xoay đồ nội thất', openDecor); }
-  if (L === 'tamcung') { add('🛏 Lên giường', 'Ngồi cùng Hoàng thượng', openBed); add('🌙 Rời tẩm cung', 'Trời sắp sáng', () => socket.emit('goto', 'phong')); }
+  if (L === 'tamcung') { const N = me.night || {};
+    if (!me.htTalked) add('💬 Hầu chuyện Hoàng thượng', 'Nghe tâm sự, chọn lời an ủi', startHtTalk);
+    add('🛏 Lên giường', 'Ngồi cùng Hoàng thượng', openBed);
+    add('🗣 Gối đầu tâu chuyện', N.tau ? 'Đêm nay đã tâu' : me.htTalked ? 'Tiến cử tỷ muội · xin tha người lãnh cung · nói xấu đối thủ' : 'Hầu chuyện xong mới tâu được', openTau, N.tau || !me.htTalked);
+    add('🌙 Ngắm trăng đối thơ', N.tho ? 'Đêm nay đã đối thơ' : 'Hoàng thượng đọc câu trên, chọn câu dưới', gameDoiTho, N.tho);
+    add('🎁 Tín vật được ban', `${Object.keys(me.tinvat || {}).length}/8 món`, openTinVat);
+    add('📔 Nhật ký sủng hạnh', '', openDiary);
+    add('🌙 Rời tẩm cung', 'Trời sắp sáng', () => socket.emit('goto', 'phong')); }
+  if (me.night && L !== 'tamcung' && !me.lanh) add('🌸 Chuẩn bị thị tẩm', me.night.prep ? `Đã chuẩn bị: ${esc(me.night.prep.text)}` : 'Tắm hoa, chọn áo ngủ, xông hương hợp tâm trạng Hoàng thượng', openPrep, !!me.night.prep);
+  if (L === 'phong') { add('📔 Nhật ký sủng hạnh', `${(me.diary || []).length} trang`, openDiary); add('🎁 Tín vật được ban', `${Object.keys(me.tinvat || {}).length}/8 món`, openTinVat); }
   if (L === 'lanhcung') { add('🧹 Làm việc lãnh cung', `Phục vị ${me.lanh?.tasks || 0}/3 · mỗi ngày 1 lần`, gameLanh); add('🕯 Hỏi chuyện phế phi', 'Mỗi ngày một lần · bà biết nhiều bí mật', () => act('phephi')); if (me.lanh?.caseId) add('📜 Kêu oan', 'Điều tra lại vụ án cũ', () => openCase(me.lanh.caseId)); }
   const ev = me.event; if (ev?.loc && ev.loc === L && !me.lanh) add(ev.act, ev.done ? 'Hôm nay đã tham gia · mai quay lại' : `${ev.sub} · sự kiện tuần`, () => act('event'), ev.done);
   if (L === 'tuninh' && me.hhVote) add('👑 Bầu phượng ấn', me.hhVote.mine ? 'Đã tiến cử · có thể đổi' : 'Tiến cử người xứng làm Hoàng hậu', openVote);
@@ -391,8 +400,9 @@ let witnessFor = null, rosterMode = null;
 
 // danh sách hậu cung
 function openRoster() { witnessFor = null; socket.emit('roster'); }
+let rosterSilent = false;
 socket.on('roster', r => {
-  if (hhMode) return;
+  if (hhMode || rosterSilent) return;
   if (witnessFor) {
     const id = witnessFor;
     modal(`<button class="close" onclick="window._close()">✕</button><h3>Chọn người làm chứng</h3><table>${r.list.filter(p => p.id !== me.id).map(p => `<tr><td>${p.online ? '🟢' : '⚪'} ${esc(p.name)}</td><td>${esc(p.rankName)}</td><td><button data-w="${p.id}">Nhờ làm chứng</button></td></tr>`).join('') || '<tr><td>Chưa có ai khác trong cung.</td></tr>'}</table>`);
@@ -407,6 +417,7 @@ socket.on('roster', r => {
   mc.querySelectorAll('[data-g]').forEach(b => b.onclick = () => act('tangqua', { target: b.dataset.g }));
   mc.querySelectorAll('tr').forEach(tr => { const g = tr.querySelector('[data-g]'); if (!g) return; const id = g.dataset.g; if (me.group?.members.some(m => m.id === id)) { g.insertAdjacentHTML('afterend', ' <span style="color:#f3a6c8">💞 tỷ muội</span>'); tr.querySelector('[data-r]')?.remove(); } else if (!me.group || me.group.members.length < 4) { const b = document.createElement('button'); b.textContent = '💞 Kết nghĩa'; b.onclick = () => inviteSis(id); g.after(' ', b); }
     const mb = document.createElement('button'); mb.textContent = '✉️ Thư'; mb.onclick = () => composeMail(id, r.list.find(x => x.id === id)?.name); g.parentNode.appendChild(mb);
+    const rp = r.list.find(x => x.id === id); if (rp?.inTam && !me.keoDay && !me.group?.members.some(m => m.id === id)) { const kb = document.createElement('button'); kb.textContent = '🌙 Giả bệnh kéo Hoàng thượng'; kb.title = '1 lượt · 50 bạc · mỗi ngày 1 lần · phải ở phòng riêng'; kb.onclick = () => { if (confirm(`Sai cung nữ sang báo bổn cung đau bụng để kéo Hoàng thượng khỏi tẩm cung của ${rp.name}?`)) { act('keoht', { target: id }); closeModal(); } }; g.parentNode.appendChild(kb); }
     const cb = document.createElement('button'); cb.textContent = '🕵️ Mua chuộc'; cb.title = `${80} bạc · mỗi ngày 1 lần · dò bí mật cung này`; cb.disabled = !!me.mcDay; cb.onclick = () => { if (confirm(`Bỏ 80 bạc mua chuộc cung nữ nhà ${r.list.find(x => x.id === id)?.name}? Có thể bị phát hiện.`)) { act('muachuoc', { target: id }); closeModal(); } }; g.parentNode.appendChild(cb); });
   mc.querySelectorAll('[data-r]').forEach(b => b.onclick = () => {
     const t = r.list.find(p => p.id === b.dataset.r);
@@ -1163,11 +1174,12 @@ socket.on('htTalkQ', async d => {
   const open = { vui: 'Hôm nay trẫm vui, nàng đến thật đúng lúc!', mệt: 'Haizz… trẫm hơi mệt.', buồn: 'Trẫm có chút tâm sự…' }[d.mood] || 'Nàng đến rồi.';
   htGesture('gio_tay');
   await say('hoangthuong_dem', 'Hoàng thượng', open, [['Thần thiếp tham kiến Hoàng thượng', 0, 'gold']]);
+  let ts = 0; if (d.tamsu) { htGesture('dung_cho_nam'); ts = await say('hoangthuong_dem', 'Hoàng thượng tâm sự', esc(d.tamsu.q), d.tamsu.opts.map((o, i) => [esc(o), i, ''])); }
   const ans = [];
   for (const q of d.qs) ans.push(await say('hoangthuong_dem', 'Hoàng thượng', esc(q.q), q.opts.map((o, i) => [esc(o), i, ''])));
-  act('httalk', { ans });
+  act('httalk', { ans, ts });
 });
-socket.on('htTalkResult', async r => { htGesture(r.score >= 2 ? 'nam_tay' : 'dung_cho_nam'); await say('hoangthuong_dem', 'Hoàng thượng', `${esc(r.line)}<br><small>💗 Sủng ái +${r.sung}</small>`, [['Tạ ơn Hoàng thượng', 0, 'gold']]); dlgClose(); htTalking = false; });
+socket.on('htTalkResult', async r => { htGesture(r.score >= 2 ? 'nam_tay' : 'dung_cho_nam'); await say('hoangthuong_dem', 'Hoàng thượng', `${esc(r.line)}<br><small>💗 Sủng ái +${r.sung}${r.gift ? ` · 🎁 Hoàng thượng ban <b>${esc(r.gift)}</b>` : ''}</small>`, [['Tạ ơn Hoàng thượng', 0, 'gold']]); dlgClose(); htTalking = false; });
 
 // =====================================================================
 // TIỆM NỘI VỤ PHỦ
@@ -1953,3 +1965,77 @@ async function gameCook(ri) {
     done();
   } catch (e) { done(); if (e !== 'quit') console.error(e); }
 }
+
+// =====================================================================
+// THỊ TẨM: chuẩn bị, tâu chuyện, đối thơ, tín vật, tranh sủng, nhật ký
+// =====================================================================
+const PREP_UI = { hoa: ['🛁 Tắm hoa', ['🌹 Cánh hồng', '🤍 Hoa nhài', '🪷 Hoa sen']], ao: ['👘 Áo ngủ', ['💗 Lụa hồng thắm', '🤍 Lụa trắng mỏng', '🌺 Gấm thêu mẫu đơn']], huong: ['🪔 Hương xông', ['🟤 Trầm hương', '🌸 Hương lan', '❄️ Hương mai thanh']] };
+function openPrep() {
+  const sel = { hoa: 0, ao: 0, huong: 0 }, mood = me.htKnown?.mood;
+  const draw = () => {
+    modal(`<button class="close" onclick="window._close()">✕</button><h3>🌸 Chuẩn bị thị tẩm</h3>
+    <div style="color:var(--muted);font-size:12.5px">Chọn hợp tâm trạng Hoàng thượng thì được thêm sủng ái và đêm hầu chuyện suôn sẻ hơn. ${mood ? `Nghe nói hôm nay người <b style="color:var(--gold2)">${esc(mood)}</b>.` : 'Chưa biết hôm nay người vui hay mệt, dò tin ở Ngự hoa viên để biết.'}<br><small>Gợi ý: vui thì rực rỡ, mệt thì nhẹ nhàng thư thái, buồn thì thanh tao.</small></div>
+    ${Object.entries(PREP_UI).map(([k, [t, opts]]) => `<div class="today"><b>${t}</b><div class="btns" style="margin:4px 0 0">${opts.map((o, i) => `<button data-k="${k}" data-i="${i}" class="${sel[k] === i ? 'gold' : ''}">${o}</button>`).join('')}</div></div>`).join('')}
+    <div class="btns"><button class="gold" id="prGo">Xong, chờ Hoàng thượng</button></div>`);
+    $('mcard').querySelectorAll('[data-k]').forEach(b => b.onclick = () => { sel[b.dataset.k] = +b.dataset.i; draw(); });
+    $('prGo').onclick = () => { act('chuanbi', sel); closeModal(); if (selfC) { const c = selfC.root; burst(c.position.x, 1.2, c.position.z, 50, .7, [0xffc2e2, 0xffffff, 0xff9ad5], 2, .2, .07); } };
+  };
+  draw();
+}
+function openTau() {
+  if (me.night?.tau || !me.htTalked) return;
+  rosterSilent = true; socket.emit('roster'); socket.once('roster', r => { rosterSilent = false;
+    const others2 = r.list.filter(p => p.id !== me.id);
+    const sis = others2.filter(p => me.group?.members.some(m => m.id === p.id) && !p.lanh), lanh = others2.filter(p => p.lanh), foes = others2.filter(p => !p.lanh && !me.group?.members.some(m => m.id === p.id));
+    const row = (p, kind, lb) => `<button data-w="${p.id}" data-k="${kind}">${lb} ${esc(p.name)}</button>`;
+    setTimeout(() => {
+      modal(`<button class="close" onclick="window._close()">✕</button><h3>🗣 Gối đầu tâu chuyện</h3><div style="color:var(--muted);font-size:12.5px">Mỗi đêm chỉ tâu một chuyện. Nói xấu người khác có thể bị Hoàng thượng cho là đố kỵ.</div>
+      <div class="today"><b>💞 Tiến cử tỷ muội</b> (+30 công trạng cho người đó)<div class="btns" style="margin:4px 0 0;flex-wrap:wrap">${sis.map(p => row(p, 'thangcap', '💞')).join('') || '<small>Chưa có tỷ muội kết nghĩa.</small>'}</div></div>
+      <div class="today"><b>🙏 Xin tha người ở lãnh cung</b> (+1 tiến độ phục vị)<div class="btns" style="margin:4px 0 0;flex-wrap:wrap">${lanh.map(p => row(p, 'thalanh', '🙏')).join('') || '<small>Không ai ở lãnh cung.</small>'}</div></div>
+      <div class="today"><b>🐍 Thì thầm nói xấu</b> (thành công: người đó -15 sủng ái · lộ: bổn cung -10)<div class="btns" style="margin:4px 0 0;flex-wrap:wrap">${foes.map(p => row(p, 'noixau', '🐍')).join('') || '<small>Không có ai.</small>'}</div></div>`);
+      $('mcard').querySelectorAll('[data-w]').forEach(b => b.onclick = () => { act('tauchuyen', { who: b.dataset.w, kind: b.dataset.k }); closeModal(); });
+    }, 50);
+  });
+}
+const DOI_THO_C = [
+  ['Sàng tiền minh nguyệt quang', 'Nghi thị địa thượng sương', ['Xứ xứ văn đề điểu', 'Hoàng Hà nhập hải lưu']],
+  ['Cử đầu vọng minh nguyệt', 'Đê đầu tư cố hương', ['Dạ bán chung thanh đáo khách thuyền', 'Phục chiếu thanh đài thượng']],
+  ['Xuân miên bất giác hiểu', 'Xứ xứ văn đề điểu', ['Nghi thị địa thượng sương', 'Đãn văn nhân ngữ hưởng']],
+  ['Dạ lai phong vũ thanh', 'Hoa lạc tri đa thiểu', ['Cánh thượng nhất tầng lâu', 'Đê đầu tư cố hương']],
+  ['Bạch nhật y sơn tận', 'Hoàng Hà nhập hải lưu', ['Hoa lạc tri đa thiểu', 'Giang phong ngư hỏa đối sầu miên']],
+  ['Dục cùng thiên lý mục', 'Cánh thượng nhất tầng lâu', ['Xuân miên bất giác hiểu', 'Nghi thị địa thượng sương']],
+  ['Không sơn bất kiến nhân', 'Đãn văn nhân ngữ hưởng', ['Hoàng Hà nhập hải lưu', 'Dạ lai phong vũ thanh']],
+  ['Nguyệt lạc ô đề sương mãn thiên', 'Giang phong ngư hỏa đối sầu miên', ['Cử đầu vọng minh nguyệt', 'Phản cảnh nhập thâm lâm']],
+];
+async function gameDoiTho() {
+  if (me.night?.tho) return; const qs = [...DOI_THO_C].sort(() => Math.random() - .5).slice(0, 3); let ok = 0;
+  await say('hoangthuong_dem', 'Hoàng thượng', 'Trăng đêm nay đẹp quá. Trẫm đọc câu trên, nàng đối câu dưới nhé.', [['Thần thiếp xin hầu', 0, 'gold']]);
+  for (const [a, b, wrong] of qs) {
+    const opts = [b, ...wrong].sort(() => Math.random() - .5);
+    const i = await say('hoangthuong_dem', 'Hoàng thượng', `<i>“${esc(a)}…”</i>`, opts.map((o, k) => [esc(o), k, '']));
+    if (opts[i] === b) { ok++; htGesture('nam_tay'); } else toast(`Câu đúng là: “${b}”`);
+  }
+  dlgClose(); act('doitho', { ok });
+}
+function openTinVat() {
+  const ALL = ['Ngọc bội song ngư', 'Quạt đề thơ ngự bút', 'Trâm bạch ngọc', 'Hộp phấn Tô Châu', 'Khăn lụa thêu long phượng', 'Chuỗi trầm hương', 'Gương đồng chạm hoa', 'Bức họa chân dung'];
+  const IC = ['🐟', '🪭', '🪮', '🧴', '🧣', '📿', '🪞', '🖼'], tv = me.tinvat || {};
+  modal(`<button class="close" onclick="window._close()">✕</button><h3>🎁 Tín vật Hoàng thượng ban</h3><div style="color:var(--muted);font-size:12.5px">Mỗi đêm hầu chuyện xong, sáng ra Hoàng thượng ban một tín vật. Gom đủ 8 món được danh hiệu "Châu ngọc mãn lâu".</div>
+  <div class="tvgrid">${ALL.map((n, i) => `<div class="tv ${tv[n] ? '' : 'no'}"><span>${tv[n] ? IC[i] : '❔'}</span>${tv[n] ? esc(n) : '???'}${tv[n] > 1 ? `<small>×${tv[n]}</small>` : ''}</div>`).join('')}</div>`);
+}
+function openDiary() {
+  const D = me.diary || [];
+  modal(`<button class="close" onclick="window._close()">✕</button><h3>📔 Nhật ký sủng hạnh</h3>
+  <div class="diary">${D.map(d => `<div class="dl"><small>${new Date(d.t).toLocaleString('vi-VN', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}</small>${esc(d.text)}</div>`).join('') || '<div style="color:var(--muted)">Chưa có trang nào. Được lật thẻ bài sẽ có kỷ niệm đầu tiên.</div>'}</div>`);
+}
+// bị người khác giả bệnh kéo Hoàng thượng đi
+socket.on('keoHT', d => {
+  let n = 0; const need = 6;
+  modal(`<h3>🌙 Có biến giữa đêm!</h3><div style="font-size:13.5px">${esc(d.from)} hớt hải chạy tới: <i>"Chủ tử nhà nô tỳ đau bụng dữ dội, xin Hoàng thượng qua xem!"</i><br>Hoàng thượng đứng dậy định đi… Bấm thật nhanh để <b>níu tay giữ người lại</b>!</div>
+  <div class="ckbar" style="margin-top:10px"><i id="kpBar" style="width:0%;transition:width .15s"></i><span id="kpT">0/${need}</span></div>
+  <div class="btns"><button class="gold big" id="kpBtn">💕 Níu tay Hoàng thượng</button></div><div style="color:var(--muted);font-size:12px">Còn <b id="kpS">20</b> giây</div>`);
+  const fin = () => { clearInterval(iv); act('giuchan', { q: n / need }); closeModal(); };
+  $('kpBtn').onclick = () => { n++; $('kpBar').style.width = Math.min(100, n / need * 100) + '%'; $('kpT').textContent = `${n}/${need}`; htGesture('dung_cho_nam'); if (n >= need) fin(); };
+  const iv = setInterval(() => { const l = Math.ceil((d.until - Date.now()) / 1000); const e = $('kpS'); if (e) e.textContent = Math.max(0, l); if (l <= 0) fin(); }, 300);
+});
+socket.on('keoKet', () => showScroll('Đêm dài', 'Hoàng thượng đã bỏ đi giữa đêm… Trong cung, ai cũng biết chuyện này. Lần sau nhớ giữ chân người cho chặt.', [['Lau nước mắt', () => { hideCut(); emote('khoc'); }]]));

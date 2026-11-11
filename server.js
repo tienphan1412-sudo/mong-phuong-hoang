@@ -146,7 +146,7 @@ function selfView(p) {
     thai: p.thai?.known ? { due: p.thai.due, care: p.thai.care || 0, antai: p.thai.antai === dayKey() } : null, children: p.children || [],
     isHH: isHH(p), hhDay: p.hhDay || {}, hhVote: hhVoteView(p), hhName: DB.state.hh ? P(DB.state.hh.id)?.name || null : null,
     event: { ...curEvent(), done: p.evDay === dayKey() }, streak: p.streak || 0, ach: achView(p), titleSel: p.titleSel || '',
-    big: bigView(p), fest: festView(p),
+    big: bigView(p), fest: festView(p), night: nightView(p), diary: (p.diary || []).slice(0, 30), tinvat: p.tinvat || {}, keoDay: p.keoDay === dayKey(),
     dish: p.dish ? { name: p.dish.name, q: p.dish.q, t: p.dish.t, dish: p.dish.dish } : null, cookN: p.cookDay?.d === dayKey() ? p.cookDay.n : 0,
     quest: questView(p), jewels: p.jewels || [], mcDay: p.mcDay === dayKey(),
     relDayMach: !!(p.relDay || {})['thaiy:mach'], detDay: p.detDay === dayKey(),
@@ -496,6 +496,8 @@ const ACH = [
   { id: 'hoadong', name: 'Trên thuận dưới hòa', desc: 'Thân thiết với cả 4 người: Thái hậu, Quế ma ma, Thái y, Tổng quản', need: 4, cur: p => ['thaihau', 'mama', 'thaiy', 'tonggiam'].filter(n => rel(p, n) >= 30).length },
   { id: 'thantham', name: 'Thần thám hậu cung', desc: 'Giúp Quế ma ma phá 5 vụ án', need: 5, cur: p => p.cnt?.det || 0 },
   { id: 'tuuluong', name: 'Tửu lượng hơn người', desc: 'Thắng tửu lệnh 5 lần', need: 5, cur: p => p.cnt?.tuulenh || 0 },
+  { id: 'tinvat', name: 'Châu ngọc mãn lâu', desc: 'Gom đủ 8 tín vật Hoàng thượng ban', need: 8, cur: p => Object.keys(p.tinvat || {}).length },
+  { id: 'thoho', name: 'Thi tình họa ý', desc: 'Đối thơ đúng cả 3 câu khi ngắm trăng', need: 1, cur: p => p.cnt?.thoOk || 0 },
   { id: 'ngutru', name: 'Bàn tay ngự trù', desc: 'Tự tay nấu 10 món ở Ngự thiện phòng', need: 10, cur: p => p.cnt?.cook || 0 },
   { id: 'thanco', name: 'Thần cơ diệu toán', desc: 'Bỏ phiếu đúng thủ phạm một đại án', need: 1, cur: p => p.cnt?.bigRight || 0 },
   { id: 'hieutam', name: 'Hiếu tâm cảm động', desc: 'Góp sức nhiều nhất một kỳ đại lễ', need: 1, cur: p => p.cnt?.festTop || 0 },
@@ -793,7 +795,7 @@ function latThe(when = 'Đêm nay') {
   for (const chosen of picked) {
     const longAbsent = (chosen.notPicked || 0) >= 5;
     chosen.sung += C.LAT_THE.sung; chosen.turns += C.LAT_THE.turns;
-    chosen.tamCungUntil = now() + 2 * 3600e3; cnt(chosen, 'latThe');
+    chosen.tamCungUntil = now() + 2 * 3600e3; cnt(chosen, 'latThe'); diary(chosen, `${when} Hoàng thượng lật thẻ bài của bổn cung.`);
     if (!chosen.thai && now() - (chosen.bornAt || 0) > 2 * 864e5 && Math.random() < C.THAI_CHANCE) chosen.thai = { since: now(), known: false };
     news(longAbsent ? `Hoàng thượng chợt nhớ người cũ: ${when.toLowerCase()} lật thẻ bài của ${title(chosen)}.` : `${when} Hoàng thượng lật thẻ bài của ${title(chosen)}.`, 'latthe');
     io.emit('latthe', { id: chosen.id, name: title(chosen), when });
@@ -904,6 +906,48 @@ function tuuLenhAnswer(p, text) {
   if (!norm(text).includes(norm(t.a))) return;
   t.done = true; p.sung += 3; p.silver += 15; cnt(p, 'tuulenh'); festAdd(p, 5, 'tửu lệnh'); push(p);
   setTimeout(() => { roomSay(`${p.name} đối nhanh nhất: "${t.q} ${t.a}"! Được Hoàng thượng ban một chén ngự tửu (+3 sủng ái, +15 bạc). Những người còn lại phạt một chén!`, '🍶 Tửu lệnh'); htSay(pick(['Nhanh trí lắm! Thưởng!', 'Hay! Rót rượu cho nàng!', 'Giỏi, trẫm uống mừng nàng một chén.'])); io.to('yentiec').emit('tuulenh', null); }, 300);
+}
+// ---------- THỊ TẨM: chuẩn bị, tâm sự, tâu chuyện, tín vật, tranh sủng, đối thơ, nhật ký ----------
+// mood index: 0 vui, 1 mệt, 2 buồn
+const PREP = {
+  hoa: [['Cánh hồng', [3, 1, 1]], ['Hoa nhài', [1, 3, 2]], ['Hoa sen', [1, 2, 3]]],
+  ao: [['Áo lụa hồng thắm', [3, 0, 1]], ['Áo lụa trắng mỏng', [1, 3, 2]], ['Áo gấm thêu mẫu đơn', [2, 1, 1]]],
+  huong: [['Hương trầm', [1, 3, 2]], ['Hương lan', [3, 1, 2]], ['Hương mai thanh', [1, 1, 3]]],
+};
+const TAMSU = [
+  { q: 'Biên cương báo tin chiến sự căng thẳng, trẫm ăn ngủ không yên…', opts: [['Hoàng thượng anh minh, tướng sĩ tất thắng. Người nghỉ một đêm mới đủ sức lo việc lớn.', 3], ['Thần thiếp nguyện ăn chay cầu bình an cho tướng sĩ.', 2], ['Hay Hoàng thượng kể thần thiếp nghe trận mạc thế nào?', -1]] },
+  { q: 'Hôm nay là ngày giỗ mẫu phi của trẫm…', opts: [['Thần thiếp xin cùng người thắp nén hương, nói chuyện về bà.', 3], ['Mẫu phi trên trời chắc tự hào về Hoàng thượng lắm.', 2], ['Hoàng thượng đừng buồn nữa, để thần thiếp múa cho người xem.', -1]] },
+  { q: 'Lão đại thần họ Vương hôm nay lại cãi trẫm giữa triều!', opts: [['Trung thần mới dám can gián, đó là phúc của Hoàng thượng.', 3], ['Người bớt giận, uống chén trà sen cho mát gan.', 2], ['Phạt lão ta thật nặng cho chừa!', -2]] },
+  { q: 'Trẫm nhớ hồi còn là hoàng tử, được tự do cưỡi ngựa ngoài thành…', opts: [['Đợi xuân sang, thần thiếp xin theo người đi săn ở Mộc Lan.', 3], ['Giờ Hoàng thượng gánh cả giang sơn, thần thiếp thương người lắm.', 2], ['Làm hoàng tử sao sướng bằng làm vua ạ?', -1]] },
+  { q: 'Hậu cung dạo này ồn ào quá, trẫm nghe mà đau đầu.', opts: [['Thần thiếp sẽ khuyên các tỷ muội giữ hòa khí.', 3], ['Ở chỗ thần thiếp yên tĩnh, người cứ đến nghỉ.', 2], ['Là do mấy người kia hay gây chuyện ạ…', -2]] },
+  { q: 'Năm nay mất mùa ở Giang Nam, trẫm lo dân đói.', opts: [['Thần thiếp xin bớt bổng lộc góp vào lương cứu đói.', 3], ['Có Hoàng thượng thương dân, ắt trời sẽ thương.', 1], ['Trong cung vẫn đủ ăn mà ạ.', -2]] },
+];
+const TINVAT = ['Ngọc bội song ngư', 'Quạt đề thơ ngự bút', 'Trâm bạch ngọc', 'Hộp phấn Tô Châu', 'Khăn lụa thêu long phượng', 'Chuỗi trầm hương', 'Gương đồng chạm hoa', 'Bức họa chân dung'];
+const DOI_THO = [
+  ['Sàng tiền minh nguyệt quang', 'Nghi thị địa thượng sương', ['Xứ xứ văn đề điểu', 'Hoàng Hà nhập hải lưu']],
+  ['Cử đầu vọng minh nguyệt', 'Đê đầu tư cố hương', ['Dạ bán chung thanh đáo khách thuyền', 'Phục chiếu thanh đài thượng']],
+  ['Xuân miên bất giác hiểu', 'Xứ xứ văn đề điểu', ['Nghi thị địa thượng sương', 'Đãn văn nhân ngữ hưởng']],
+  ['Dạ lai phong vũ thanh', 'Hoa lạc tri đa thiểu', ['Cánh thượng nhất tầng lâu', 'Đê đầu tư cố hương']],
+  ['Bạch nhật y sơn tận', 'Hoàng Hà nhập hải lưu', ['Hoa lạc tri đa thiểu', 'Giang phong ngư hỏa đối sầu miên']],
+  ['Dục cùng thiên lý mục', 'Cánh thượng nhất tầng lâu', ['Xuân miên bất giác hiểu', 'Nghi thị địa thượng sương']],
+  ['Không sơn bất kiến nhân', 'Đãn văn nhân ngữ hưởng', ['Hoàng Hà nhập hải lưu', 'Dạ lai phong vũ thanh']],
+  ['Nguyệt lạc ô đề sương mãn thiên', 'Giang phong ngư hỏa đối sầu miên', ['Cử đầu vọng minh nguyệt', 'Phản cảnh nhập thâm lâm']],
+];
+function diary(p, text) { p.diary = p.diary || []; p.diary.unshift({ t: now(), text }); p.diary = p.diary.slice(0, 40); }
+const night = p => p.tamCungUntil > now() ? p.tamCungUntil : 0;
+function nightView(p) {
+  const n = night(p); if (!n) return null; const N = p.night?.id === n ? p.night : {};
+  return { until: n, prep: N.prep || null, tau: !!N.tau, tho: !!N.tho, gift: N.gift || null, mood: C.HT.mood[ht().mood] };
+}
+function nightState(p) { const n = night(p); if (!n) return null; if (p.night?.id !== n) p.night = { id: n }; return p.night; }
+const KEO = {}; // targetId -> {by, at, timer}
+function resolveKeo(tid, held) {
+  const k = KEO[tid]; if (!k) return; delete KEO[tid]; clearTimeout(k.timer);
+  const t = P(tid), a = P(k.by); if (!t || !a) return;
+  if (held) { a.sung = Math.max(0, a.sung - 5); toast(a, `Hoàng thượng chỉ sai thái y qua xem, rồi ở lại với ${t.name}. Kế không thành (sủng ái -5).`, 'bad'); toast(t, '💕 Bổn cung giữ chân được Hoàng thượng. Người ở lại cả đêm.', 'good'); t.sung += 5; diary(t, `Có kẻ giả bệnh mời Hoàng thượng đi, nhưng người ở lại với bổn cung.`); news(`🌙 Có người giả bệnh mời Hoàng thượng giữa đêm, nhưng người vẫn ở lại với ${t.name}.`); }
+  else { t.tamCungUntil = now(); a.sung += 10; toast(t, `💔 Hoàng thượng bỏ đi giữa đêm sang cung ${a.name}…`, 'bad'); toast(a, `🌙 Kế thành! Hoàng thượng rời ${t.name}, sang thăm bổn cung (+10 sủng ái).`, 'good'); diary(t, `Đang hầu thì ${a.name} sai người báo bệnh, Hoàng thượng bỏ đi giữa đêm.`); diary(a, `Giả bệnh kéo Hoàng thượng khỏi tẩm cung của ${t.name}. Người sang thăm bổn cung.`); news(`🌙 Nửa đêm ${a.name} trở bệnh, Hoàng thượng rời tẩm cung của ${t.name} sang thăm.`, 'latthe');
+    const sk = sockOf(t.id); if (sk) { sk.emit('keoKet', { lost: true }); setTimeout(() => { if (t.loc === 'tamcung') { t.outfit = C.RANKS[t.rank].outfit; enter(t, 'phong', sk); push(t); } }, 3500); } }
+  push(t); push(a); save();
 }
 // hầu chuyện Hoàng thượng trong tẩm cung: điểm mỗi lựa chọn theo tâm trạng [vui, mệt, buồn]
 const HT_TALK = [
@@ -1272,8 +1316,46 @@ io.on('connection', sock => {
       if (me.htTalked === me.tamCungUntil) return toast(me, 'Đêm nay đã hầu chuyện Hoàng thượng rồi.');
       const ans = Array.isArray(d.ans) ? d.ans.slice(0, 3) : []; const mood = ht().mood; let sc = 0;
       (me.htQs || [0, 1, 2]).forEach((qi, i) => { const o = HT_TALK[qi]?.opts[+ans[i]]; if (o) sc += o.s[mood]; });
+      const T = TAMSU[me.ts ?? 0], to = T?.opts[+d.ts]; if (to) sc += to[1]; const N = nightState(me); if (N?.prep) sc += Math.floor(N.prep.score / 3);
       me.htTalked = me.tamCungUntil; const sung = Math.max(0, sc * 2); me.sung += sung; addPts(me, 5 + sc);
-      const s = sockOf(me.id); if (s) s.emit('htTalkResult', { sung, score: sc, line: sc >= 5 ? 'Có nàng ở bên, trẫm thấy lòng nhẹ hẳn.' : sc >= 2 ? 'Nàng thật biết điều.' : 'Trẫm hơi mệt, nàng lui về nghỉ sớm đi.' });
+      const gift = pick(TINVAT); if (N) N.gift = gift; me.tinvat = me.tinvat || {}; me.tinvat[gift] = (me.tinvat[gift] || 0) + 1;
+      diary(me, sc >= 5 ? `Hầu chuyện Hoàng thượng rất vui. ${to && to[1] >= 3 ? 'Người nói nàng hiểu lòng trẫm nhất. ' : ''}Sáng ra được ban ${gift}.` : sc >= 2 ? `Hầu Hoàng thượng một đêm yên ả, được ban ${gift}.` : `Đêm ấy Hoàng thượng không vui lắm, lúc về vẫn ban ${gift}.`);
+      const s = sockOf(me.id); if (s) s.emit('htTalkResult', { sung, score: sc, gift, line: sc >= 5 ? 'Có nàng ở bên, trẫm thấy lòng nhẹ hẳn.' : sc >= 2 ? 'Nàng thật biết điều.' : 'Trẫm hơi mệt, nàng lui về nghỉ sớm đi.' });
+    } else if (a === 'chuanbi') {
+      const N = nightState(me); if (!N) return toast(me, 'Chỉ khi được lật thẻ mới chuẩn bị.'); if (N.prep) return toast(me, 'Đã chuẩn bị xong rồi.');
+      const mood = ht().mood, pk = k => PREP[k][Math.max(0, Math.min(2, +d[k] || 0))];
+      const ch = { hoa: pk('hoa'), ao: pk('ao'), huong: pk('huong') }, score = ch.hoa[1][mood] + ch.ao[1][mood] + ch.huong[1][mood];
+      N.prep = { score, text: `${ch.hoa[0]}, ${ch.ao[0]}, ${ch.huong[0]}` }; const sung = Math.max(0, score - 3); me.sung += sung;
+      diary(me, `Tắm ${ch.hoa[0].toLowerCase()}, mặc ${ch.ao[0].toLowerCase()}, xông ${ch.huong[0].toLowerCase()} chờ Hoàng thượng.`);
+      toast(me, score >= 8 ? `Chuẩn bị hoàn hảo, đúng ý Hoàng thượng đang ${C.HT.mood[mood]} (+${sung} sủng ái).` : score >= 5 ? `Chuẩn bị khá ổn (+${sung} sủng ái).` : 'Chuẩn bị chưa hợp tâm trạng Hoàng thượng lắm…', score >= 5 ? 'good' : 'info');
+    } else if (a === 'tauchuyen') {
+      if (me.loc !== 'tamcung') return; const N = nightState(me); if (!N) return; if (N.tau) return toast(me, 'Đêm nay đã tâu chuyện rồi.'); if (me.htTalked !== me.tamCungUntil) return toast(me, 'Hầu chuyện Hoàng thượng trước đã.');
+      const t = P(d.who); if (!t || t.id === me.id) return; const s = sockOf(me.id), say = text => s && s.emit('npcSay', { who: 'Hoàng thượng', text, long: true });
+      N.tau = 1;
+      if (d.kind === 'thangcap') { if (!sisters(me, t)) { N.tau = 0; return toast(me, 'Chỉ tiến cử được tỷ muội kết nghĩa.'); } addPts(t, 30); t.sung += 5; say(`Được, nàng đã khen ${t.name} như vậy, trẫm sẽ để ý.`); toast(t, `💞 ${me.name} tiến cử bổn cung với Hoàng thượng: +30 công trạng.`, 'good'); diary(me, `Gối đầu tâu Hoàng thượng khen tỷ muội ${t.name}.`); notify(t, '💞 Tỷ muội tiến cử', `${me.name} nói tốt cho bổn cung với Hoàng thượng.`); }
+      else if (d.kind === 'thalanh') { if (!t.lanh) { N.tau = 0; return toast(me, 'Người này không ở lãnh cung.'); } t.lanh.tasks++; say('Thôi được, nể nàng, trẫm sẽ cho người xét lại.'); toast(t, `🙏 ${me.name} xin Hoàng thượng tha tội cho bổn cung. Tiến độ phục vị ${t.lanh.tasks}/3.`, 'good'); diary(me, `Xin Hoàng thượng khoan dung cho ${t.name} ở lãnh cung.`); if (t.lanh.tasks >= 3) phucVi(t, 2, 'nhờ có người cầu xin Hoàng thượng'); }
+      else if (d.kind === 'noixau') {
+        if (sisters(me, t)) { N.tau = 0; return toast(me, 'Sao nỡ nói xấu tỷ muội.'); } if (t.lanh) { N.tau = 0; return; }
+        if (Math.random() < .62) { t.sung = Math.max(0, t.sung - 15); say(`Thật sao? Trẫm không ngờ ${t.name} lại như vậy…`); diary(me, `Thì thầm với Hoàng thượng về ${t.name}. Người có vẻ tin.`); toast(t, '🗣 Có tin đồn ai đó nói xấu bổn cung bên gối Hoàng thượng (sủng ái -15).', 'bad'); }
+        else { me.sung = Math.max(0, me.sung - 10); relAdd(me, 'thaihau', -3, 'đố kỵ nói xấu người khác'); say('Nàng cũng biết đố kỵ sao? Trẫm không thích nghe chuyện này.'); diary(me, `Nói xấu ${t.name} với Hoàng thượng, bị người quở là đố kỵ.`); toast(me, 'Hoàng thượng chê bổn cung đố kỵ (sủng ái -10).', 'bad'); }
+      } else { N.tau = 0; return; }
+      push(t);
+    } else if (a === 'doitho') {
+      if (me.loc !== 'tamcung') return; const N = nightState(me); if (!N) return; if (N.tho) return toast(me, 'Đêm nay đã ngắm trăng đối thơ rồi.');
+      N.tho = 1; const ok = Math.max(0, Math.min(3, +d.ok || 0)), sung = ok * 3; me.sung += sung; addPts(me, ok * 2); if (ok === 3) cnt(me, 'thoOk');
+      diary(me, ok === 3 ? 'Ngắm trăng bên cửa sổ, đối thơ không sai câu nào. Hoàng thượng khen nàng tài hoa.' : `Ngắm trăng cùng Hoàng thượng, đối được ${ok}/3 câu thơ.`);
+      const s = sockOf(me.id); if (s) s.emit('npcSay', { who: 'Hoàng thượng', text: ok === 3 ? 'Tài nữ của trẫm! Đêm nay trăng cũng không đẹp bằng nàng.' : ok >= 2 ? 'Khá lắm, nàng thuộc thơ Đường nhiều đấy.' : 'Ha ha, nàng phải đọc thêm sách rồi.' });
+      toast(me, `Đối đúng ${ok}/3 câu: sủng ái +${sung}.`, ok >= 2 ? 'good' : 'info');
+    } else if (a === 'keoht') {
+      const t = P(d.target); if (!t || t.id === me.id || !night(t) || t.loc !== 'tamcung' || !online.has(t.id)) return toast(me, 'Người này không đang hầu Hoàng thượng.');
+      if (sisters(me, t)) return toast(me, 'Không nỡ phá đêm của tỷ muội.'); if (me.keoDay === dayKey()) return toast(me, 'Hôm nay đã dùng kế này rồi, làm nữa dễ lộ.');
+      if (KEO[t.id]) return toast(me, 'Đã có người khác ra tay rồi.'); if (me.loc !== 'phong') return toast(me, 'Phải ở phòng riêng mới giả bệnh được.');
+      if (!useTurn(1, 50)) return; me.keoDay = dayKey();
+      KEO[t.id] = { by: me.id, at: now(), timer: setTimeout(() => resolveKeo(t.id, Math.random() < .4), 25e3) };
+      const sk = sockOf(t.id); if (sk) sk.emit('keoHT', { from: 'Một cung nữ', until: now() + 20e3 });
+      toast(me, `Đã sai cung nữ chạy sang báo bổn cung đau bụng dữ dội… chờ xem Hoàng thượng có đến không.`, 'good');
+    } else if (a === 'giuchan') {
+      if (!KEO[me.id]) return; resolveKeo(me.id, (+d.q || 0) >= .5); return;
     } else if (a === 'lanh') {
       if (!me.lanh) return;
       if (me.lanhToday) return toast(me, 'Hôm nay đã làm xong việc ở lãnh cung.');
@@ -1467,7 +1549,7 @@ io.on('connection', sock => {
     } else return;
     save(); push(me);
   });
-  sock.on('htTalkQ', () => { if (!me) return; if (!me.htQs || me.htQsFor !== me.tamCungUntil) { me.htQs = [...HT_TALK.keys()].sort(() => Math.random() - .5).slice(0, 3); me.htQsFor = me.tamCungUntil; } sock.emit('htTalkQ', { mood: C.HT.mood[ht().mood], qs: me.htQs.map(i => HT_TALK[i]).map(q => ({ q: q.q, opts: q.opts.map(o => o.t) })) }); });
+  sock.on('htTalkQ', () => { if (!me) return; if (!me.htQs || me.htQsFor !== me.tamCungUntil) { me.htQs = [...HT_TALK.keys()].sort(() => Math.random() - .5).slice(0, 3); me.htQsFor = me.tamCungUntil; } if (me.tsFor !== me.tamCungUntil) { me.ts = rnd(TAMSU.length); me.tsFor = me.tamCungUntil; } const T = TAMSU[me.ts]; sock.emit('htTalkQ', { mood: C.HT.mood[ht().mood], tamsu: { q: T.q, opts: T.opts.map(o => o[0]) }, qs: me.htQs.map(i => HT_TALK[i]).map(q => ({ q: q.q, opts: q.opts.map(o => o.t) })) }); });
   sock.on('witnessAnswer', d => {
     if (!me || !d) return; const c = DB.state.cases[d.caseId]; if (!c || !c.witnessReq || c.witnessReq.who !== me.id) return;
     if (d.refuse) { const v = P(c.victim); c.witnessReq = null; if (v) { v.turns += 1; toast(v, `${me.name} từ chối làm chứng. Đã trả lại 1 lượt.`, 'bad'); push(v); const s = sockOf(v.id); if (s) s.emit('caseDetail', { ...caseView(c, v), table: suspectTraitText(c) }); } save(); return; }
@@ -1489,7 +1571,7 @@ io.on('connection', sock => {
   });
   sock.on('roster', () => {
     if (!me) return;
-    const list = Object.values(DB.players).map(p => ({ id: p.id, thai: !!p.thai?.known, kids: (p.children || []).length, camTuc: (p.camTucUntil || 0) > now(), lanh: !!p.lanh, name: p.name + (p.sick ? ' (cáo bệnh)' : '') + ((p.camTucUntil || 0) > now() ? ' (cấm túc)' : ''), rank: p.rank, rankName: rankName(p), online: online.has(p.id), sung: p.sung, canTarget: !p.lanh && p.rank >= C.FIGHT_RANK && !((p.protectUntil || 0) > now()) }));
+    const list = Object.values(DB.players).map(p => ({ id: p.id, inTam: !!night(p) && p.loc === 'tamcung' && online.has(p.id), thai: !!p.thai?.known, kids: (p.children || []).length, camTuc: (p.camTucUntil || 0) > now(), lanh: !!p.lanh, name: p.name + (p.sick ? ' (cáo bệnh)' : '') + ((p.camTucUntil || 0) > now() ? ' (cấm túc)' : ''), rank: p.rank, rankName: rankName(p), online: online.has(p.id), sung: p.sung, canTarget: !p.lanh && p.rank >= C.FIGHT_RANK && !((p.protectUntil || 0) > now()) }));
     list.sort((a, b) => (b.rankName === 'Hoàng hậu') - (a.rankName === 'Hoàng hậu') || b.rank - a.rank || b.sung - a.sung);
     const seats = C.RANKS.map((r, i) => ({ name: r.name, seats: r.seats, used: seatCount(i) }));
     sock.emit('roster', { list, seats, methods: C.METHODS, thaiMethods: C.THAI_METHODS, hh: DB.state.hh ? title(P(DB.state.hh.id) || { name: '?', rank: 0 }) : null });
