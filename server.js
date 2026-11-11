@@ -102,6 +102,7 @@ function selfView(p) {
     stats: p.stats, tasks: p.tasks, thinhAn: p.thinhAn, waiting: p.waiting || false, lanh: p.lanh || null,
     outfits: allowedOutfits(p), decor: p.decor || [], hasPalace: p.rank >= C.PALACE_RANK, cases: open,
     protectedUntil: p.protectUntil || 0, admin: !!p.admin, canFight: !p.lanh && p.rank >= C.FIGHT_RANK,
+    camTuc: (p.camTucUntil || 0) > now() ? p.camTucUntil : 0, loyal: p.loyal ?? 50, sick: !!p.sick,
     attacksLeft: C.ATTACK_PER_DAY - (p.attacks || 0), latThe: (p.tamCungUntil || 0) > now(),
     htKnown: htKnownView(p), decorOwned: p.decorOwned || [], huong: !!p.huong, feast: feastView(p), htTalked: p.htTalked === p.tamCungUntil && !!p.tamCungUntil,
   };
@@ -151,7 +152,7 @@ function demote(p, steps, reason) {
 function sendToLanhCung(p, reason, caseId) {
   if (!p.lanh) p.trend = { dir: -1, t: now() };
   if (p.lanh) { if (caseId) p.lanh.caseId = caseId; return; }
-  p.lanh = { from: p.rank, tasks: 0, caseId: caseId || null, since: now() };
+  p.lanh = { from: p.rank, tasks: 0, caseId: caseId || null, since: now() }; p.loyal = Math.max(0, (p.loyal ?? 50) - 20);
   p.waiting = false;
   p.outfit = 'tunu';
   p.protectUntil = now() + C.PROTECT_HOURS * 3600e3;
@@ -214,7 +215,8 @@ function caseView(c, viewer) {
 }
 function revealClue(c, kind, p) {
   const clue = C.CLUES[kind];
-  const trait = kind === 'thaiy' ? 'dau' : clue.trait;
+  let trait = kind === 'thaiy' ? 'dau' : clue.trait;
+  if (trait === 'any') { const known = c.found.filter(f => f.value !== null && f.value !== undefined).map(f => f.trait); const miss = ['cung', 'gio', 'dau'].filter(t => !known.includes(t)); trait = miss.length ? pick(miss) : pick(['cung', 'gio', 'dau']); }
   const guilty = c.suspects.find(s => s.guilty);
   if (c.blurred === trait && kind !== 'thaiy') {
     c.found.push({ kind, name: clue.name, text: `${clue.text}… nhưng dấu vết đã bị xóa sạch, không thấy gì rõ ràng.`, trait, value: null });
@@ -223,6 +225,11 @@ function revealClue(c, kind, p) {
   const value = guilty.traits[trait];
   const word = C.TRAITS[trait][value];
   c.found.push({ kind, name: clue.name, text: `${clue.text} ${word}.`, trait, value });
+  // cung nữ trung thành cao: khai thêm một người chắc chắn vô can
+  if (kind === 'hoi' && (p.loyal ?? 50) >= 80) {
+    const inn = c.suspects.filter(s => !s.guilty && !c.found.some(f => f.exclude === s.id));
+    if (inn.length) { const s = pick(inn); c.found.push({ kind: 'hoi2', name: 'Cung nữ thân tín (trung thành)', text: `Nô tỳ dám lấy mạng ra thề: ${s.name} hôm ấy không hề lại gần phòng.`, trait: null, value: null, exclude: s.id }); }
+  }
 }
 function suspectTraitText(c) {
   // cho người chơi bảng đặc điểm từng nghi phạm để tự loại trừ
@@ -253,6 +260,9 @@ function caseOp(p, data) {
   if (op === 'clue') {
     const clue = C.CLUES[data.kind]; if (!clue) return;
     if (c.found.some(f => f.kind === data.kind)) return toast(p, 'Manh mối này đã điều tra rồi.');
+    if (data.kind === 'hoi' && (p.loyal ?? 50) < 30 && !data.bribe) return toast(p, 'Cung nữ ấp úng không dám nói. Thử ban thưởng cho nàng trước.', 'bad');
+    if (data.kind === 'hoi' && data.bribe) { if (p.silver < 30) return toast(p, 'Không đủ bạc.', 'bad'); p.silver -= 30; }
+    if (data.kind === 'theodoi' && data.fail) { if (p.turns < 1) return toast(p, 'Hết lượt.', 'bad'); p.turns -= 1; save(); push(p); return toast(p, 'Bị phát hiện, nghi phạm lẩn mất. Thử lại sau.', 'bad'); }
     const freeMuu = p.path === 'muuke' && !c.muuFree;
     if (!freeMuu) {
       if (p.turns < clue.turn) return toast(p, 'Hết lượt hôm nay.', 'bad');
@@ -273,8 +283,14 @@ function caseOp(p, data) {
     else autoWitness(c.id);
   } else if (op === 'confess') {
     if (isReopen) return;
-    closeCase(c, 'nhantoi', `${p.name} nhận tội, được giảm nhẹ: giáng một bậc.`);
-    if (p.rank > 0) demote(p, 1, 'nhận tội ' + c.crime); else push(p);
+    if (data.mode === 'camtuc') {
+      closeCase(c, 'nhantoi', `${p.name} nhận tội, được giảm nhẹ: cấm túc một ngày trong phòng.`);
+      p.camTucUntil = now() + 24 * 3600e3; p.protectUntil = Math.max(p.protectUntil || 0, p.camTucUntil);
+      const sk = sockOf(p.id); if (sk && p.loc !== 'phong') { enter(p, 'phong', sk); }
+    } else {
+      closeCase(c, 'nhantoi', `${p.name} nhận tội, được giảm nhẹ: giáng một bậc.`);
+      if (p.rank > 0) demote(p, 1, 'nhận tội ' + c.crime); else push(p);
+    }
     news(`${p.name} nhận tội trong vụ ${c.methodName}, được Thái hậu giảm nhẹ hình phạt.`, 'phat');
   } else if (op === 'accuse') {
     const s = c.suspects.find(x => x.id === data.who); if (!s) return;
@@ -330,7 +346,7 @@ function checkDeadlines() {
 
 // ---------------- lật thẻ ----------------
 function latThe(when = 'Đêm nay') {
-  const pool = Object.values(DB.players).filter(p => !p.lanh && p.rank >= 1 && (online.has(p.id) || now() - (p.lastSeen || p.created || 0) < 3 * 864e5));
+  const pool = Object.values(DB.players).filter(p => !p.lanh && !((p.camTucUntil || 0) > now()) && p.rank >= 1 && (online.has(p.id) || now() - (p.lastSeen || p.created || 0) < 3 * 864e5));
   if (!pool.length) return null;
   const weight = p => {
     let m = 1;
@@ -407,7 +423,8 @@ function nightTick() {
   for (const p of Object.values(DB.players)) {
     if (p.lanh || p.rank < C.PALACE_RANK) continue;
     const days = (now() - (p.lastSeen || now())) / 864e5;
-    if (days >= C.ABSENT_LOSE_DAYS && !online.has(p.id)) { const r = p.rank; p.rank = C.FIGHT_RANK - 1; p.trend = { dir: -1, t: now() }; p.outfit = C.RANKS[p.rank].outfit; news(`${p.name} vắng mặt quá lâu, nhường ghế ${C.RANKS[r].name}.`); freeSeatCheck(); }
+    if (days >= C.ABSENT_SICK_DAYS && days < C.ABSENT_LOSE_DAYS && !p.sick && !online.has(p.id)) { p.sick = true; news(`${p.name} cáo bệnh, đã ${Math.floor(days)} ngày không ra khỏi cung.`); }
+    if (days >= C.ABSENT_LOSE_DAYS && !online.has(p.id)) { p.sick = false; const r = p.rank; p.rank = C.FIGHT_RANK - 1; p.trend = { dir: -1, t: now() }; p.outfit = C.RANKS[p.rank].outfit; news(`${p.name} vắng mặt quá lâu, nhường ghế ${C.RANKS[r].name}.`); freeSeatCheck(); }
   }
   checkDeadlines();
   // vụ án do hệ thống dàn dựng khi cung vắng người
@@ -456,7 +473,8 @@ io.on('connection', sock => {
       setTimeout(() => sock.emit('cutscene', { type: 'phatgiac', caseId: c.id, method: c.method, methodName: c.methodName, crime: c.crime, hours: c.hours }), 2500);
     }
     push(p);
-    const back = p.lanh ? 'lanhcung' : (p.loc === 'tamcung' && p.tamCungUntil > now() ? 'tamcung' : (p.loc && p.loc !== 'tamcung' && !(p.loc === 'yentiec' && !(DB.state.feast && !DB.state.feast.done)) ? p.loc : 'hoavien'));
+    if (p.sick) { p.sick = false; news(`${p.name} đã khỏi bệnh, trở lại hầu hạ.`); }
+    const back = p.lanh ? 'lanhcung' : (p.camTucUntil || 0) > now() ? 'phong' : (p.loc === 'tamcung' && p.tamCungUntil > now() ? 'tamcung' : (p.loc && p.loc !== 'tamcung' && !(p.loc === 'yentiec' && !(DB.state.feast && !DB.state.feast.done)) ? p.loc : 'hoavien'));
     if (p.outfit === 'aongu' && back !== 'tamcung' && back !== 'phong') p.outfit = p.lanh ? 'tunu' : C.RANKS[p.rank].outfit;
     enter(p, back, sock);
     tryPromote(p); save();
@@ -498,6 +516,7 @@ io.on('connection', sock => {
     if (me.lanh && loc !== 'lanhcung') return toast(me, 'Người ở lãnh cung không được ra ngoài.', 'bad');
     if (!me.lanh && loc === 'lanhcung') return toast(me, 'Lãnh cung không phải nơi tùy tiện lui tới.');
     if (loc === 'tamcung' && !(me.tamCungUntil > now())) return toast(me, 'Chỉ người được lật thẻ mới vào tẩm cung đêm nay.');
+    if ((me.camTucUntil || 0) > now() && loc !== 'phong') return toast(me, 'Đang bị cấm túc, chưa được ra khỏi phòng.', 'bad');
     if (loc === 'yentiec' && !(DB.state.feast && !DB.state.feast.done)) return toast(me, 'Hiện không có yến tiệc.');
     if (loc === 'tamcung') me.outfit = 'aongu';
     else if (me.outfit === 'aongu' && loc !== 'phong') me.outfit = me.lanh ? 'tunu' : C.RANKS[me.rank].outfit;
@@ -527,6 +546,7 @@ io.on('connection', sock => {
     freshDay(me);
     const a = d.type;
     if (me.lanh && !['lanh', 'tangqua', 'phephi'].includes(a)) return toast(me, 'Ở lãnh cung chỉ có thể làm nhiệm vụ lãnh cung.', 'bad');
+    if ((me.camTucUntil || 0) > now() && !['luyen', 'thuongcn', 'shop'].includes(a)) return toast(me, 'Đang bị cấm túc: chỉ được luyện tài nghệ trong phòng.', 'bad');
     regen(me);
     const useTurn = (n, silver = 0) => {
       if (me.turns < n) { toast(me, 'Hết lượt hôm nay. Mai quay lại nhé.', 'bad'); return false; }
@@ -613,6 +633,12 @@ io.on('connection', sock => {
         if (me.silver < C.DECOR_PRICE[it]) return toast(me, 'Không đủ bạc.', 'bad');
         me.silver -= C.DECOR_PRICE[it]; me.decorOwned.push(it); toast(me, 'Nội vụ phủ đã đưa đồ tới phòng.', 'good');
       } else return;
+    } else if (a === 'thuongcn') {
+      if (me.loc !== 'phong') return toast(me, 'Về phòng riêng mới ban thưởng được.');
+      if (me.cnDay === dayKey()) return toast(me, 'Hôm nay đã ban thưởng rồi.');
+      if (me.silver < 20) return toast(me, 'Không đủ bạc.', 'bad');
+      me.silver -= 20; me.cnDay = dayKey(); me.loyal = Math.min(100, (me.loyal ?? 50) + 10);
+      toast(me, `Cung nữ cảm động rơi nước mắt. Trung thành ${me.loyal}/100.`, 'good');
     } else if (a === 'yentiec') {
       const f = DB.state.feast; if (!f || f.done || now() > f.end) return toast(me, 'Hiện không có yến tiệc.');
       if (me.loc !== 'yentiec') return toast(me, 'Vào yến tiệc mới dâng tiết mục được.');
@@ -675,7 +701,7 @@ io.on('connection', sock => {
   });
   sock.on('roster', () => {
     if (!me) return;
-    const list = Object.values(DB.players).map(p => ({ id: p.id, name: p.name, rank: p.rank, rankName: rankName(p), online: online.has(p.id), sung: p.sung, canTarget: !p.lanh && p.rank >= C.FIGHT_RANK && !((p.protectUntil || 0) > now()) }));
+    const list = Object.values(DB.players).map(p => ({ id: p.id, name: p.name + (p.sick ? ' (cáo bệnh)' : '') + ((p.camTucUntil || 0) > now() ? ' (cấm túc)' : ''), rank: p.rank, rankName: rankName(p), online: online.has(p.id), sung: p.sung, canTarget: !p.lanh && p.rank >= C.FIGHT_RANK && !((p.protectUntil || 0) > now()) }));
     list.sort((a, b) => b.rank - a.rank || b.sung - a.sung);
     const seats = C.RANKS.map((r, i) => ({ name: r.name, seats: r.seats, used: seatCount(i) }));
     sock.emit('roster', { list, seats, methods: C.METHODS });
@@ -717,7 +743,7 @@ function top5() {
   return Object.values(DB.players).filter(p => !p.lanh)
     .sort((a, b) => b.rank - a.rank || b.pts - a.pts || b.sung - a.sung)
     .slice(0, 5)
-    .map(p => ({ id: p.id, name: p.name, rankName: C.RANKS[p.rank].name, pts: p.pts, online: online.has(p.id), trend: p.trend && now() - p.trend.t < H ? p.trend.dir : 0 }));
+    .map(p => ({ id: p.id, name: p.name + (p.sick ? ' 🤒' : ''), rankName: C.RANKS[p.rank].name, pts: p.pts, online: online.has(p.id), trend: p.trend && now() - p.trend.t < H ? p.trend.dir : 0 }));
 }
 let lastTop = '';
 setInterval(() => { const t = JSON.stringify(top5()); if (t !== lastTop) { lastTop = t; io.emit('top5', JSON.parse(t)); } }, 2000);

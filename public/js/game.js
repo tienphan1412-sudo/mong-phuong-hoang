@@ -279,14 +279,14 @@ function renderHud() {
   const lo = me.nextPts ? (me.pts / me.nextPts) : 1; $('hBar').style.width = Math.min(100, lo * 100) + '%';
   $('hPts').textContent = me.nextPts ? `Công trạng ${me.pts}/${me.nextPts}` : `Công trạng ${me.pts}`;
   const t = me.tasks || {};
-  $('stats').innerHTML = `<span class="pill">💰 Bạc <b>${me.silver}</b></span><span class="pill" title="Cứ 90 phút hồi 1 lượt (tối đa ${me.turnCap}). Làm đủ 3 nhiệm vụ ngày, dự yến tiệc, được lật thẻ cũng được thêm lượt.">⏳ Lượt <b>${me.turns}</b>${me.nextTurn ? ` <small id="turnT" style="opacity:.75"></small>` : ''}</span><span class="pill">💗 Sủng ái <b>${me.sung}</b></span><span class="pill">🍵 Thái hậu <b>${me.haiLong}</b></span><span class="pill">Nhiệm vụ: ${t.thinhan ? '✅' : '⬜'} thỉnh an ${t.luyen ? '✅' : '⬜'} luyện ${t.dotin ? '✅' : '⬜'} dò tin</span>${htPill()}${feast ? `<span class="pill feast">🎎 Yến tiệc · <b id="feastT"></b> · ${feast.n} tiết mục</span>` : ''}${me.cases.length ? `<button class="pill" id="caseBtn" style="border-color:#c0503a">⚖️ Vụ án đang mở (${me.cases.length})</button>` : ''}`;
+  $('stats').innerHTML = `<span class="pill">💰 Bạc <b>${me.silver}</b></span><span class="pill" title="Cứ 90 phút hồi 1 lượt (tối đa ${me.turnCap}). Làm đủ 3 nhiệm vụ ngày, dự yến tiệc, được lật thẻ cũng được thêm lượt.">⏳ Lượt <b>${me.turns}</b>${me.nextTurn ? ` <small id="turnT" style="opacity:.75"></small>` : ''}</span><span class="pill">💗 Sủng ái <b>${me.sung}</b></span><span class="pill">🍵 Thái hậu <b>${me.haiLong}</b></span><span class="pill">Nhiệm vụ: ${t.thinhan ? '✅' : '⬜'} thỉnh an ${t.luyen ? '✅' : '⬜'} luyện ${t.dotin ? '✅' : '⬜'} dò tin</span>${me.camTuc ? `<span class="pill" style="border-color:#c0503a">🔒 Cấm túc còn ${Math.max(1, Math.ceil((me.camTuc - Date.now()) / 3600e3))} giờ</span>` : ''}${htPill()}${feast ? `<span class="pill feast">🎎 Yến tiệc · <b id="feastT"></b> · ${feast.n} tiết mục</span>` : ''}${me.cases.length ? `<button class="pill" id="caseBtn" style="border-color:#c0503a">⚖️ Vụ án đang mở (${me.cases.length})</button>` : ''}`;
   const cb = $('caseBtn'); if (cb) cb.onclick = () => openCase(me.cases[0].id);
 }
 const LOCNAMES = { yentiec: '🎎 Yến tiệc', hoavien: 'Ngự hoa viên', tuninh: 'Từ Ninh cung', duongtam: 'Dưỡng Tâm điện', phong: 'Phòng riêng', tamcung: 'Tẩm cung', lanhcung: 'Lãnh cung' };
 function renderMap() {
   if (!me) return;
   const m = $('map'); m.innerHTML = '';
-  const list = me.lanh ? ['lanhcung'] : ['hoavien', 'tuninh', 'duongtam', 'phong'];
+  const list = me.lanh ? ['lanhcung'] : me.camTuc ? ['phong'] : ['hoavien', 'tuninh', 'duongtam', 'phong'];
   if (latTheMe && !me.lanh) list.push('tamcung');
   if (feast && !me.lanh) list.push('yentiec');
   for (const l of list) { const b = document.createElement('button'); b.textContent = l === 'phong' && me.hasPalace ? 'Cung riêng' : LOCNAMES[l]; b.classList.toggle('on', world?.loc === l); b.onclick = () => socket.emit('goto', l); m.appendChild(b); }
@@ -301,7 +301,7 @@ function renderActs() {
   if (L === 'duongtam') add('🍲 Dâng canh Hoàng thượng', '1 lượt · 30 bạc · nấu đúng món người thèm được sủng nhiều', gameCanh);
   if (L === 'yentiec') { if (!feast?.mine) add('🎎 Dâng tiết mục', 'Bước ra giữa, đàn, múa hay ngâm thơ cho Hoàng thượng', performFeast); add('🚪 Rời yến tiệc', '', () => socket.emit('goto', 'hoavien')); }
   if (L === 'hoavien') { if (feast) add('🎎 Dự yến tiệc', 'Đang có yến tiệc, vào ngồi cùng mọi người', () => socket.emit('goto', 'yentiec')); add('👂 Dò tin', '1 lượt · nghe sở thích Hoàng thượng, chuyện trong cung', () => act('dotin')); add('🎐 Luyện tài nghệ', '1 lượt · chơi càng hay càng nhiều điểm', () => chooseTai(t => gameRhythm(t, q => act('luyen', { tai: t, q })))); }
-  if (L === 'phong') { add('🎐 Luyện tài nghệ', '1 lượt · chơi càng hay càng nhiều điểm', () => chooseTai(t => gameRhythm(t, q => act('luyen', { tai: t, q })))); add('👘 Thay trang phục', '', openWardrobe); add('🏮 Bài trí ' + (me.hasPalace ? 'cung' : 'phòng'), 'Đặt, xoay đồ nội thất', openDecor); }
+  if (L === 'phong') { add('🎐 Luyện tài nghệ', '1 lượt · chơi càng hay càng nhiều điểm', () => chooseTai(t => gameRhythm(t, q => act('luyen', { tai: t, q })))); add('🎁 Ban thưởng cung nữ', `20 bạc · trung thành ${me.loyal ?? 50}/100 · mỗi ngày 1 lần`, () => act('thuongcn')); add('👘 Thay trang phục', '', openWardrobe); add('🏮 Bài trí ' + (me.hasPalace ? 'cung' : 'phòng'), 'Đặt, xoay đồ nội thất', openDecor); }
   if (L === 'tamcung') { add('🛏 Lên giường', 'Ngồi cùng Hoàng thượng', openBed); add('🌙 Rời tẩm cung', 'Trời sắp sáng', () => socket.emit('goto', 'phong')); }
   if (L === 'lanhcung') { add('🧹 Làm việc lãnh cung', `Phục vị ${me.lanh?.tasks || 0}/3 · mỗi ngày 1 lần`, gameLanh); add('🕯 Hỏi chuyện phế phi', 'Mỗi ngày một lần · bà biết nhiều bí mật', () => act('phephi')); if (me.lanh?.caseId) add('📜 Kêu oan', 'Điều tra lại vụ án cũ', () => openCase(me.lanh.caseId)); }
   if (!me.lanh) { add('👥 Danh sách hậu cung', 'Tặng quà · ra tay', openRoster); add('🏪 Nội vụ phủ', 'Mua nhân sâm, hương, đồ bài trí', openShop); }
@@ -434,6 +434,7 @@ async function playCut(d) {
   if (d.type === 'tiencung') showScroll('Tiến cung', `Tú nữ <b>${esc(d.name)}</b> đã vào cung với lối sống <b>${esc(d.path)}</b>.<br><br>Mỗi ngày: thỉnh an Thái hậu ở <b>Từ Ninh cung</b>, luyện tài nghệ và dò tin ở <b>Ngự hoa viên</b>, dâng canh ở <b>Dưỡng Tâm điện</b>. Đủ công trạng sẽ được tấn phong. Tối nào Hoàng thượng cũng lật thẻ bài.<br><br>Bấm xuống đất để đi, kéo để xoay góc nhìn, bấm tên NPC để nói chuyện.`, [['Vào cung', () => { hideCut(); setTimeout(() => startTour(), 600); }]]);
   else if (d.type === 'sacphong' || d.type === 'phucvi') runSacPhong(d);
   else if (d.type === 'phatgiac') runPhatGiac(d);
+  else if (d.type === 'doncung') runDonCung(d);
   else if (d.type === 'phatgiac_old') showScroll('Phát giác', `Quế ma ma khám phòng và tìm thấy <b>${esc(d.methodName)}</b>. Bổn cung bị nghi <b>${esc(d.crime)}</b>.<br><br>Có <b>${d.hours} giờ</b> trước phiên xử ở Từ Ninh cung. Hỏi cung nữ, dò sổ quà, lục tro, nhờ thái y, hoặc nhờ người làm chứng để tìm ra kẻ hãm hại.`, [['Để sau', hideCut], ['Xem vụ án', () => { hideCut(); openCase(d.caseId); }]]);
   else if (d.type === 'lanhcung') { await fade(true); showScroll('Lãnh cung', `Bổn cung bị đày vào lãnh cung vì <b>${esc(d.reason)}</b>.<br><br>Ở đây vẫn có đường về: làm việc lãnh cung 3 ngày để được phục vị, hoặc tiếp tục điều tra và kêu oan.<br><i>“Được, chờ bổn cung quay về.”</i>`, [['Bước vào lãnh cung', async () => { hideCut(); socket.emit('goto', 'lanhcung'); await fade(false); }]]); }
   else if (d.type === 'latan') showScroll('Lật án', `Chân tướng đã rõ: thủ phạm là <b>${esc(d.culprit)}</b>. Thái hậu minh xét, trả lại trong sạch cho ${esc(d.name)}.`, [['Tạ ơn Thái hậu', () => { hideCut(); emote('hanh_le'); }]]);
@@ -473,7 +474,7 @@ async function runSacPhong(d) {
       if (pendingScene) { const ps = pendingScene; pendingScene = null; await enterScene(ps.loc, ps.players, ps.venue, ps.seat); }
       else if (selfC && selfC.outfit !== me.outfit) { const r = selfC.root; await respawnSelf(r.position.x, r.position.z, r.rotation.y); }
       document.body.classList.remove('staging'); cutActive = false; await fade(false); sacBusy = false; { const f = cutDone; cutDone = () => {}; f(); }
-      if (d.palace || d.type === 'phucvi') socket.emit('goto', 'phong');
+      if (d.palace) { cutQ.unshift({ type: 'doncung', name: d.name, rankName: d.rankName }); nextCut(); } else if (d.type === 'phucvi') socket.emit('goto', 'phong');
     }]]);
   }]]);
 }
@@ -629,7 +630,7 @@ socket.on('top5', list => {
 let nb = null, nbMin = false;
 const TRAIT_ICON = { cung: '🏯', gio: '🕯', dau: '👣' };
 const TRAIT_NAME = { cung: 'Nơi ở', gio: 'Giờ lui tới', dau: 'Dấu vết' };
-const CLUE_BTNS = [['hoi', '👧 Hỏi cung nữ thân tín', 'miễn phí · biết giờ', 'phong', 'Phòng riêng', 'cung nữ'], ['so', '📖 Dò sổ quà Nội vụ phủ', '1 lượt · 40 bạc · biết nơi ở', 'duongtam', 'Dưỡng Tâm điện', 'Tổng quản thái giám'], ['tro', '🔥 Lục tro trong lò than', '1 lượt · biết dấu vết', 'hoavien', 'Ngự hoa viên', 'lò than 🔍'], ['thaiy', '⚕️ Nhờ thái y kiểm nghiệm', '80 bạc · biết dấu vết, không bị xóa', 'tuninh', 'Từ Ninh cung', 'Thái y']];
+const CLUE_BTNS = [['hoi', '👧 Hỏi cung nữ thân tín', 'miễn phí · biết giờ', 'phong', 'Phòng riêng', 'cung nữ'], ['so', '📖 Dò sổ quà Nội vụ phủ', '1 lượt · 40 bạc · biết nơi ở', 'duongtam', 'Dưỡng Tâm điện', 'Tổng quản thái giám'], ['tro', '🔥 Lục tro trong lò than', '1 lượt · biết dấu vết', 'hoavien', 'Ngự hoa viên', 'lò than 🔍'], ['thaiy', '⚕️ Nhờ thái y kiểm nghiệm', '80 bạc · biết dấu vết, không bị xóa', 'tuninh', 'Từ Ninh cung', 'Thái y'], ['theodoi', '👀 Theo dõi nghi phạm', '1 lượt · biết một đặc điểm còn thiếu', 'hoavien', 'Ngự hoa viên', 'bóng người khả nghi']];
 const nbEl = document.createElement('div'); nbEl.id = 'case'; nbEl.className = 'hidden'; document.body.appendChild(nbEl);
 function closeNotebook() { nb = null; caseOpenId = null; nbEl.classList.add('hidden'); document.body.classList.remove('nbopen'); }
 socket.on('caseDetail', c => {
@@ -648,7 +649,8 @@ function analyse(c) {
       else if (w && w.trait === t) st = s.ti[t] === w.value ? 'maybe' : 'doubt';
       return { t, word: s[t], st };
     });
-    return { ...s, chips, out: chips.some(x => x.st === 'no') };
+    const ex = c.found.some(f => f.exclude === s.id);
+    return { ...s, chips, out: ex || chips.some(x => x.st === 'no') };
   });
 }
 function fmtLeft(ms) { ms = Math.max(0, ms); const h = Math.floor(ms / 3600e3), m = Math.floor(ms % 3600e3 / 60e3), sec = Math.floor(ms % 60e3 / 1000); return `${h}:${String(m).padStart(2, '0')}:${String(sec).padStart(2, '0')}`; }
@@ -673,14 +675,14 @@ async function renderNotebook() {
   ${c.witness ? `<div class="cl wit">• <b>Nhân chứng ${esc(c.witness.name)}:</b> ${esc(c.witness.text)} <i>(có thể khai gian)</i></div>` : ''}</div>
   ${open ? `<div class="nbacts">${CLUE_BTNS.filter(([k]) => !c.found.some(f => f.kind === k)).map(([k, n, sub, loc, locName, who]) => me.lanh ? `<button data-clue="${k}">${n}<small>${sub}</small></button>` : world?.loc === loc ? `<button class="here" data-here="${k}">${n}<small>✨ Đang ở ${locName}: bấm vào ${who} có dấu 🔍</small></button>` : `<button data-go="${loc}">${n}<small>${sub} · đi tới ${locName} ➜</small></button>`).join('')}
     ${c.witness ? '' : c.witnessWait ? `<button disabled>⏳ Đang chờ ${esc(c.witnessWait)} khai…<small>tối đa 5 phút, quá hạn sẽ tự khai</small></button>` : '<button id="nbWit">🙋 Nhờ người làm chứng<small>1 lượt · người thật tự chọn lời khai, có thể khai gian</small></button>'}
-    ${c.status === 'open' ? '<button id="nbConf">🙇 Nhận tội<small>giảm nhẹ: giáng 1 bậc</small></button>' : ''}
+    ${c.status === 'open' ? '<button id="nbConf">🙇 Nhận tội<small>giảm nhẹ: cấm túc 1 ngày hoặc giáng 1 bậc</small></button>' : ''}
     <button class="gold big" id="nbTrial">⚖️ Ra phiên xử<small>buộc tội trước mặt Thái hậu · chỉ 1 lần</small></button></div>` : ''}`;
   nbEl.querySelector('.nbx').onclick = (e) => { e.stopPropagation(); nbMin = true; renderNotebook(); };
   nbEl.querySelectorAll('[data-clue]').forEach(b => b.onclick = () => socket.emit('case', { caseId: c.id, op: 'clue', kind: b.dataset.clue }));
   nbEl.querySelectorAll('[data-go]').forEach(b => b.onclick = () => socket.emit('goto', b.dataset.go));
   nbEl.querySelectorAll('[data-here]').forEach(b => b.onclick = () => startClueHere(b.dataset.here));
   const bw = $('nbWit'); if (bw) bw.onclick = () => { witnessFor = c.id; socket.emit('roster'); };
-  const bc = $('nbConf'); if (bc) bc.onclick = () => { if (confirm('Nhận tội để được giảm nhẹ (giáng 1 bậc)?')) socket.emit('case', { caseId: c.id, op: 'confess' }); };
+  const bc = $('nbConf'); if (bc) bc.onclick = () => { modal(`<button class="close" onclick="window._close()">✕</button><h3>🙇 Nhận tội</h3><div style="color:var(--muted)">Nhận tội thì vụ án khép lại, được giảm nhẹ. Chọn hình phạt:</div><div class="btns" style="flex-direction:column;align-items:stretch"><button data-m="camtuc">🔒 Cấm túc 1 ngày<small style="display:block;color:var(--muted)">Giữ nguyên cấp bậc, nhưng 24 giờ chỉ được ở phòng, không dự yến tiệc, không được lật thẻ</small></button><button data-m="giang">⬇️ Giáng 1 bậc<small style="display:block;color:var(--muted)">Mất cấp ngay, nhưng vẫn tự do đi lại</small></button></div>`); $('mcard').querySelectorAll('[data-m]').forEach(b => b.onclick = () => { closeModal(); socket.emit('case', { caseId: c.id, op: 'confess', mode: b.dataset.m }); }); };
   const bt = $('nbTrial'); if (bt) bt.onclick = () => runTrial(c);
   for (const img of nbEl.querySelectorAll('img.pt')) portrait(img.dataset.m).then(u => { img.src = u; }).catch(() => {});
 }
@@ -859,7 +861,7 @@ async function endTrial() {
 // 2. ĐI TÌM MANH MỐI TẬN NƠI
 // =====================================================================
 const clueWaiters = [];
-const CLUE_AT = { hoi: { loc: 'phong', talk: 'cungnu' }, so: { loc: 'duongtam', talk: 'thaigiam' }, thaiy: { loc: 'tuninh', talk: 'thaiy' }, tro: { loc: 'hoavien' } };
+const CLUE_AT = { theodoi: { loc: 'hoavien' }, hoi: { loc: 'phong', talk: 'cungnu' }, so: { loc: 'duongtam', talk: 'thaigiam' }, thaiy: { loc: 'tuninh', talk: 'thaiy' }, tro: { loc: 'hoavien' } };
 function clueOpen(kind) { return nb && (nb.status === 'open' || nb.reopen) && !nb.found.some(f => f.kind === kind); }
 function getClue(kind) {
   return new Promise(res => {
@@ -870,6 +872,7 @@ function getClue(kind) {
 }
 function startClueHere(kind) {
   if (kind === 'tro') return clueTro();
+  if (kind === 'theodoi') return clueTheoDoi();
   const n = world?.npcs.find(x => x.talk === CLUE_AT[kind].talk); if (n) talk(n);
 }
 function refreshClueMarkers() {
@@ -885,7 +888,15 @@ function refreshClueMarkers() {
     const d = document.createElement('div'); d.className = 'label npc clue'; d.innerHTML = '<div class="bbl"></div>Lò than'; d.style.pointerEvents = 'auto'; d.style.cursor = 'pointer'; d.onclick = e => { e.stopPropagation(); clueTro(); };
     const lb = new CSS2DObject(d); lb.position.set(0, 1.0, 0); g.add(lb);
     world.group.add(g); world.brazier = g; world.blocks = [...(world.blocks || []), { x: 1.8, z: 4.3, r: .45 }];
-  } else if (world.brazier && !clueOpen('tro')) { world.brazier.traverse(o => { if (o.isCSS2DObject) o.element.remove(); }); world.group.remove(world.brazier); world.brazier = null; }
+  }
+  if (world.loc === 'hoavien' && clueOpen('theodoi') && !world.spy) {
+    const w = world; world.spy = 'loading';
+    spawn('cungnu').then(c => { if (world !== w || !clueOpen('theodoi')) return c.dispose(); c.root.position.set(-2.5, 0, 2.3); c.root.rotation.y = 2.3; c.play('chap_tay'); w.group.add(c.root);
+      c.root.traverse(o => { if (o.isMesh && o.material) { o.material = o.material.clone(); o.material.color?.multiplyScalar(.45); } });
+      const d = document.createElement('div'); d.className = 'label npc clue'; d.innerHTML = '<div class="bbl"></div>Bóng người khả nghi'; d.style.pointerEvents = 'auto'; d.style.cursor = 'pointer'; d.onclick = e => { e.stopPropagation(); clueTheoDoi(); };
+      const lb = new CSS2DObject(d); lb.position.set(0, 1.1, 0); c.root.add(lb); w.spy = c; w.npcs.push({ c, name: 'Bóng người', label: lb, spy: true }); });
+  } else if (world.spy && world.spy !== 'loading' && !clueOpen('theodoi')) { world.spy.root.traverse(o => { if (o.isCSS2DObject) o.element.remove(); }); world.spy.dispose(); world.spy = null; }
+  if (world.brazier && !clueOpen('tro')) { world.brazier.traverse(o => { if (o.isCSS2DObject) o.element.remove(); }); world.group.remove(world.brazier); world.brazier = null; }
 }
 // khung hội thoại kiểu truyện tranh, có chân dung
 const dlgEl = document.createElement('div'); dlgEl.id = 'dlg'; dlgEl.className = 'hidden'; document.body.appendChild(dlgEl);
@@ -900,9 +911,18 @@ function say(model, name, text, choices = [['Tiếp', null]]) {
 const dlgClose = () => dlgEl.classList.add('hidden');
 const meModel = () => (me.outfit === 'aongu' ? 'tunu' : me.outfit);
 async function clueCungNu(n) {
+  const L = me.loyal ?? 50;
+  if (L < 30) {
+    const k = await say('cungnu', n.name, `Nương nương… nô tỳ… nô tỳ không dám nói. Lỡ người ta biết thì nô tỳ mất mạng. <br><small>Trung thành: ${L}/100. Thấp quá nên nàng sợ.</small>`, [['Ban 30 bạc cho nàng yên tâm', 1, 'gold'], ['Thôi', 0]]);
+    if (k !== 1) return dlgClose();
+    const f = await new Promise(res => { let done = false; const t = setTimeout(() => { done = true; res(null); }, 3500); clueWaiters.push(function w(c) { const x = c.found.find(y => y.kind === 'hoi'); if (x && !done) { done = true; clearTimeout(t); res(x); } else if (!done) clueWaiters.push(w); }); socket.emit('case', { caseId: nb.id, op: 'clue', kind: 'hoi', bribe: true }); });
+    if (f) await say('cungnu', n.name, `Đa tạ nương nương… Nô tỳ nhớ: <i>“${esc(f.text)}”</i><br><small>📒 Đã ghi vào sổ điều tra.</small>`, [['Tốt lắm', 0, 'gold']]);
+    return dlgClose();
+  }
   if (await say('cungnu', n.name, 'Nương nương… chuyện tang vật, nô tỳ có điều muốn bẩm. Đêm ấy nô tỳ trực ngoài cửa, hình như có người lén vào phòng.', [['Ngươi thấy gì? Nói mau!', 1, 'gold'], ['Để sau', 0]]) === 0) {
     const f = await getClue('hoi'); if (!f) return dlgClose();
-    await say('cungnu', n.name, `Nô tỳ không dám nhìn kỹ… <i>“${esc(f.text)}”</i><br><small>📒 Đã ghi vào sổ điều tra.</small>`, [['Tốt lắm', 0, 'gold']]);
+    const ex = nb?.found.find(x => x.kind === 'hoi2');
+    await say('cungnu', n.name, `Nô tỳ không dám nhìn kỹ… <i>“${esc(f.text)}”</i>${ex ? `<br>${esc(ex.text)}` : ''}<br><small>📒 Đã ghi vào sổ điều tra. Trung thành: ${me.loyal ?? 50}/100${(me.loyal ?? 50) >= 80 ? ' · nàng khai thêm vì rất trung thành' : ''}</small>`, [['Tốt lắm', 0, 'gold']]);
   }
   dlgClose();
 }
@@ -1086,12 +1106,13 @@ let htTalking = false;
 function startHtTalk() { if (htTalking || me.htTalked) return; htTalking = true; socket.emit('htTalkQ'); }
 socket.on('htTalkQ', async d => {
   const open = { vui: 'Hôm nay trẫm vui, nàng đến thật đúng lúc!', mệt: 'Haizz… trẫm hơi mệt.', buồn: 'Trẫm có chút tâm sự…' }[d.mood] || 'Nàng đến rồi.';
+  htGesture('gio_tay');
   await say('hoangthuong_dem', 'Hoàng thượng', open, [['Thần thiếp tham kiến Hoàng thượng', 0, 'gold']]);
   const ans = [];
   for (const q of d.qs) ans.push(await say('hoangthuong_dem', 'Hoàng thượng', esc(q.q), q.opts.map((o, i) => [esc(o), i, ''])));
   act('httalk', { ans });
 });
-socket.on('htTalkResult', async r => { await say('hoangthuong_dem', 'Hoàng thượng', `${esc(r.line)}<br><small>💗 Sủng ái +${r.sung}</small>`, [['Tạ ơn Hoàng thượng', 0, 'gold']]); dlgClose(); htTalking = false; });
+socket.on('htTalkResult', async r => { htGesture(r.score >= 2 ? 'nam_tay' : 'dung_cho_nam'); await say('hoangthuong_dem', 'Hoàng thượng', `${esc(r.line)}<br><small>💗 Sủng ái +${r.sung}</small>`, [['Tạ ơn Hoàng thượng', 0, 'gold']]); dlgClose(); htTalking = false; });
 
 // =====================================================================
 // TIỆM NỘI VỤ PHỦ
@@ -1195,3 +1216,51 @@ async function performFeast() {
 
 // đồng hồ hồi lượt
 setInterval(() => { const el = $('turnT'); if (!el || !me?.nextTurn) return; const l = me.nextTurn - Date.now(); if (l <= 0) { el.textContent = ''; me.nextTurn = null; socket.emit('refresh'); return; } el.textContent = `+1 sau ${Math.floor(l / 3600e3) ? Math.floor(l / 3600e3) + 'g' : ''}${Math.floor(l % 3600e3 / 60e3)}p`; }, 1000);
+
+// cử chỉ của Hoàng thượng (động tác Tiên làm thêm trong Tripo)
+function htGesture(name) {
+  const n = world?.npcs.find(x => x.model?.startsWith('hoangthuong') && x.c && !x.sit); if (!n || seated) return;
+  const a = n.c.actions[name]; if (!a) return;
+  n.c.play(name, { restart: true }); clearTimeout(n._g); n._g = setTimeout(() => n.c.play('dung_cho'), Math.min(6000, a.getClip().duration * 1000));
+}
+// =====================================================================
+// THEO DÕI NGHI PHẠM: nấp kịp lúc kẻ khả nghi ngoái lại
+// =====================================================================
+function clueTheoDoi() {
+  if (mgOn || !clueOpen('theodoi')) return;
+  if (me.turns < 1) return toast('Hết lượt hôm nay.', 'bad');
+  const spy = world.spy && world.spy !== 'loading' ? world.spy : null;
+  if (selfC) { selfC.target = null; selfC.play('chap_tay'); }
+  let round = 0, ok = 0, k = 0, dir = 1, raf;
+  mgOpen(`<div class="mgt">👀 Rình kẻ khả nghi: bấm "Nấp!" khi kim vào vùng xanh, lúc người đó sắp ngoái lại (3 lần)</div><div class="heat"><div class="ok"></div><div class="nd"></div></div><div class="mgs">Nấp kịp <b id="tdOk">0</b>/3 · <button id="tdHide" class="gold" style="padding:4px 14px">Nấp!</button></div>`);
+  const zone = .25 + Math.random() * .5; mgEl.querySelector('.ok').style.left = (zone - .1) * 100 + '%';
+  const nd = mgEl.querySelector('.nd'), heat = mgEl.querySelector('.heat');
+  const loop = () => { k += dir * .02 * (1 + round * .4); if (k > 1) { k = 1; dir = -1; } if (k < 0) { k = 0; dir = 1; } nd.style.left = k * 100 + '%'; raf = requestAnimationFrame(loop); };
+  const tap = () => { round++; const hit = Math.abs(k - zone) < .1; if (hit) ok++; heat.classList.add(hit ? 'good' : 'bad'); setTimeout(() => heat.classList.remove('good', 'bad'), 220); $('tdOk').textContent = ok;
+    if (spy) { spy.root.rotation.y += Math.PI; setTimeout(() => spy.root.rotation.y -= Math.PI, 500); }
+    if (round >= 3) { cancelAnimationFrame(raf); removeEventListener('keydown', key); const success = ok >= 2;
+      setTimeout(async () => { mgClose(); if (!success) { socket.emit('case', { caseId: nb.id, op: 'clue', kind: 'theodoi', fail: true }); if (selfC) selfC.play('dung_cho'); return; }
+        const f = await getClue('theodoi'); if (selfC) selfC.play('dung_cho'); if (f) { await say(spy ? 'cungnu' : 'cungnu', 'Nghe lén được', `Kẻ khả nghi thì thầm với đồng bọn: <i>“${esc(f.text)}”</i><br><small>📒 Đã ghi vào sổ điều tra.</small>`, [['Ghi nhớ', 0, 'gold']]); dlgClose(); } }, 700); } };
+  const key = e => { if (e.code === 'Space') { e.preventDefault(); tap(); } };
+  addEventListener('keydown', key); $('tdHide').onclick = tap; heat.onpointerdown = tap; raf = requestAnimationFrame(loop);
+}
+// =====================================================================
+// DỌN SANG CUNG MỚI (khi lên Tần)
+// =====================================================================
+async function runDonCung(d) {
+  const S = await stageBegin('phong');
+  const o = S.o, D = o.roomSize.D, W = o.roomSize.W;
+  const me3 = await stageChar(S, me.outfit, 0, D / 2 - .4, Math.PI, 'dung_cho');
+  const m1 = await stageChar(S, 'cungnu', -.75, D / 2 - 1.6, Math.PI / 2, 'chap_tay');
+  const m2 = await stageChar(S, 'cungnu', .75, D / 2 - 1.6, -Math.PI / 2, 'chap_tay');
+  const tg = await stageChar(S, 'thaigiam', 1.2, -D / 2 + 1.4, -.6, 'dung_cho');
+  camera.position.set(0, 1.5, -D / 2 + 1.0); camera.lookAt(0, .7, D / 2 - 1.5); camera.userData.look = new THREE.Vector3(0, .7, D / 2 - 1.5);
+  await fade(false);
+  showBar('Cung nữ', `Cung nghênh nương nương dọn về cung mới!`);
+  m1.play('cui_chao'); m2.play('cui_chao');
+  await walkTo(S, me3, 0, 0, 3.2);
+  me3.root.rotation.y = 0; tg.play('cui_chao');
+  await camTo(new THREE.Vector3(1.6, 1.2, 1.4), new THREE.Vector3(0, .7, -.5), 1.4);
+  showBar('Tổng quản thái giám', `Từ nay nơi này là cung riêng của ${esc(d.rankName)} ${esc(d.name)}. Nội vụ phủ đã chuẩn bị đầy đủ, nương nương cứ tùy ý bài trí.`,
+    [['Vào cung', async () => { await stageEnd(S, true); socket.emit('goto', 'phong'); }, 'gold']]);
+}

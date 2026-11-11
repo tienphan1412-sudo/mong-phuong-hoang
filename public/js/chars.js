@@ -62,7 +62,7 @@ function maleStance(c) {
 }
 export { aim, v3 };
 
-let HT_IDLE = null; // Hoàng thượng đứng khoanh tay (cắt đoạn giữa của động tác, lặp mượt)
+let HT_IDLE = null, HT_G = []; // Hoàng thượng đứng khoanh tay (cắt đoạn giữa của động tác, lặp mượt)
 export async function spawn(modelName) {
   const g = await loadModel(modelName);
   await ready();
@@ -70,6 +70,7 @@ export async function spawn(modelName) {
   if (isHT && !HT_IDLE) {
     const d = await loadModel('hoangthuong_dem'); const k = d.animations.find(a => a.name === 'khoanh_tay');
     if (k) HT_IDLE = THREE.AnimationUtils.subclip(k, 'khoanh_tay', 78, 432, 30);
+    HT_G = d.animations.filter(a => ['gio_tay', 'nam_tay', 'dung_cho_nam'].includes(a.name));
   }
   const male = MALE_MODELS.has(modelName);
   const root = SkeletonUtils.clone(g.scene);
@@ -81,6 +82,7 @@ export async function spawn(modelName) {
   for (const clip of FEMALE) actions[clip.name] = mixer.clipAction(clip);
   if (male) for (const clip of MALE) actions[clip.name] = mixer.clipAction(clip);
   for (const clip of g.animations || []) if (!actions[clip.name] || male) actions[clip.name] = mixer.clipAction(clip);
+  if (isHT) for (const g2 of HT_G) if (!actions[g2.name]) actions[g2.name] = mixer.clipAction(g2);
   if (isHT && HT_IDLE) { actions.khoanh_tay = mixer.clipAction(HT_IDLE); actions.dung_cho = actions.khoanh_tay; }
   const idle = actions.dung_cho; idle.play(); mixer.update(0); root.updateMatrixWorld(true);
   const idlePose = new Map(); root.traverse(o => { if (o.isBone) idlePose.set(o, o.quaternion.clone()); });

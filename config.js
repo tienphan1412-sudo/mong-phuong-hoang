@@ -97,6 +97,7 @@ module.exports = {
     hoi:  { name: 'Hỏi cung nữ', where: 'phong', trait: 'gio', cost: 0, turn: 0, text: 'Cung nữ nhớ có người lạ ghé phòng vào' },
     so:   { name: 'Dò sổ quà ở Nội vụ phủ', where: 'hoavien', trait: 'cung', cost: 40, turn: 1, text: 'Sổ ghi tang vật đi qua tay người ở' },
     tro:  { name: 'Lục tro tàn', where: 'phong', trait: 'dau', cost: 0, turn: 1, text: 'Trong tro còn sót lại' },
+    theodoi: { name: 'Theo dõi nghi phạm', where: 'hoavien', trait: 'any', cost: 0, turn: 1, text: 'Rình ở Ngự hoa viên, nghe được kẻ đáng ngờ có' },
     thaiy:{ name: 'Nhờ thái y kiểm nghiệm', where: 'tuninh', trait: 'dau2', cost: 80, turn: 0, text: 'Thái y phát hiện trên tang vật có' },
   },
 };
