@@ -117,6 +117,30 @@ module.exports = {
   ],
   DET_HOURS: 2,                // thời hạn tra án giúp Quế ma ma
   DET_REWARD: { pts: 20, silver: 50 },
+  // ---------- đại án (cả cung cùng tra) ----------
+  BIG_HOURS: 96,               // hạn tra đại án (giờ)
+  BIG_REWARD: { silver: 100, pts: 40, haiLong: 5, right: 20 }, // thưởng mỗi người góp sức, +right nếu bỏ phiếu đúng
+  BIG_CASES: [
+    { title: 'Ngọc tỷ của Hoàng thượng bị đánh cắp', intro: 'Sáng nay thái giám mở hộp ngọc tỷ thì thấy trống không. Đêm qua chỉ có 6 người từng đi ngang Dưỡng Tâm điện.' },
+    { title: 'Thái hậu trúng độc trong chén trà sen', intro: 'Thái hậu ngất xỉu sau khi uống trà, Thái y phát hiện có độc. 6 người từng chạm vào khay trà.' },
+    { title: 'Lửa cháy kho gấm Nội vụ phủ', intro: 'Nửa đêm kho gấm bốc cháy, mất trắng gấm tiến cống. Có kẻ cố ý phóng hỏa.' },
+    { title: 'Hoàng tử nhỏ bị bắt cóc ở Ngự hoa viên', intro: 'Hoàng tử chơi ở hồ thì biến mất, may được tìm thấy trong hang đá. Kẻ đem đi vẫn còn trong cung.' },
+    { title: 'Mật thư thông đồng với giặc ngoài biên', intro: 'Thị vệ bắt được bồ câu mang mật thư gửi ra ngoài cung, nét chữ đã bị cố ý che giấu.' },
+  ],
+  // ---------- đại lễ (cả cung góp sức) ----------
+  FEST_HOURS: 120,             // đại lễ kéo dài 5 ngày, 2 tuần một lần
+  FEST_MIN_GOAL: 600, FEST_PER_PLAYER: 80,
+  FESTS: [
+    { name: 'Đại lễ mừng thọ Thái hậu', desc: 'Thái hậu tròn sáu mươi tuổi, cả hậu cung chuẩn bị lễ mừng thọ.' },
+    { name: 'Vạn thọ tiết của Hoàng thượng', desc: 'Sinh thần Hoàng thượng, cả cung dâng lễ chúc thọ.' },
+    { name: 'Lễ hội đèn Nguyên tiêu', desc: 'Cả cung treo đèn kết hoa đón rằm tháng Giêng.' },
+  ],
+  FEST_MILES: [
+    { at: .25, silver: 30, text: '30 bạc mỗi người' },
+    { at: .5, silver: 50, turns: 1, text: '50 bạc và 1 lượt' },
+    { at: .75, silver: 80, sung: 10, text: '80 bạc và 10 sủng ái' },
+    { at: 1, silver: 150, haiLong: 15, text: '150 bạc, 15 hài lòng và đại yến khao cả cung' },
+  ],
   HH_MIN_RANK: 5,              // từ Tần trở lên được ứng cử Hoàng hậu
   HH_CYCLE_DAYS: 14,           // bao lâu bầu phượng ấn một lần
   HH_VOTE_HOURS: 24,           // thời gian tiến cử

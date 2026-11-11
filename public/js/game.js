@@ -291,9 +291,9 @@ function renderHud() {
   let qd = $('hQuest'); if (!qd) { qd = document.createElement('div'); qd.id = 'hQuest'; $('who').appendChild(qd); }
   qd.innerHTML = me.quest ? `🎯 <b>${me.quest.i + 1}/${me.quest.n}</b> ${esc(me.quest.t)}${me.quest.need > 1 && me.quest.need < 50 && !/^Lên/.test(me.quest.t) ? ` (${me.quest.cur}/${me.quest.need})` : ''}` : ''; qd.style.display = me.quest ? '' : 'none';
   const t = me.tasks || {};
-  $('stats').innerHTML = `<span class="pill">💰 Bạc <b>${me.silver}</b></span><span class="pill" title="Cứ 30 phút hồi 1 lượt (tối đa ${me.turnCap}). Làm đủ 3 nhiệm vụ ngày, dự yến tiệc, được lật thẻ cũng được thêm lượt.">⏳ Lượt <b>${me.turns}</b>${me.nextTurn ? ` <small id="turnT" style="opacity:.75"></small>` : ''}</span><span class="pill">💗 Sủng ái <b>${me.sung}</b></span><span class="pill">🍵 Thái hậu <b>${me.haiLong}</b></span><span class="pill" title="Nhiệm vụ ngày: thỉnh an, luyện tài nghệ, dò tin. Làm đủ 3 được thêm lượt và công trạng.">📋 ${t.thinhan ? '✅' : '⬜'}${t.luyen ? '✅' : '⬜'}${t.dotin ? '✅' : '⬜'}</span>${me.camTuc ? `<span class="pill" style="border-color:#c0503a">🔒 Cấm túc còn ${Math.max(1, Math.ceil((me.camTuc - Date.now()) / 3600e3))} giờ</span>` : ''}${me.thai ? `<span class="pill" style="border-color:#f3a6c8" title="Mỗi ngày uống thuốc an thai ở chỗ Thái y (Từ Ninh cung). Uống đủ 2 ngày trở lên thì sinh thuận.">🤰 Long thai · còn ${Math.max(0, Math.ceil((me.thai.due - Date.now()) / 3600e3))} giờ · an thai ${me.thai.antai ? '✅' : '⬜'}</span>` : ''}${me.isHH ? '<button class="pill" id="hhBtn" style="border-color:#e8c25a">👑 Hoàng hậu</button>' : ''}${me.hhVote ? `<button class="pill" id="voteBtn" style="border-color:#e8c25a">👑 Bầu phượng ấn · còn ${Math.max(1, Math.ceil((me.hhVote.end - Date.now()) / 3600e3))} giờ</button>` : ''}<button class="pill" id="todayBtn">🗓 Hôm nay</button>${htPill()}${feast ? `<span class="pill feast">🎎 Yến tiệc · <b id="feastT"></b> · ${feast.n} tiết mục</span>` : ''}${me.cases.length ? `<button class="pill" id="caseBtn" style="border-color:#c0503a">${me.cases[0].det ? '🔍 Đang tra án' : '⚖️ Vụ án đang mở'}${me.cases.length > 1 ? ` (${me.cases.length})` : ''}</button>` : ''}`;
+  $('stats').innerHTML = `<span class="pill">💰 Bạc <b>${me.silver}</b></span><span class="pill" title="Cứ 30 phút hồi 1 lượt (tối đa ${me.turnCap}). Làm đủ 3 nhiệm vụ ngày, dự yến tiệc, được lật thẻ cũng được thêm lượt.">⏳ Lượt <b>${me.turns}</b>${me.nextTurn ? ` <small id="turnT" style="opacity:.75"></small>` : ''}</span><span class="pill">💗 Sủng ái <b>${me.sung}</b></span><span class="pill">🍵 Thái hậu <b>${me.haiLong}</b></span><span class="pill" title="Nhiệm vụ ngày: thỉnh an, luyện tài nghệ, dò tin. Làm đủ 3 được thêm lượt và công trạng.">📋 ${t.thinhan ? '✅' : '⬜'}${t.luyen ? '✅' : '⬜'}${t.dotin ? '✅' : '⬜'}</span>${me.camTuc ? `<span class="pill" style="border-color:#c0503a">🔒 Cấm túc còn ${Math.max(1, Math.ceil((me.camTuc - Date.now()) / 3600e3))} giờ</span>` : ''}${me.thai ? `<span class="pill" style="border-color:#f3a6c8" title="Mỗi ngày uống thuốc an thai ở chỗ Thái y (Từ Ninh cung). Uống đủ 2 ngày trở lên thì sinh thuận.">🤰 Long thai · còn ${Math.max(0, Math.ceil((me.thai.due - Date.now()) / 3600e3))} giờ · an thai ${me.thai.antai ? '✅' : '⬜'}</span>` : ''}${me.isHH ? '<button class="pill" id="hhBtn" style="border-color:#e8c25a">👑 Hoàng hậu</button>' : ''}${me.hhVote ? `<button class="pill" id="voteBtn" style="border-color:#e8c25a">👑 Bầu phượng ấn · còn ${Math.max(1, Math.ceil((me.hhVote.end - Date.now()) / 3600e3))} giờ</button>` : ''}${me.big ? `<button class="pill" id="bigBtn" style="border-color:#c0503a">📜 Đại án${me.big.done ? ' · kết quả' : ` · ${me.big.mine.length} manh mối`}</button>` : ''}${me.fest && !me.fest.done ? `<button class="pill" id="festBtn" style="border-color:#e8c25a">🏮 Đại lễ <b id="festPct">${Math.min(100, Math.floor(me.fest.pts / me.fest.goal * 100))}%</b></button>` : ''}<button class="pill" id="todayBtn">🗓 Hôm nay</button>${htPill()}${feast ? `<span class="pill feast">🎎 Yến tiệc · <b id="feastT"></b> · ${feast.n} tiết mục</span>` : ''}${me.cases.length ? `<button class="pill" id="caseBtn" style="border-color:#c0503a">${me.cases[0].det ? '🔍 Đang tra án' : '⚖️ Vụ án đang mở'}${me.cases.length > 1 ? ` (${me.cases.length})` : ''}</button>` : ''}`;
   const cb = $('caseBtn'); if (cb) cb.onclick = () => openCase(me.cases[0].id);
-  const tb = $('todayBtn'); if (tb) tb.onclick = openToday;
+  const tb = $('todayBtn'); if (tb) tb.onclick = openToday; const bb = $('bigBtn'); if (bb) bb.onclick = openBig; const fb = $('festBtn'); if (fb) fb.onclick = openFest;
   const hb = $('hhBtn'); if (hb) hb.onclick = openHH; const vb = $('voteBtn'); if (vb) vb.onclick = openVote;
 }
 const LOCNAMES = { yentiec: '🎎 Yến tiệc', hoavien: 'Ngự hoa viên', tuninh: 'Từ Ninh cung', duongtam: 'Dưỡng Tâm điện', phong: 'Phòng riêng', tamcung: 'Tẩm cung', lanhcung: 'Lãnh cung' };
@@ -322,6 +322,8 @@ function renderActs() {
   if (L === 'lanhcung') { add('🧹 Làm việc lãnh cung', `Phục vị ${me.lanh?.tasks || 0}/3 · mỗi ngày 1 lần`, gameLanh); add('🕯 Hỏi chuyện phế phi', 'Mỗi ngày một lần · bà biết nhiều bí mật', () => act('phephi')); if (me.lanh?.caseId) add('📜 Kêu oan', 'Điều tra lại vụ án cũ', () => openCase(me.lanh.caseId)); }
   const ev = me.event; if (ev?.loc && ev.loc === L && !me.lanh) add(ev.act, ev.done ? 'Hôm nay đã tham gia · mai quay lại' : `${ev.sub} · sự kiện tuần`, () => act('event'), ev.done);
   if (L === 'tuninh' && me.hhVote) add('👑 Bầu phượng ấn', me.hhVote.mine ? 'Đã tiến cử · có thể đổi' : 'Tiến cử người xứng làm Hoàng hậu', openVote);
+  const B = me.big; if (B && !B.done && !me.lanh && ['hoavien', 'tuninh', 'duongtam'].includes(L)) add('📜 Tra đại án ở đây', B.invToday.length >= 2 ? 'Hôm nay đã tra đủ 2 lần · mai quay lại' : B.invToday.includes(L) ? 'Hôm nay đã tra ở đây · thử nơi khác' : `1 lượt · còn ${2 - B.invToday.length} lần hôm nay · mỗi người nhận manh mối khác nhau`, () => socket.emit('big', { op: 'inv' }), B.invToday.includes(L) || B.invToday.length >= 2);
+  const F = me.fest; if (F && !F.done && !me.lanh) { if (L === 'phong') add('🧵 Thêu gấm cho đại lễ', F.today.theu ? 'Hôm nay đã thêu' : '1 lượt · mỗi ngày 1 lần · thêu khéo được nhiều điểm', () => gameRhythm('múa', q => socket.emit('fest', { op: 'theu', q })), F.today.theu); if (L === 'tuninh') add('📿 Chép kinh cho đại lễ', F.today.kinh ? 'Hôm nay đã chép' : '1 lượt · mỗi ngày 1 lần · +15 điểm đại lễ', () => socket.emit('fest', { op: 'kinh' }), F.today.kinh); }
   if (me.isHH) add('👑 Quyền Hoàng hậu', 'Ân xá · phạt cấm túc · thiết yến', openHH);
   renderMenu();
 }
@@ -362,8 +364,9 @@ function talk(n) {
 }
 
 // ---------------- hộp thoại ----------------
-function modal(html) { $('mcard').innerHTML = html; $('modal').classList.remove('hidden'); }
-function closeModal() { $('modal').classList.add('hidden'); }
+let bigOpen = false;
+function modal(html) { bigOpen = false; $('mcard').classList.remove('wide'); $('mcard').innerHTML = html; $('modal').classList.remove('hidden'); }
+function closeModal() { bigOpen = false; $('modal').classList.add('hidden'); }
 window._close = closeModal;
 $('modal').addEventListener('click', e => { if (e.target === $('modal')) closeModal(); });
 
@@ -1545,6 +1548,8 @@ const CAMNANG = [
   ['👑 Hoàng thượng', 'Mỗi ngày Hoàng thượng thèm một món canh, thích một màu áo, muốn xem một tài nghệ. Dò tin ở Ngự hoa viên để biết. Dâng đúng canh được nhiều sủng ái. Hoàng thượng <b>lật thẻ mỗi 2 tiếng từ 8h tới 22h</b>: mặc đúng màu, dâng hương mê điệp, đeo trâm phỉ thúy để dễ được chọn. Được lật thẻ thì vào tẩm cung trong 2 giờ, hầu chuyện khéo được thêm sủng.'],
   ['🎎 Yến tiệc', 'Mỗi ngày 9h, 11h (ngoài trời ở Ngự hoa viên), 15h, 17h (trong điện), mỗi buổi 20 phút. Vào ngồi, bước ra dâng tiết mục: tiết mục hay nhất được thưởng lớn, mọi người dâng đều có quà. Tỷ muội cùng diễn được cộng điểm.'],
   ['🔍 Phá án', 'Ở Từ Ninh cung, mỗi ngày <b>nhận tra án giúp Quế ma ma</b>. Mỗi manh mối cho biết một đặc điểm thật của thủ phạm, ai không khớp bị đóng dấu LOẠI. Còn một người thì ra phiên xử. Từ Quý nhân, bổn cung có thể bị người khác vu oan: khi đó phải tự điều tra để minh oan, sai là bị giáng cấp.'],
+  ['📜 Đại án (cả cung cùng tra)', 'Mỗi tuần một vụ án lớn cho cả cung. Mỗi ngày tra 2 lần ở Ngự hoa viên, Từ Ninh cung, Dưỡng Tâm điện: mỗi người nhận <b>manh mối khác nhau, chỉ mình thấy</b>. Công bố cho cả cung hoặc kể trong chat (người khác có thể nói dối!). Tin đồn ⚠️ có thể sai. Cuối hạn người bị nhiều phiếu nhất bị xử: đúng thì ai góp sức cũng được 100 bạc, 40 công trạng (bỏ phiếu đúng thêm 20).'],
+  ['🏮 Đại lễ (cả cung góp sức)', '2 tuần một lần, 5 ngày. Góp bạc, thêu gấm ở phòng, chép kinh ở Từ Ninh cung, câu cá, dâng tiết mục ở yến tiệc đều cộng vào thanh tiến độ chung. Đạt 25%, 50%, 75%, 100% thì cả cung có quà (người đã góp nhận đủ, chưa góp nhận một nửa). Đủ 100% Hoàng thượng mở đại yến.'],
   ['🤰 Long thai', 'Được lật thẻ có thể mang thai. Nhờ Thái y bắt mạch, uống thuốc an thai mỗi ngày. 3 ngày sau sinh hoàng tự: lên bậc, mỗi ngày thêm 1 lượt. Kẻ khác có thể hại thai: tìm đúng hung thủ trước hạn thì giữ được.'],
   ['💞 Tỷ muội', 'Kết nghĩa tối đa 4 người: kênh chat riêng (nút 💞 ở ô chat), góp bạc may áo dâng Thái hậu, cầu tình khi tỷ muội bị phạt, cùng diễn yến tiệc được cộng điểm. Tỷ muội không được ra tay với nhau.'],
   ['✉️ Thư từ', 'Gửi thư, quà, lời mời kết nghĩa cho cả người đang offline. Thư nặc danh tốn 30 bạc. <b>🕵️ Mua chuộc</b> cung nữ nhà người khác (80 bạc/ngày) để dò bí mật: họ từng hại ai, tiến cử ai, có điều gì giấu giếm.'],
@@ -1556,4 +1561,58 @@ function openGuide() {
   <div class="btns" style="margin-top:0"><button class="gold" id="gTour">Xem lại hướng dẫn nhanh</button></div>
   ${CAMNANG.map(([t, x]) => `<details class="cn"><summary>${t}</summary><div>${x}</div></details>`).join('')}`);
   $('gTour').onclick = () => { closeModal(); startTour(true); };
+}
+
+// ---------------- ĐẠI ÁN: mỗi người một mảnh manh mối ----------------
+socket.on('bigClue', c => { if (bigOpen) setTimeout(openBig, 400); else toast('📜 ' + c.text, 'good'); });
+function bigAnalyse(B) {
+  // manh mối chắc chắn (của mình + đã công bố, trừ tin đồn): loại người không khớp
+  const sure = [...B.mine, ...B.board].filter(c => c.kind !== 'don');
+  return B.sus.map(s => {
+    let out = null;
+    for (const c of sure) {
+      if (c.kind === 'ngoai' && c.s === s.id) out = 'ngoại phạm';
+      if (c.kind === 'dac' && s.t[c.k] !== c.v) out = `không có ${B.traits[c.k][c.v]}`;
+    }
+    return { ...s, out };
+  });
+}
+function openBig() {
+  const B = me.big; if (!B) return;
+  const S = bigAnalyse(B), left = S.filter(s => !s.out);
+  const chip = (s, k) => `<div class="chip">${{ cung: '🏯', gio: '🕰', dau: '👣', mau: '👘' }[k]} ${esc(B.traits[k][s.t[k]])}</div>`;
+  const clue = (c, mine) => `<div class="cl ${c.kind === 'don' ? 'don' : ''}">${c.kind === 'don' ? '⚠️' : c.kind === 'ngoai' ? '🛡' : '🔎'} ${esc(c.text)}${mine ? (c.shared ? ' <small>· đã công bố</small>' : ` <button data-sh="${c.id}">📢 Công bố</button>`) : ` <small>· ${esc(c.by)} công bố</small>`}</div>`;
+  modal(`<button class="close" onclick="window._close()">✕</button><h3>📜 Đại án: ${esc(B.title)}</h3>
+  <div style="color:var(--muted);font-size:12.5px">${esc(B.intro)}</div>
+  ${B.done ? `<div class="today" style="border-color:#e8c25a"><b>⚖️ Phán quyết</b>${esc(B.verdict)}</div>` : `<div class="today"><b>⏳ Còn ${fmtLeft(B.end - Date.now()).split(':').slice(0, 2).join(' giờ ')} phút · ${B.people} người đang tra</b>Tra ở <b>Ngự hoa viên, Từ Ninh cung, Dưỡng Tâm điện</b>: mỗi ngày tra được 2 lần ở 2 nơi khác nhau. Manh mối của mỗi người <b>khác nhau và chỉ mình thấy</b>. Công bố cho cả cung, hoặc kể trong chat (có thể nói dối!). Người không khớp manh mối chắc chắn sẽ tự bị gạch. Cuối hạn, người bị nhiều phiếu nhất bị xử.</div>`}
+  <div class="bigsus">${S.map(s => `<div class="sus ${s.out ? 'out' : ''} ${B.done && s.guilty ? 'top' : ''}"><img class="pt" data-m="${esc(s.model)}" alt=""><div class="sn">${esc(s.name)}</div>${['cung', 'gio', 'dau', 'mau'].map(k => chip(s, k)).join('')}
+    ${s.out ? `<div class="stamp">LOẠI</div><small class="why">${esc(s.out)}</small>` : ''}${B.done && s.guilty ? '<div class="stamp red">THỦ PHẠM</div>' : ''}
+    <div class="vt">🗳 ${s.votes} phiếu ${B.done ? '' : B.vote === s.id ? '<b>✓ phiếu của bổn cung</b>' : `<button data-v="${s.id}">Buộc tội</button>`}</div></div>`).join('')}</div>
+  ${!B.done && left.length === 1 && B.mine.length ? `<div class="hint">🔎 Theo manh mối chắc chắn, chỉ còn <b>${esc(left[0].name)}</b> khả nghi.</div>` : ''}
+  <h4 style="margin:12px 0 4px">🗝 Manh mối của bổn cung (${B.mine.length})</h4>${B.mine.map(c => clue(c, true)).join('') || '<div class="none">Chưa có. Đi tra ở 3 nơi trên.</div>'}
+  <h4 style="margin:12px 0 4px">📢 Cả cung đã công bố (${B.board.length})</h4>${B.board.filter(b => !B.mine.some(m => m.id === b.cid)).map(c => clue(c, false)).join('') || '<div class="none">Chưa ai công bố. Rủ mọi người góp manh mối trong chat.</div>'}`);
+  const mc = $('mcard'); mc.classList.add('wide'); bigOpen = true;
+  mc.querySelectorAll('img.pt').forEach(img => portrait(img.dataset.m).then(u => { img.src = u; }).catch(() => {}));
+  mc.querySelectorAll('[data-sh]').forEach(b => b.onclick = () => { socket.emit('big', { op: 'share', cid: b.dataset.sh }); setTimeout(openBig, 400); });
+  mc.querySelectorAll('[data-v]').forEach(b => b.onclick = () => { socket.emit('big', { op: 'vote', s: b.dataset.v }); setTimeout(openBig, 400); });
+}
+
+// ---------------- ĐẠI LỄ: cả cung góp sức ----------------
+socket.on('festUp', d => { if (me?.fest) { me.fest.pts = d.pts; const e = $('festPct'); if (e) e.textContent = Math.min(100, Math.floor(d.pts / d.goal * 100)) + '%'; } });
+function openFest() {
+  const F = me.fest; if (!F) return; const pct = Math.min(100, F.pts / F.goal * 100);
+  const MILES = [[.25, '30 bạc'], [.5, '50 bạc + 1 lượt'], [.75, '80 bạc + 10 sủng ái'], [1, '150 bạc + 15 hài lòng + đại yến']];
+  modal(`<button class="close" onclick="window._close()">✕</button><h3>🏮 ${esc(F.name)}</h3>
+  <div style="color:var(--muted);font-size:12.5px">${esc(F.desc)} ${F.done ? 'Đại lễ đã khép lại.' : `Còn ${Math.max(1, Math.ceil((F.end - Date.now()) / 3600e3))} giờ.`}</div>
+  <div class="fbar"><i style="width:${pct}%"></i>${MILES.map(([m, t]) => `<span class="ml ${F.hit.includes(MILES.findIndex(x => x[0] === m)) ? 'ok' : ''}" style="left:${m * 100}%" title="${t}">${F.hit.includes(MILES.findIndex(x => x[0] === m)) ? '✅' : '🎁'}</span>`).join('')}</div>
+  <div style="display:flex;justify-content:space-between;font-size:12.5px;color:var(--muted)"><span><b style="color:var(--gold2)">${Math.floor(F.pts)}</b> / ${F.goal} điểm · ${F.people} người góp sức</span><span>Bổn cung góp: <b style="color:var(--gold2)">${Math.floor(F.mine)}</b></span></div>
+  <div class="today"><b>🎁 Mốc thưởng cho cả cung</b>${MILES.map(([m, t]) => `${Math.round(m * 100)}%: ${t}`).join(' · ')}<br><small>Người đã góp sức nhận đủ, người chưa góp chỉ nhận một nửa.</small></div>
+  <div class="today"><b>🙌 Cách góp sức</b>
+    • Góp bạc: 10 bạc = 1 điểm, mỗi ngày tối đa 300 bạc (hôm nay đã góp ${F.today.silver}) ${F.done ? '' : '<span class="btns" style="display:inline-flex;margin:4px 0 0"><button data-g="50">50 bạc</button><button data-g="100">100 bạc</button><button data-g="300">300 bạc</button></span>'}<br>
+    • Thêu gấm ở phòng riêng: 1 lượt, 10–30 điểm ${F.today.theu ? '✅' : ''}<br>
+    • Chép kinh ở Từ Ninh cung: 1 lượt, 15 điểm ${F.today.kinh ? '✅' : ''}<br>
+    • Câu cá: mỗi con +2 điểm (15 con đầu mỗi ngày, hôm nay ${F.today.fish}/15)<br>
+    • Dâng tiết mục ở yến tiệc: +20 điểm</div>
+  <div class="today"><b>🏅 Góp sức nhiều nhất</b>${F.top.map((t, i) => `${i + 1}. ${esc(t.name)} · ${Math.floor(t.n)}`).join('<br>') || 'Chưa ai góp.'}</div>`);
+  $('mcard').querySelectorAll('[data-g]').forEach(b => b.onclick = () => { socket.emit('fest', { op: 'silver', amount: +b.dataset.g }); setTimeout(openFest, 400); });
 }
