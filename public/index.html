@@ -53,7 +53,6 @@ input, select { font:inherit; padding:10px 12px; border-radius:10px; border:1px 
 #top5 .tr.up { color:#3fd46b; } #top5 .tr.down { color:#ff4d4d; }
 #top5 .on { width:6px; height:6px; border-radius:50%; background:#555; flex:none; } #top5 .on.y { background:#3fd46b; }
 body.staging #top5 { display:none !important; }
-@media (max-width:760px) { #top5 { top:auto; bottom:250px; width:200px; } }
 #who { background:var(--panel); border:1px solid var(--line); border-radius:14px; padding:10px 14px; min-width:220px; }
 #who .nm { font-family:'Noto Serif',serif; font-size:17px; color:var(--gold2); font-weight:700; }
 #who .rk { color:var(--gold); font-size:13px; }
@@ -180,6 +179,69 @@ body.staging #case { display:none !important; }
 .ledger .blot { color:#3a1408; letter-spacing:-2px; }
 .shake { animation:shake .4s; } @keyframes shake { 25% { transform:translateX(-5px); } 75% { transform:translateX(5px); } }
 
+
+/* ---- màn chờ ---- */
+#loading { position:fixed; inset:0; z-index:100; display:flex; flex-direction:column; align-items:center; justify-content:center; background:radial-gradient(ellipse at center,#5a1a14 0%,#2a0a08 70%); transition:opacity .8s; text-align:center; padding:0 18px; }
+#loading.gone { opacity:0; pointer-events:none; }
+#loading h1 { font-family:'Noto Serif',serif; font-size:clamp(32px,7vw,64px); letter-spacing:.08em; margin:0; color:#f3dc96; text-shadow:0 2px 0 #6a3a10,0 0 24px rgba(240,190,90,.55); }
+#loading .sub { font-family:'Noto Serif',serif; color:#e2bf6b; letter-spacing:.25em; margin:8px 0; font-size:clamp(14px,2.4vw,20px); }
+#loading .tag { font-family:'Noto Serif',serif; font-style:italic; color:#e2bf6b; font-size:clamp(14px,2vw,18px); margin:14px 0 30px; }
+#loading .gates { width:120px; height:80px; position:relative; margin-bottom:18px; }
+#loading .gates i { position:absolute; top:0; width:58px; height:80px; background:linear-gradient(#b8231d,#7d1210); border:2px solid #e2bf6b; border-radius:6px 6px 0 0; animation:door 2.4s ease-in-out infinite alternate; background-image:radial-gradient(circle,#e2bf6b 2.5px,transparent 3px); background-size:14px 14px; background-color:#9c1a15; }
+#loading .gates i:first-child { left:2px; transform-origin:left center; } #loading .gates i:last-child { right:2px; transform-origin:right center; animation-name:door2; }
+@keyframes door { to { transform:perspective(200px) rotateY(55deg); } } @keyframes door2 { to { transform:perspective(200px) rotateY(-55deg); } }
+#loading .st { color:#f3dc96; letter-spacing:.12em; } #loading .st::after { content:'…'; animation:dots 1.4s steps(4) infinite; display:inline-block; width:1.2em; text-align:left; overflow:hidden; vertical-align:bottom; }
+@keyframes dots { from { width:0; } to { width:1.2em; } }
+/* ---- chữ bay ---- */
+.fdelta { position:fixed; left:50%; top:46%; transform:translateX(-50%); z-index:60; font-weight:800; font-size:20px; pointer-events:none; text-shadow:0 2px 6px rgba(0,0,0,.8); animation:fup 2.4s ease-out forwards; opacity:0; white-space:nowrap; }
+.fdelta.up { color:#9dffb0; } .fdelta.down { color:#ff9a8a; }
+@keyframes fup { 0% { opacity:0; transform:translate(-50%,10px) scale(.8); } 15% { opacity:1; transform:translate(-50%,0) scale(1.1); } 100% { opacity:0; transform:translate(-50%,-110px) scale(1); } }
+.pill.ht { border-color:#e2bf6b; } .pill.ht.dim { opacity:.7; } .pill.feast { border-color:#3fd46b; background:rgba(30,90,40,.75); }
+/* ---- trò nhỏ ---- */
+#mg { position:fixed; left:50%; bottom:14px; transform:translateX(-50%); width:min(560px,94vw); z-index:24; background:linear-gradient(#f8ead0f2,#ecd6a3f2); color:#3a1408; border:2px solid #b8862d; border-radius:14px; padding:10px 12px; box-shadow:0 8px 24px rgba(0,0,0,.5); }
+#mg .mgt { font-family:'Noto Serif',serif; font-weight:700; color:#8a1a17; margin-bottom:6px; } #mg .mgt small { font-weight:400; color:#7a4a22; font-family:'Be Vietnam Pro',sans-serif; }
+#mg .row { display:flex; gap:6px; flex-wrap:wrap; } #mg .row button { background:#fff3da; color:#3a1408; border-color:#c9a35a; } #mg .row button.gold { background:linear-gradient(#f0cf73,#c99a3c); }
+#mg .mgs { margin-top:6px; font-size:13px; text-align:center; }
+#mg .lane { position:relative; height:52px; background:#3a1408; border-radius:10px; overflow:hidden; cursor:pointer; touch-action:manipulation; transition:background .15s; }
+#mg .lane.miss { background:#6a1a10; }
+#mg .zone { position:absolute; left:82%; top:6px; bottom:6px; width:44px; margin-left:-22px; border:3px solid #f3d27a; border-radius:10px; box-shadow:0 0 12px rgba(243,210,122,.7); }
+#mg .note { position:absolute; left:-20px; top:11px; width:30px; height:30px; margin-left:-15px; border-radius:50%; background:#f3dc96; color:#8a1a17; font-weight:800; text-align:center; line-height:30px; font-size:17px; }
+#mg .note.ok { background:#3fd46b; color:#fff; transform:scale(1.4) !important; opacity:0; transition:all .3s; } #mg .note.miss { opacity:.25; }
+#mg .heat { position:relative; height:30px; border-radius:15px; background:linear-gradient(90deg,#4a90d9,#f0cf73,#e0402a); cursor:pointer; touch-action:manipulation; }
+#mg .heat .ok { position:absolute; top:-3px; bottom:-3px; width:20%; border:3px solid #1f9d45; border-radius:10px; background:rgba(63,212,107,.35); }
+#mg .heat .nd { position:absolute; top:-6px; width:6px; height:42px; margin-left:-3px; background:#3a1408; border-radius:3px; }
+#mg .heat.good { box-shadow:0 0 14px #3fd46b; } #mg .heat.bad { box-shadow:0 0 14px #e0402a; }
+#mg .yard { position:relative; height:120px; background:linear-gradient(#6b6258,#4e463e); border-radius:10px; overflow:hidden; touch-action:manipulation; }
+#mg .leaf { position:absolute; top:-30px; font-size:26px; cursor:pointer; animation:fall linear forwards; user-select:none; }
+@keyframes fall { to { transform:translateY(160px) rotate(260deg); } }
+body.mgopen #chat, body.mgopen #dlg { display:none; }
+/* ---- tiệm ---- */
+.shop { display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-top:10px; }
+.shop .it { background:rgba(255,255,255,.05); border:1px solid var(--line); border-radius:10px; padding:8px 10px; display:flex; flex-direction:column; gap:4px; }
+.shop .it small { color:var(--muted); font-size:11.5px; } .shop .it button { margin-top:auto; }
+/* ---- điện thoại ---- */
+@media (max-width:760px) {
+  body { font-size:13px; } .lbl { display:none; }
+  #hud { flex-direction:column; gap:5px; right:56px; left:6px; top:6px; }
+  #who { padding:6px 10px; min-width:0; } #who .nm { font-size:15px; }
+  #stats { max-width:100%; gap:4px; } #stats .pill { padding:3px 8px; font-size:11px; } .pill.ht { white-space:normal; }
+  #newsbtn, #guidebtn, #musicbtn { position:fixed !important; right:6px !important; left:auto !important; bottom:auto !important; width:42px; height:38px; padding:0 !important; font-size:17px !important; text-align:center; }
+  #newsbtn { top:6px !important; } #guidebtn { top:48px !important; } #musicbtn { top:90px !important; }
+  #news { right:6px; left:6px; width:auto; top:52px; bottom:auto; max-height:50vh; }
+  #top5 { top:auto; bottom:calc(84px + 38vh + 8px); right:6px; left:auto; width:auto; max-width:60vw; font-size:11px; } #top5 .rk { display:none; } #top5 .t { font-size:12px; }
+  #map { flex-direction:row; flex-wrap:wrap; left:6px; right:6px; top:auto; bottom:6px; transform:none; gap:4px; }
+  #map button { min-width:0; padding:6px 8px; font-size:11.5px; flex:1 1 auto; }
+  #acts { top:auto; bottom:84px; right:6px; transform:none; max-width:48vw; max-height:38vh; overflow-y:auto; } #acts .ttl { font-size:13px; } #acts button { padding:6px 8px; font-size:12px; } #acts button small { display:none; }
+  #chat { bottom:84px; left:6px; width:46vw; } #chatlog { max-height:64px; font-size:11.5px; } #chatin { font-size:12px; padding:7px 9px; }
+  #case { left:6px; right:6px; width:auto; top:auto; bottom:6px; max-height:64vh; z-index:26; } #case.min { left:6px; right:auto; bottom:auto; top:auto; bottom:190px; font-size:12px; }
+  #case .pt { width:42px; height:42px; } #case .sn { font-size:11px; } #case .chip { font-size:9.5px; }
+  #dlg { padding:8px 10px; font-size:13.5px; bottom:6px; } #dlg .pt { width:56px; height:56px; }
+  #sbar { font-size:13.5px; top:6px; } #mg { bottom:6px; }
+  .shop { grid-template-columns:1fr; }
+  #mcard { max-height:82vh; overflow-y:auto; }
+  .fdelta { font-size:16px; }
+}
+
 #musicbtn { position:fixed; right:10px; top:10px; z-index:6; background:var(--panel); color:var(--gold2); border:1px solid var(--line); border-radius:10px; padding:7px 12px; font-size:13px; cursor:pointer; }
 #cut .scroll h3 { margin:0 0 4px; color:#8a1a17; font-size:17px; }
 #cut .scroll .btns { justify-content:flex-end; }
@@ -187,7 +249,6 @@ body.staging #case { display:none !important; }
 #decorbar { position:fixed; bottom:10px; left:50%; transform:translateX(-50%); display:flex; gap:6px; flex-wrap:wrap; justify-content:center; background:var(--panel); border:1px solid var(--line); border-radius:14px; padding:8px; z-index:7; max-width:94vw; }
 #decorbar button { font-size:12px; padding:7px 9px; }
 #decorbar button.on { border-color:var(--gold); background:rgba(160,90,30,.55); }
-@media (max-width:760px) { #map { top:auto; bottom:200px; transform:none; } #map button { min-width:0; padding:7px 9px; font-size:12px; } #acts { top:auto; bottom:200px; transform:none; max-width:170px; } #who { min-width:0; } #stats .pill { font-size:11.5px; } }
 </style>
 </head>
 <body>
@@ -195,6 +256,7 @@ body.staging #case { display:none !important; }
 <div id="labels"></div>
 <div id="fade"></div>
 
+<div id="loading"><div class="gates"><i></i><i></i></div><h1>MỘNG PHƯỢNG HOÀNG</h1><div class="sub">Phượng khởi thâm cung</div><div class="tag">“Một hậu cung, ngàn toan tính. Ai sẽ bước lên ngôi Hoàng hậu?”</div><div class="st">Cung môn đang mở</div></div>
 <div id="gate">
   <h1>MỘNG PHƯỢNG HOÀNG</h1>
   <div class="sub">Phượng khởi thâm cung</div>
@@ -226,7 +288,7 @@ body.staging #case { display:none !important; }
   <div id="map"></div>
   <div id="acts"></div>
   <div id="chat"><div id="chatlog"></div><input id="chatin" placeholder="Nói gì đó… (Enter để gửi)" maxlength="200"></div>
-  <button id="newsbtn">📜 Bảng tin hậu cung</button>
+  <button id="newsbtn">📜<span class="lbl"> Bảng tin hậu cung</span></button>
   <div id="news" class="hidden"><h4>Bảng tin hậu cung</h4><div id="newslist"></div></div>
 </div>
 <div id="decorbar" class="hidden"></div>

@@ -277,6 +277,6 @@ export function buildLocation(loc, opts = {}) {
   else if (loc === 'hoavien') { garden(o); o.npcs = [{ model: 'cungnu', x: 3, z: -1.2, ry: -1, name: 'Cung nữ Tiểu Thúy', talk: 'dotin' }, { model: 'thive', x: 0, z: 8.6, ry: Math.PI, male: true, name: 'Thị vệ' }]; }
   else if (loc === 'phong') { room(o, { big: !!opts.palace, palaceName: opts.palace ? opts.palaceName : null }); o.npcs = [{ model: 'cungnu', x: (o.roomSize.W / 2 - .8), z: -o.roomSize.D / 2 + 1, ry: -2.3, name: 'Cung nữ thân tín', talk: 'cungnu' }]; o.decorable = true; }
   else if (loc === 'tamcung') { bedroom(o); o.npcs = [{ model: 'hoangthuong_dem', x: -.5, z: -.4, ry: .4, male: true, name: 'Hoàng thượng', idle: 'khoanh_tay' }]; }
-  else if (loc === 'lanhcung') { coldPalace(o); o.npcs = [{ model: 'mama', x: 2, z: -2.2, ry: -2.5, name: 'Lão ma ma lãnh cung', talk: 'lanh' }]; }
+  else if (loc === 'lanhcung') { coldPalace(o); o.npcs = [{ model: 'mama', x: 2, z: -2.2, ry: -2.5, name: 'Lão ma ma lãnh cung', talk: 'lanh' }, { model: 'aongu', x: -1.8, z: -1.6, ry: 2.2, name: 'Phế phi Trần thị', talk: 'phephi', idle: 'khoc' }]; }
   return o;
 }

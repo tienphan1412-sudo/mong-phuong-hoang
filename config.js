@@ -1,7 +1,10 @@
 // MỘNG PHƯỢNG HOÀNG – cấu hình luật chơi. Chỉnh số ở đây, không cần sửa code.
 module.exports = {
   TZ_OFFSET_H: 7,              // giờ Việt Nam
-  NIGHT_HOUR: 21,              // giờ lật thẻ mỗi tối
+  NIGHT_HOUR: 21,              // (cũ) giờ lật thẻ mỗi tối
+  LAT_THE_SLOTS: [[11, 30, 'Trưa nay'], [21, 0, 'Đêm nay']], // giờ:phút lật thẻ mỗi ngày (giờ VN)
+  FEAST_SLOTS: [[8, 0], [12, 0], [17, 0], [20, 0]],            // giờ bắt đầu yến tiệc
+  FEAST_MIN: 20,               // yến tiệc kéo dài (phút)
   TURNS_PER_DAY: 5,
   CASE_HOURS: 24,              // thời hạn điều tra trước khi xử án
   PROTECT_HOURS: 24,           // bảo hộ sau khi bị giáng cấp
@@ -55,6 +58,21 @@ module.exports = {
     ratay:   { name: 'Ra tay', turn: 1, silver: 120 },
   },
   THINH_AN: { pts: 10, haiLong: 3 },
+  // Hoàng thượng mỗi ngày một sở thích
+  HT: {
+    canh: ['Canh sen hạt', 'Canh gà hầm sâm', 'Chè tổ yến', 'Canh cá chép', 'Canh bí đao', 'Chè long nhãn'],
+    mau: ['đỏ', 'tím', 'xanh', 'hồng', 'cam', 'vàng'],
+    tai: ['đàn', 'múa', 'thơ'],
+    mood: ['vui', 'mệt', 'buồn'],
+  },
+  OUTFIT_COLOR: { tunu: 'xanh', thuongtai: 'tím', thuongtai_hong: 'hồng', quynhan: 'xanh', quynhan_lam: 'xanh', tan: 'cam', tan_tim: 'tím', phi: 'tím', quyphi: 'đỏ', quyphi_phuong: 'đỏ', hoangquyphi: 'cam', hoangquyphi_kim: 'đỏ', hoanghau: 'vàng', aongu: '' },
+  // tiệm Nội vụ phủ
+  SHOP: {
+    sam:   { name: 'Nhân sâm bồi bổ', desc: '+1 lượt (mỗi ngày mua 1 lần)', price: 80 },
+    huong: { name: 'Hương mê điệp', desc: 'Lần lật thẻ tới dễ được chọn hơn', price: 120 },
+    le:    { name: 'Lễ vật tiến Thái hậu', desc: 'Thái hậu hài lòng +8', price: 60 },
+  },
+  DECOR_PRICE: { denlong: 60, binhsu: 80, luhuong: 100, tham: 40, giuong: 200 }, // món không có tên ở đây là miễn phí
   LAT_THE: { pts: 25, sung: 20 },
 
   WITNESS_WAIT_MS: 5 * 60e3, // chờ nhân chứng khai tối đa 5 phút, quá hạn thì tự khai

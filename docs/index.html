@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="vi"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>MỘNG PHƯỢNG HOÀNG · Cung môn đang mở…</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Serif:ital,wght@0,400;0,700;1,400&display=swap" rel="stylesheet">
+<style>
+html,body{margin:0;height:100%;background:radial-gradient(ellipse at center,#5a1a14 0%,#2a0a08 70%);color:#f3dc96;font-family:'Noto Serif',serif;}
+.w{height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:0 18px;box-sizing:border-box}
+h1{font-size:clamp(32px,7vw,64px);letter-spacing:.08em;margin:0;text-shadow:0 2px 0 #6a3a10,0 0 24px rgba(240,190,90,.55)}
+.sub{color:#e2bf6b;letter-spacing:.25em;margin:8px 0;font-size:clamp(14px,2.4vw,20px)}
+.tag{font-style:italic;color:#e2bf6b;font-size:clamp(14px,2vw,18px);margin:14px 0 30px}
+.gates{width:120px;height:80px;position:relative;margin-bottom:18px}
+.gates i{position:absolute;top:0;width:58px;height:80px;border:2px solid #e2bf6b;border-radius:6px 6px 0 0;background-color:#9c1a15;background-image:radial-gradient(circle,#e2bf6b 2.5px,transparent 3px);background-size:14px 14px;animation:d 2.4s ease-in-out infinite alternate}
+.gates i:first-child{left:2px;transform-origin:left center}.gates i:last-child{right:2px;transform-origin:right center;animation-name:d2}
+@keyframes d{to{transform:perspective(200px) rotateY(55deg)}}@keyframes d2{to{transform:perspective(200px) rotateY(-55deg)}}
+.st{letter-spacing:.12em}.st b{display:inline-block;width:1.2em;text-align:left}
+.hint{margin-top:16px;font-size:13px;color:#c9a35a;max-width:420px;line-height:1.6}
+</style></head><body><div class="w">
+<div class="gates"><i></i><i></i></div>
+<h1>MỘNG PHƯỢNG HOÀNG</h1><div class="sub">Phượng khởi thâm cung</div>
+<div class="tag">“Một hậu cung, ngàn toan tính. Ai sẽ bước lên ngôi Hoàng hậu?”</div>
+<div class="st" id="st">Cung môn đang mở<b id="dots"></b></div>
+<div class="hint" id="hint">Thái giám đang mở cửa cung, chờ một lát nhé.</div>
+</div>
+<script>
+const GAME = 'https://mong-phuong-hoang.onrender.com/';
+let n = 0; setInterval(() => { document.getElementById('dots').textContent = '.'.repeat(n++ % 4); }, 400);
+const t0 = Date.now();
+async function ping() {
+  try { const r = await fetch(GAME + 'ping?t=' + Date.now(), { cache: 'no-store' }); if (r.ok) { document.getElementById('st').textContent = 'Cung môn đã mở'; location.replace(GAME); return; } } catch (e) {}
+  const s = Math.round((Date.now() - t0) / 1000);
+  if (s > 20) document.getElementById('hint').textContent = 'Cửa cung nặng quá, các thái giám đang ra sức đẩy… (' + s + ' giây)';
+  setTimeout(ping, 2500);
+}
+ping();
+</script></body></html>

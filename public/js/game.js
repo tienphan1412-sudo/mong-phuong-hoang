@@ -55,6 +55,7 @@ function bubble(label, text) {
 }
 
 function clearWorld() {
+  feastHT = null;
   if (!world) return;
   scene.remove(world.group);
   for (const n of world.npcs) if (n.c) { n.c.dispose(); }
@@ -102,7 +103,8 @@ async function enterScene(loc, players) {
   const sp = clampPos(o.spawn.x + (Math.random() - .5) * 1.4, o.spawn.z + (Math.random() - .5) * .6);
   await respawnSelf(sp.x, sp.z, Math.PI);
   if (tok !== loadToken) return;
-  sendMove('dung_cho'); snapCam = true; refreshClueMarkers(); if (nb) renderNotebook();
+  sendMove('dung_cho'); snapCam = true; refreshClueMarkers(); if (nb) renderNotebook(); syncFeastHT(); hideLoading();
+  if (loc === 'tamcung' && !me.htTalked) setTimeout(() => { if (world?.loc === 'tamcung') startHtTalk(); }, 2500);
   for (const p of players || []) addOther(p);
   renderMap(); renderActs();
 }
@@ -201,9 +203,9 @@ renderer.setAnimationLoop(() => {
 addEventListener('pointerdown', () => music.start(), { once: true });
 addEventListener('keydown', () => music.start(), { once: true });
 function musicBtn() {
-  const g = document.createElement('button'); g.id = 'guidebtn'; g.textContent = '📖 Hướng dẫn'; g.onclick = () => startTour(true); document.body.appendChild(g);
+  const g = document.createElement('button'); g.id = 'guidebtn'; g.innerHTML = '📖<span class="lbl"> Hướng dẫn</span>'; g.onclick = () => startTour(true); document.body.appendChild(g);
   const b = document.createElement('button'); b.id = 'musicbtn';
-  const paint = () => b.textContent = music.isOn() ? '🎵 Nhạc: bật' : '🔇 Nhạc: tắt';
+  const paint = () => b.innerHTML = music.isOn() ? '🎵<span class="lbl"> Nhạc: bật</span>' : '🔇<span class="lbl"> Nhạc: tắt</span>';
   b.onclick = () => { music.toggle(); paint(); }; paint(); document.body.appendChild(b);
 }
 
@@ -228,7 +230,7 @@ socket.on('kicked', () => { toast('Tài khoản vừa đăng nhập ở nơi kh�
 
 // ---------------- dữ liệu từ máy chủ ----------------
 socket.on('me', async m => {
-  const first = !me; const oldOutfit = me?.outfit;
+  const first = !me; const oldOutfit = me?.outfit; const prev = me;
   me = m;
   if (first) {
     $('gate').classList.add('hidden'); $('game').classList.remove('hidden'); gateSpin = false;
@@ -236,6 +238,8 @@ socket.on('me', async m => {
     musicBtn();
   }
   if (me.latThe) latTheMe = true;
+  if (prev) floatDeltas(prev, me);
+  if (feast) feast.mine = me.feast?.names?.includes(`${me.name} ${me.rankName}`) || feast.mine;
   renderHud(); renderMap(); renderActs();
   if (selfC && world && oldOutfit && oldOutfit !== me.outfit && !stage) { const r = selfC.root; await respawnSelf(r.position.x, r.position.z, r.rotation.y); }
   if (selfC) { const r = selfC.label.element.querySelector('.r'); if (r) { const t = rankTier(me.rankName); r.className = 'r ' + t; r.textContent = (t === 't3' ? '★ ' : '') + me.rankName; } }
@@ -258,7 +262,7 @@ socket.on('news', n => { addNews(n); if (['phong', 'latthe', 'an', 'latan', 'pha
 function addNews(n) { const d = document.createElement('div'); d.className = 'n'; d.innerHTML = `<time>${new Date(n.t).toLocaleString('vi-VN', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit' })}</time>${esc(n.text)}`; $('newslist').prepend(d); }
 $('newsbtn').onclick = () => $('news').classList.toggle('hidden');
 socket.on('toast', t => toast(t.text, t.kind));
-socket.on('npcSay', d => { const n = world?.npcs.find(x => x.name === d.who); if (n?.label) bubble(n.label, d.text); else toast(`${d.who}: ${d.text}`); });
+socket.on('npcSay', d => { const n = world?.npcs.find(x => x.name === d.who); if (d.long) { say(n?.model || 'aongu', d.who, esc(d.text), [['Đa tạ', 0, 'gold']]).then(dlgClose); return; } if (n?.label) bubble(n.label, d.text); else toast(`${d.who}: ${d.text}`); });
 function toast(text, kind = 'info') { const d = document.createElement('div'); d.className = 'toast ' + kind; d.textContent = text; $('toasts').appendChild(d); setTimeout(() => d.remove(), 5200); }
 
 // ---------------- HUD, bản đồ, hành động ----------------
@@ -268,7 +272,7 @@ function renderHud() {
   const lo = me.nextPts ? (me.pts / me.nextPts) : 1; $('hBar').style.width = Math.min(100, lo * 100) + '%';
   $('hPts').textContent = me.nextPts ? `Công trạng ${me.pts}/${me.nextPts}` : `Công trạng ${me.pts}`;
   const t = me.tasks || {};
-  $('stats').innerHTML = `<span class="pill">💰 Bạc <b>${me.silver}</b></span><span class="pill">⏳ Lượt <b>${me.turns}</b></span><span class="pill">💗 Sủng ái <b>${me.sung}</b></span><span class="pill">🍵 Thái hậu <b>${me.haiLong}</b></span><span class="pill">Nhiệm vụ: ${t.thinhan ? '✅' : '⬜'} thỉnh an ${t.luyen ? '✅' : '⬜'} luyện ${t.dotin ? '✅' : '⬜'} dò tin</span>${me.cases.length ? `<button class="pill" id="caseBtn" style="border-color:#c0503a">⚖️ Vụ án đang mở (${me.cases.length})</button>` : ''}`;
+  $('stats').innerHTML = `<span class="pill">💰 Bạc <b>${me.silver}</b></span><span class="pill">⏳ Lượt <b>${me.turns}</b></span><span class="pill">💗 Sủng ái <b>${me.sung}</b></span><span class="pill">🍵 Thái hậu <b>${me.haiLong}</b></span><span class="pill">Nhiệm vụ: ${t.thinhan ? '✅' : '⬜'} thỉnh an ${t.luyen ? '✅' : '⬜'} luyện ${t.dotin ? '✅' : '⬜'} dò tin</span>${htPill()}${feast ? `<span class="pill feast">🎎 Yến tiệc · <b id="feastT"></b> · ${feast.n} tiết mục</span>` : ''}${me.cases.length ? `<button class="pill" id="caseBtn" style="border-color:#c0503a">⚖️ Vụ án đang mở (${me.cases.length})</button>` : ''}`;
   const cb = $('caseBtn'); if (cb) cb.onclick = () => openCase(me.cases[0].id);
 }
 const LOCNAMES = { hoavien: 'Ngự hoa viên', tuninh: 'Từ Ninh cung', duongtam: 'Dưỡng Tâm điện', phong: 'Phòng riêng', tamcung: 'Tẩm cung', lanhcung: 'Lãnh cung' };
@@ -286,12 +290,12 @@ function renderActs() {
   const add = (label, sub, fn, dis) => { const b = document.createElement('button'); b.innerHTML = `${label}${sub ? `<small>${sub}</small>` : ''}`; b.onclick = fn; if (dis) b.disabled = true; a.appendChild(b); };
   const L = world.loc;
   if (L === 'tuninh') { add('🙇 Thỉnh an Thái hậu', me.thinhAn ? 'Hôm nay đã thỉnh an' : 'Miễn phí, mỗi sáng 1 lần', () => { emote('hanh_le'); act('thinhan'); }, me.thinhAn); }
-  if (L === 'duongtam') add('🍲 Dâng canh Hoàng thượng', '1 lượt · 30 bạc · sủng ái +5', () => { emote('cui_chao'); act('dangcanh'); });
-  if (L === 'hoavien') { add('👂 Dò tin', '1 lượt · nghe ngóng chuyện trong cung', () => act('dotin')); add('🎐 Luyện tài nghệ', '1 lượt · công trạng +8', () => { emote('mua'); act('luyen'); }); }
-  if (L === 'phong') { add('🎐 Luyện tài nghệ', '1 lượt · công trạng +8', () => { emote('mua'); act('luyen'); }); add('👘 Thay trang phục', '', openWardrobe); add('🏮 Bài trí ' + (me.hasPalace ? 'cung' : 'phòng'), 'Đặt, xoay đồ nội thất', openDecor); }
+  if (L === 'duongtam') add('🍲 Dâng canh Hoàng thượng', '1 lượt · 30 bạc · nấu đúng món người thèm được sủng nhiều', gameCanh);
+  if (L === 'hoavien') { if (feast && !feast.mine) add('🎎 Dâng tiết mục yến tiệc', 'Đàn, múa hay ngâm thơ cho Hoàng thượng', () => chooseTai(t => gameRhythm(t, q => act('yentiec', { tai: t, q })))); add('👂 Dò tin', '1 lượt · nghe sở thích Hoàng thượng, chuyện trong cung', () => act('dotin')); add('🎐 Luyện tài nghệ', '1 lượt · chơi càng hay càng nhiều điểm', () => chooseTai(t => gameRhythm(t, q => act('luyen', { tai: t, q })))); }
+  if (L === 'phong') { add('🎐 Luyện tài nghệ', '1 lượt · chơi càng hay càng nhiều điểm', () => chooseTai(t => gameRhythm(t, q => act('luyen', { tai: t, q })))); add('👘 Thay trang phục', '', openWardrobe); add('🏮 Bài trí ' + (me.hasPalace ? 'cung' : 'phòng'), 'Đặt, xoay đồ nội thất', openDecor); }
   if (L === 'tamcung') { add('🛏 Lên giường', 'Ngồi cùng Hoàng thượng', openBed); add('🌙 Rời tẩm cung', 'Trời sắp sáng', () => socket.emit('goto', 'phong')); }
-  if (L === 'lanhcung') { add('🧹 Làm việc lãnh cung', `Phục vị ${me.lanh?.tasks || 0}/3 · mỗi ngày 1 lần`, () => act('lanh')); if (me.lanh?.caseId) add('📜 Kêu oan', 'Điều tra lại vụ án cũ', () => openCase(me.lanh.caseId)); }
-  if (!me.lanh) add('👥 Danh sách hậu cung', 'Tặng quà · ra tay', openRoster);
+  if (L === 'lanhcung') { add('🧹 Làm việc lãnh cung', `Phục vị ${me.lanh?.tasks || 0}/3 · mỗi ngày 1 lần`, gameLanh); add('🕯 Hỏi chuyện phế phi', 'Mỗi ngày một lần · bà biết nhiều bí mật', () => act('phephi')); if (me.lanh?.caseId) add('📜 Kêu oan', 'Điều tra lại vụ án cũ', () => openCase(me.lanh.caseId)); }
+  if (!me.lanh) { add('👥 Danh sách hậu cung', 'Tặng quà · ra tay', openRoster); add('🏪 Nội vụ phủ', 'Mua nhân sâm, hương, đồ bài trí', openShop); }
   add('💃 Động tác', 'Hành lễ, múa, che miệng cười…', openEmotes);
 }
 function openEmotes() {
@@ -304,9 +308,10 @@ function openEmotes() {
 function talk(n) {
   const c = me.cases[0];
   if (n.talk === 'thinhan') { if (world.loc === 'tuninh') { emote('hanh_le'); act('thinhan'); } }
-  else if (n.talk === 'dangcanh') { emote('cui_chao'); act('dangcanh'); }
+  else if (n.talk === 'dangcanh') gameCanh();
   else if (n.talk === 'dotin') act('dotin');
-  else if (n.talk === 'lanh') act('lanh');
+  else if (n.talk === 'lanh') gameLanh();
+  else if (n.talk === 'phephi') act('phephi');
   else if (n.talk === 'thaiy') { if (c && clueOpen('thaiy')) clueThaiY(n); else bubble(n.label, 'Nương nương khí sắc tốt lắm, không có gì đáng lo.'); }
   else if (n.talk === 'cungnu') { if (c && clueOpen('hoi')) clueCungNu(n); else bubble(n.label, ['Nương nương nghỉ ngơi chút đi ạ.', 'Nô tỳ đã pha trà hoa cúc.', 'Hôm nay trong cung có vẻ yên ắng.'][Math.floor(Math.random() * 3)]); }
   else if (n.talk === 'mama') bubble(n.label, 'Trong cung quy củ nghiêm ngặt, các vị chủ tử nhớ giữ mình.');
@@ -370,7 +375,8 @@ function renderDecor(list) {
 function openDecor() {
   decor.on = true; decor.sel = -1; decor.placing = null;
   const bar = $('decorbar'); bar.classList.remove('hidden');
-  bar.innerHTML = Object.entries(DECOR).map(([k, v]) => `<button data-d="${k}">${v.name}</button>`).join('') + '<button id="dRot">↻ Xoay</button><button id="dDel">🗑 Bỏ</button><button class="gold" id="dSave">Lưu</button><button id="dExit">Xong</button>';
+  bar.innerHTML = Object.entries(DECOR).map(([k, v]) => DECOR_PRICE[k] && !me.decorOwned?.includes(k) ? `<button data-lock="${k}">🔒 ${v.name}</button>` : `<button data-d="${k}">${v.name}</button>`).join('') + '<button id="dRot">↻ Xoay</button><button id="dDel">🗑 Bỏ</button><button class="gold" id="dSave">Lưu</button><button id="dExit">Xong</button>';
+  bar.querySelectorAll('[data-lock]').forEach(b => b.onclick = () => openShop());
   bar.querySelectorAll('[data-d]').forEach(b => b.onclick = () => { decor.placing = b.dataset.d; bar.querySelectorAll('[data-d]').forEach(x => x.classList.toggle('on', x === b)); toast('Bấm xuống sàn để đặt ' + DECOR[b.dataset.d].name); });
   $('dRot').onclick = () => { const d = decor.list[decor.sel]; if (d) { d.ry += Math.PI / 4; d.obj.rotation.y = d.ry; } };
   $('dDel').onclick = () => { const d = decor.list[decor.sel]; if (d) { decor.group.remove(d.obj); decor.list.splice(decor.sel, 1); decor.list.forEach((x, i) => x.obj.userData.idx = i); decor.sel = -1; } };
@@ -590,6 +596,7 @@ function standUp(keepCam) {
 // ---------------- bảng xếp hạng top 5 ----------------
 let lastTopIds = [];
 $('top5').querySelector('.t').onclick = () => $('top5').classList.toggle('min');
+if (innerWidth < 760) $('top5').classList.add('min');
 socket.on('top5', list => {
   const ol = $('top5list'); ol.innerHTML = '';
   list.forEach((p, i) => {
@@ -951,3 +958,137 @@ socket.on('witnessAsk', d => {
   const tick = setInterval(() => { const el = $('wTimer'); if (!el) return clearInterval(tick); const l = Math.max(0, end - Date.now()); el.textContent = `${Math.floor(l / 60e3)}:${String(Math.floor(l % 60e3 / 1000)).padStart(2, '0')}`; if (l <= 0) { clearInterval(tick); closeModal(); } }, 500);
   $('mcard').querySelectorAll('[data-v]').forEach(b => b.onclick = () => { const v = +b.dataset.v; socket.emit('witnessAnswer', v < 0 ? { caseId: d.caseId, refuse: true } : { caseId: d.caseId, value: v }); clearInterval(tick); closeModal(); });
 });
+
+// =====================================================================
+// MÀN CHỜ, CHỮ BAY, GỢI Ý HOÀNG THƯỢNG
+// =====================================================================
+function hideLoading() { const l = $('loading'); if (l && !l.classList.contains('gone')) { l.classList.add('gone'); setTimeout(() => l.remove(), 900); } }
+setTimeout(hideLoading, 25000);
+socket.on('connect', () => { const l = $('loading'); if (l) l.querySelector('.st').textContent = localStorage.getItem('mph_token') ? 'Đang vào cung…' : 'Cung môn đã mở'; if (!localStorage.getItem('mph_token')) setTimeout(hideLoading, 600); });
+socket.on('needLogin', () => setTimeout(hideLoading, 300));
+function floatDeltas(a, b) {
+  const D = [['silver', '💰', 'bạc'], ['sung', '💗', 'sủng ái'], ['pts', '⭐', 'công trạng'], ['haiLong', '🍵', 'Thái hậu'], ['turns', '⏳', 'lượt']];
+  let i = 0;
+  for (const [k, ic, nm] of D) { const d = (b[k] ?? 0) - (a[k] ?? 0); if (!d || a.rank !== b.rank && k === 'pts' && Math.abs(d) > 500) continue;
+    const el = document.createElement('div'); el.className = 'fdelta ' + (d > 0 ? 'up' : 'down'); el.textContent = `${d > 0 ? '+' : ''}${d} ${ic} ${nm}`;
+    el.style.animationDelay = (i++ * .25) + 's'; document.body.appendChild(el); setTimeout(() => el.remove(), 2600 + i * 250); }
+}
+function htPill() {
+  const k = me?.htKnown || {}; const parts = [];
+  if (k.canh) parts.push('thèm ' + k.canh); if (k.mau) parts.push('thích áo ' + k.mau); if (k.tai) parts.push('muốn xem ' + k.tai); if (k.mood) parts.push('tâm trạng ' + k.mood);
+  return parts.length ? `<span class="pill ht" title="Dò tin ở Ngự hoa viên để biết thêm">👑 Hôm nay Hoàng thượng ${parts.join(', ')}</span>` : '<span class="pill ht dim" title="Dò tin ở Ngự hoa viên">👑 Sở thích Hoàng thượng hôm nay: chưa dò</span>';
+}
+
+// =====================================================================
+// TRÒ NHỎ (nhân vật diễn, khung nhỏ phía dưới không che nhân vật)
+// =====================================================================
+const mgEl = document.createElement('div'); mgEl.id = 'mg'; mgEl.className = 'hidden'; document.body.appendChild(mgEl);
+let mgOn = false;
+function mgOpen(html) { mgOn = true; mgEl.innerHTML = html; mgEl.classList.remove('hidden'); document.body.classList.add('mgopen'); camDistSaved = camDist; camDist = Math.max(2.2, camDist * .8); }
+let camDistSaved = null;
+function mgClose() { mgOn = false; mgEl.classList.add('hidden'); document.body.classList.remove('mgopen'); if (camDistSaved) camDist = camDistSaved; camDistSaved = null; }
+function chooseTai(cb) {
+  if (mgOn) return;
+  if (me.turns < 1 && !(feast && world?.loc === 'hoavien')) return toast('Hết lượt hôm nay.', 'bad');
+  const fav = me.htKnown?.tai;
+  mgOpen(`<div class="mgt">Chọn tài nghệ</div><div class="row">${[['đàn', '🎵 Đàn tranh'], ['múa', '💃 Múa quạt'], ['thơ', '📜 Ngâm thơ']].map(([k, n]) => `<button data-t="${k}" class="${fav === k ? 'gold' : ''}">${n}${fav === k ? ' ★' : ''}</button>`).join('')}<button data-x>✕</button></div>`);
+  mgEl.querySelectorAll('[data-t]').forEach(b => b.onclick = () => cb(b.dataset.t));
+  mgEl.querySelector('[data-x]').onclick = mgClose;
+}
+// nhịp phách: nốt chạy sang phải, bấm khi nốt vào ô vàng
+function gameRhythm(tai, done) {
+  const anim = tai === 'múa' ? 'mua' : tai === 'thơ' ? 'chap_tay' : 'hanh_le';
+  if (selfC) { selfC.target = null; selfC.play(anim); socket.emit('emote', anim); camYaw = selfC.root.rotation.y; }
+  const N = 8, notes = []; let t0 = performance.now() + 900, hits = 0, judged = 0, raf;
+  for (let i = 0; i < N; i++) notes.push({ t: t0 + i * (520 + Math.random() * 380), st: 0 });
+  mgOpen(`<div class="mgt">${tai === 'đàn' ? '🎵 Gảy đàn' : tai === 'múa' ? '💃 Múa quạt' : '📜 Ngâm thơ'} · bấm khi nốt chạm ô vàng <small>(phím cách hoặc chạm)</small></div><div class="lane"><div class="zone"></div></div><div class="mgs">Trúng <b id="mgHit">0</b>/${N}</div>`);
+  const lane = mgEl.querySelector('.lane'); const els = notes.map(() => { const d = document.createElement('div'); d.className = 'note'; d.textContent = tai === 'đàn' ? '♪' : tai === 'múa' ? '❀' : '字'; lane.appendChild(d); return d; });
+  const W = () => lane.clientWidth, ZX = () => W() * .82, SPEED = .32; // px/ms
+  const hit = () => { const now2 = performance.now(); let best = null; for (const n of notes) if (!n.st) { const dt = Math.abs(now2 - n.t); if (dt < 170 && (!best || dt < Math.abs(now2 - best.t))) best = n; } if (best) { best.st = 1; hits++; judged++; els[notes.indexOf(best)].className = 'note ok'; $('mgHit').textContent = hits; } else { lane.classList.add('miss'); setTimeout(() => lane.classList.remove('miss'), 150); } };
+  const key = e => { if (e.code === 'Space') { e.preventDefault(); hit(); } };
+  addEventListener('keydown', key); lane.onpointerdown = hit;
+  const loop = () => { const now2 = performance.now(); notes.forEach((n, i) => { const x = ZX() - (n.t - now2) * SPEED; els[i].style.transform = `translateX(${x}px)`; if (!n.st && now2 - n.t > 170) { n.st = 2; judged++; els[i].className = 'note miss'; } });
+    if (judged >= N) { finish(); return; } raf = requestAnimationFrame(loop); };
+  const finish = () => { cancelAnimationFrame(raf); removeEventListener('keydown', key); const q = hits / N;
+    mgEl.querySelector('.mgs').innerHTML = `${q > .8 ? '🌟 Xuất sắc!' : q > .5 ? '👏 Khá lắm' : '😅 Còn vụng'} · trúng ${hits}/${N}`;
+    if (selfC) { selfC.play(q > .5 ? 'hanh_le' : 'dung_cho'); }
+    setTimeout(() => { mgClose(); done(q); if (selfC) selfC.play('dung_cho'); }, 1300); };
+  raf = requestAnimationFrame(loop);
+}
+// nấu canh: chọn món rồi canh lửa
+const CANH = ['Canh sen hạt', 'Canh gà hầm sâm', 'Chè tổ yến', 'Canh cá chép', 'Canh bí đao', 'Chè long nhãn'];
+function gameCanh() {
+  if (mgOn) return; if (world?.loc !== 'duongtam') return toast('Phải đến Dưỡng Tâm điện mới dâng canh được.');
+  if (me.turns < 1) return toast('Hết lượt hôm nay.', 'bad'); if (me.silver < 30) return toast('Không đủ 30 bạc.', 'bad');
+  const fav = me.htKnown?.canh;
+  mgOpen(`<div class="mgt">🍲 Chọn món dâng Hoàng thượng ${fav ? `<small>(nghe nói người thèm <b>${esc(fav)}</b>)</small>` : '<small>(chưa dò được người thèm món gì)</small>'}</div><div class="row wrap">${CANH.map((c, i) => `<button data-s="${i}" class="${fav === c ? 'gold' : ''}">${esc(c)}</button>`).join('')}<button data-x>✕</button></div>`);
+  mgEl.querySelector('[data-x]').onclick = mgClose;
+  mgEl.querySelectorAll('[data-s]').forEach(b => b.onclick = () => {
+    const soup = +b.dataset.s; if (selfC) { selfC.target = null; selfC.play('chap_tay'); }
+    let k = 0, dir = 1, raf, taps = 0, good = 0;
+    mgEl.innerHTML = `<div class="mgt">🔥 Canh lửa: bấm khi kim nằm trong vùng xanh (3 lần)</div><div class="heat"><div class="ok"></div><div class="nd"></div></div><div class="mgs">Lần <b id="mgT">0</b>/3</div>`;
+    const nd = mgEl.querySelector('.nd'), heat = mgEl.querySelector('.heat'); const zone = [.4 + Math.random() * .2]; mgEl.querySelector('.ok').style.left = (zone[0] - .1) * 100 + '%';
+    const loop = () => { k += dir * .018 * (1 + taps * .35); if (k > 1) { k = 1; dir = -1; } if (k < 0) { k = 0; dir = 1; } nd.style.left = k * 100 + '%'; raf = requestAnimationFrame(loop); };
+    const tap = () => { taps++; if (Math.abs(k - zone[0]) < .1) { good++; heat.classList.add('good'); } else heat.classList.add('bad'); setTimeout(() => heat.classList.remove('good', 'bad'), 200); $('mgT').textContent = taps;
+      if (taps >= 3) { cancelAnimationFrame(raf); removeEventListener('keydown', key); heat.onpointerdown = null; const q = good / 3; if (selfC) selfC.play('cui_chao');
+        setTimeout(() => { mgClose(); act('dangcanh', { soup, q }); }, 900); } };
+    const key = e => { if (e.code === 'Space') { e.preventDefault(); tap(); } };
+    addEventListener('keydown', key); heat.onpointerdown = tap; raf = requestAnimationFrame(loop);
+  });
+}
+// lãnh cung: quét lá
+function gameLanh() {
+  if (mgOn || !me.lanh) return; if (me.lanhToday) return toast('Hôm nay đã làm xong việc ở lãnh cung.');
+  if (selfC) { selfC.target = null; selfC.play('cui_chao'); }
+  const N = 10; let got = 0, end = performance.now() + 15000, raf;
+  mgOpen(`<div class="mgt">🍂 Quét sân lãnh cung: bấm vào lá rụng trước khi hết giờ</div><div class="yard"></div><div class="mgs">Đã quét <b id="mgL">0</b>/${N} · còn <b id="mgS">15</b>s</div>`);
+  const yard = mgEl.querySelector('.yard');
+  const spawnLeaf = () => { const l = document.createElement('div'); l.className = 'leaf'; l.textContent = ['🍂', '🍁', '🍃'][Math.floor(Math.random() * 3)]; l.style.left = (5 + Math.random() * 85) + '%'; l.style.animationDuration = (2.6 + Math.random() * 1.8) + 's';
+    l.onpointerdown = () => { l.remove(); got++; $('mgL').textContent = got; if (got >= N) fin(); }; l.addEventListener('animationend', () => l.remove()); yard.appendChild(l); };
+  const iv = setInterval(spawnLeaf, 550); spawnLeaf();
+  const loop = () => { const l = Math.max(0, end - performance.now()); $('mgS').textContent = Math.ceil(l / 1000); if (l <= 0) return fin(); raf = requestAnimationFrame(loop); };
+  const fin = () => { if (!mgOn) return; clearInterval(iv); cancelAnimationFrame(raf); const q = got / N; mgEl.querySelector('.mgs').innerHTML = q >= .4 ? `Sân đã sạch (${got}/${N}).` : `Chưa sạch (${got}/${N}), lão ma ma không vừa ý.`;
+    setTimeout(() => { mgClose(); act('lanh', { q }); if (selfC) selfC.play('dung_cho'); }, 1100); };
+  raf = requestAnimationFrame(loop);
+}
+
+// =====================================================================
+// YẾN TIỆC
+// =====================================================================
+let feast = null, feastHT = null;
+socket.on('feast', f => { feast = f ? { ...f, mine: feast?.id === f?.id ? feast.mine : false } : null; renderHud(); renderActs(); syncFeastHT(); });
+socket.on('feastUpdate', f => { if (feast && f) { feast.n = f.n; renderHud(); } });
+socket.on('feastEnd', d => { feast = null; renderHud(); renderActs(); syncFeastHT(); if (d.winner) toast(`🏮 ${d.winner.name} thắng yến tiệc với tiết mục ${d.winner.tai}!`, d.winner.id === me?.id ? 'good' : 'info'); });
+setInterval(() => { const el = $('feastT'); if (el && feast) { const l = Math.max(0, feast.end - Date.now()); el.textContent = `${Math.floor(l / 60e3)}:${String(Math.floor(l % 60e3 / 1000)).padStart(2, '0')}`; } }, 1000);
+async function syncFeastHT() {
+  const want = !!(feast && world?.loc === 'hoavien');
+  if (!want && feastHT) { feastHT.label?.element.remove(); feastHT.root.parent?.remove(feastHT.root); feastHT.dispose(); feastHT = null; }
+  if (want && !feastHT) { const w = world; const c = await spawn('hoangthuong'); if (world !== w || feastHT) return c.dispose(); c.root.position.set(2.4, 0, -1.4); c.root.rotation.y = -.9; c.play('dung_cho'); world.group.add(c.root); const lb = makeLabel('Hoàng thượng', '', true); c.root.add(lb); c.label = lb; feastHT = c; world.npcs.push({ c, name: 'Hoàng thượng', model: 'hoangthuong', label: lb, feast: true }); }
+}
+
+// =====================================================================
+// TẨM CUNG: HẦU CHUYỆN HOÀNG THƯỢNG
+// =====================================================================
+let htTalking = false;
+function startHtTalk() { if (htTalking || me.htTalked) return; htTalking = true; socket.emit('htTalkQ'); }
+socket.on('htTalkQ', async d => {
+  const open = { vui: 'Hôm nay trẫm vui, nàng đến thật đúng lúc!', mệt: 'Haizz… trẫm hơi mệt.', buồn: 'Trẫm có chút tâm sự…' }[d.mood] || 'Nàng đến rồi.';
+  await say('hoangthuong_dem', 'Hoàng thượng', open, [['Thần thiếp tham kiến Hoàng thượng', 0, 'gold']]);
+  const ans = [];
+  for (const q of d.qs) ans.push(await say('hoangthuong_dem', 'Hoàng thượng', esc(q.q), q.opts.map((o, i) => [esc(o), i, ''])));
+  act('httalk', { ans });
+});
+socket.on('htTalkResult', async r => { await say('hoangthuong_dem', 'Hoàng thượng', `${esc(r.line)}<br><small>💗 Sủng ái +${r.sung}</small>`, [['Tạ ơn Hoàng thượng', 0, 'gold']]); dlgClose(); htTalking = false; });
+
+// =====================================================================
+// TIỆM NỘI VỤ PHỦ
+// =====================================================================
+const SHOP = { sam: ['🌿 Nhân sâm bồi bổ', '+1 lượt (mỗi ngày 1 lần)', 80], huong: ['🪷 Hương mê điệp', 'Lần lật thẻ tới dễ được chọn hơn', 120], le: ['🎁 Lễ vật tiến Thái hậu', 'Thái hậu hài lòng +8', 60] };
+const DECOR_PRICE = { denlong: 60, binhsu: 80, luhuong: 100, tham: 40, giuong: 200 };
+function openShop() {
+  closeModal();
+  modal(`<button class="close" onclick="window._close()">✕</button><h3>🏪 Nội vụ phủ</h3><div style="color:var(--muted);font-size:13px">Bạc hiện có: <b style="color:var(--gold2)">${me.silver}</b> · thắng yến tiệc, luyện xuất sắc để có thêm bạc</div>
+  <div class="shop">${Object.entries(SHOP).map(([k, [n, d, p]]) => `<div class="it"><b>${n}</b><small>${d}${k === 'huong' && me.huong ? ' · <i>đang có</i>' : ''}</small><button data-b="${k}" ${me.silver < p ? 'disabled' : ''}>${p} bạc</button></div>`).join('')}
+  ${Object.entries(DECOR_PRICE).map(([k, p]) => `<div class="it"><b>🏮 ${DECOR[k].name}</b><small>Đồ bài trí phòng</small>${me.decorOwned?.includes(k) ? '<button disabled>Đã có</button>' : `<button data-b="${k}" ${me.silver < p ? 'disabled' : ''}>${p} bạc</button>`}</div>`).join('')}</div>`);
+  $('mcard').querySelectorAll('[data-b]').forEach(b => b.onclick = () => { act('shop', { item: b.dataset.b }); setTimeout(openShop, 500); });
+}
