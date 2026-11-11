@@ -1852,7 +1852,7 @@ function ringAt(x, y, z, r = .32) {
 }
 function setCookTarget(pos, label, fn) {
   clearCookTarget(); const R = ringAt(pos.x, pos.y, pos.z, pos.r);
-  const d = document.createElement('div'); d.className = 'cktip'; d.textContent = label; const lb = new CSS2DObject(d); lb.position.set(pos.x, pos.y + .4, pos.z); world.group.add(lb);
+  const d = document.createElement('div'); d.innerHTML = `<div class="cktip">${esc(label)}</div>`; const lb = new CSS2DObject(d); lb.position.set(pos.x, pos.y + .4, pos.z); world.group.add(lb);
   cookTarget = { ...R, lb, fn: () => { const f = fn; clearCookTarget(); f(); } };
 }
 function clearCookTarget() { if (!cookTarget) return; cookTarget.lb.element.remove(); cookTarget.lb.parent?.remove(cookTarget.lb); cookTarget.g.parent?.remove(cookTarget.g); cookTarget = null; }
@@ -1865,7 +1865,7 @@ function worldBar(pos, ms, label) {
 }
 function propAt(obj, pos) { obj.scale.multiplyScalar(.6); obj.position.set(pos.x, pos.y, pos.z); world.group.add(obj); return obj; }
 function flyTo(obj, to, ms) { const from = obj.position.clone(); let t = 0; return new Promise(res => FX.push(dt => { t += dt * 1000 / ms; const k = Math.min(1, t); obj.position.lerpVectors(from, to, k); obj.position.y += Math.sin(k * Math.PI) * .25; if (k >= 1) { res(); return false; } })); }
-function dishLabel(obj, name) { const d = document.createElement('div'); d.className = 'cktip dish'; d.textContent = '🍽 ' + name; const lb = new CSS2DObject(d); lb.position.set(0, .16, 0); obj.add(lb); obj.userData.lb = lb; return lb; }
+function dishLabel(obj, name) { const d = document.createElement('div'); d.innerHTML = `<div class="cktip dish">🍽 ${esc(name)}</div>`; const lb = new CSS2DObject(d); lb.position.set(0, .16, 0); obj.add(lb); obj.userData.lb = lb; return lb; }
 // ảnh món ăn cho bí kíp
 let dishR = null; const dishCache = new Map();
 function dishSnap(name) {
