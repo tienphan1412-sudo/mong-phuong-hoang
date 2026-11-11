@@ -683,7 +683,13 @@ function admin(p, text) {
   else if (cmd === '/vuan') createCase(p, null, { hours: +arg || C.CASE_HOURS });
   else if (cmd === '/hethan') { for (const c of Object.values(DB.state.cases)) if (c.victim === p.id && c.status === 'open') c.deadline = 0; checkDeadlines(); }
   else if (cmd === '/lanhcung') sendToLanhCung(p, 'thử nghiệm', null);
-  else return toast(p, 'Lệnh: /latthe [trua] /yentiec [phút] /diem N /diemcho N tên /bac N /ngay /vuan /hethan /lanhcung');
+  else if (cmd === '/rakhoi') { // quản trị: đưa mình (hoặc người khác) ra khỏi lãnh cung, giữ nguyên cấp cũ
+    const who = [arg, ...rest].filter(Boolean).join(' ').toLowerCase(); const q = who ? Object.values(DB.players).find(x => x.name.toLowerCase() === who || x.user === who) : p;
+    if (!q || !q.lanh) return toast(p, 'Người này không ở lãnh cung.');
+    q.rank = Math.max(q.rank, q.lanh.from || 0); q.lanh = null; q.outfit = C.RANKS[q.rank].outfit; q.trend = null;
+    const sk = sockOf(q.id); if (sk) enter(q, 'hoavien', sk); push(q); save(); toast(p, `Đã đưa ${q.name} ra khỏi lãnh cung.`, 'good');
+  }
+  else return toast(p, 'Lệnh: /latthe [trua] /yentiec [phút] /diem N /diemcho N tên /bac N /ngay /vuan /hethan /lanhcung /rakhoi [tên]');
   toast(p, 'Đã chạy ' + cmd); push(p); save();
 }
 
