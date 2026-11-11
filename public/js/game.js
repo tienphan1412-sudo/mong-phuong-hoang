@@ -1,7 +1,8 @@
 // MỘNG PHƯỢNG HOÀNG – phía người chơi
 import * as THREE from 'three';
 import { CSS2DRenderer, CSS2DObject } from 'three/addons/renderers/CSS2DRenderer.js';
-import { buildLocation, DECOR, makeGuzheng, makeFan, makeScroll, makeSword, makeCup, makeRibbon } from './scenes.js';
+import { buildLocation, DECOR, makeGuzheng, makeFan, makeScroll, makeSword, makeCup, makeRibbon, makeCleaver, makeLadle } from './scenes.js';
+import { makeIngredient, makeDish } from './food.js';
 import { spawn, seatPlacement, ready, loadModel, aim, v3, kneelOn } from './chars.js';
 import * as music from './music.js';
 
@@ -99,6 +100,7 @@ async function enterScene(loc, players, venue, seatId) {
   }
   clearWorld();
   world = o; scene.add(o.group); applyLights(o.lights);
+  if (o.steamAt) startSteam(o);
   camDist = o.cam.dist; camH = o.cam.height; camYaw = 0;
   if (o.decorable) renderDecor(me.decor);
   // bản thân
@@ -135,8 +137,8 @@ function removeOther(id) { const o = others.get(id); if (!o) return; if (o.c) { 
 // ---------------- di chuyển ----------------
 const ray = new THREE.Raycaster(), ndc = new THREE.Vector2();
 let drag = null;
-canvas.addEventListener('pointerdown', e => { specCam = null; drag = { x: e.clientX, y: e.clientY, yaw: camYaw, moved: false }; });
-addEventListener('pointermove', e => { if (!drag) return; const dx = e.clientX - drag.x; if (Math.abs(dx) > 4) drag.moved = true; camYaw = drag.yaw - dx * 0.006; });
+canvas.addEventListener('pointerdown', e => { if (specCam?.loc !== 'ngutien') specCam = null; drag = { x: e.clientX, y: e.clientY, yaw: camYaw, moved: false }; });
+addEventListener('pointermove', e => { if (!drag || specCam?.loc === 'ngutien') return; const dx = e.clientX - drag.x; if (Math.abs(dx) > 4) drag.moved = true; camYaw = drag.yaw - dx * 0.006; });
 addEventListener('pointerup', e => { const d = drag; drag = null; if (!d || d.moved || e.target !== canvas) return; clickWorld(e); });
 canvas.addEventListener('wheel', e => { camDist = Math.min(7, Math.max(1.4, camDist + e.deltaY * 0.002)); }, { passive: true });
 function clickWorld(e) {
@@ -145,6 +147,7 @@ function clickWorld(e) {
   if (decor.on) return decorClick();
   if (world.bed && ray.intersectObject(world.bed, true).length) return openBed();
   if (world.brazier && ray.intersectObject(world.brazier, true).length) return clueTro();
+  if (cookTarget && ray.intersectObject(cookTarget.g, true).length) return cookTarget.fn();
   if (taiOn) return;
   if (world.seats && world.loc !== 'yentiec') { const hs = world.seats.find(st => ray.intersectObject(st.obj, true).length); if (hs) return socket.emit('sit', { seat: hs.id }); }
   if (chairSeat) { if (world.loc === 'yentiec') return; standChair(); }
@@ -183,7 +186,8 @@ function emote(a) { if (!selfC) return; if (seated) standUp(); if (chairSeat && 
 
 // ---------------- vòng lặp ----------------
 let specCam = null; // camera khán giả: nhìn sân khấu yến tiệc
-function watchStage(z, ms) { if (world?.loc !== 'yentiec' || taiOn || dancing || mgOn) return; specCam = { pos: new THREE.Vector3(.4, 2.05, z + 4.4), look: new THREE.Vector3(0, .95, z), until: Date.now() + ms }; }
+function watchStage(z, ms) { if (world?.loc !== 'yentiec' || taiOn || dancing || mgOn) return; specCam = { loc: 'yentiec', pos: new THREE.Vector3(.4, 2.05, z + 4.4), look: new THREE.Vector3(0, .95, z), until: Date.now() + ms }; }
+function kitchenCam(on) { for (const o of world?.overhead || []) o.visible = !on; specCam = on ? { loc: 'ngutien', pos: new THREE.Vector3(0, 6.6, 5.2), look: new THREE.Vector3(0, .3, -.7), until: Date.now() + 36e5 } : null; }
 const FX = []; // hiệu ứng: hàm(dt) trả false khi xong
 const clock = new THREE.Clock(); let T = 0;
 renderer.setAnimationLoop(() => {
@@ -197,12 +201,12 @@ renderer.setAnimationLoop(() => {
     for (let i = FX.length; i--;) if (FX[i](dt) === false) FX.splice(i, 1);
     if (world.flicker) for (const L of world.flicker) L.intensity = 2 + Math.sin(T * 9 + L.id) * .25 + Math.random() * .2;
     if (stage) stage.update(dt);
-    else if (specCam && Date.now() < specCam.until && world.loc === 'yentiec') { camera.position.lerp(specCam.pos, Math.min(1, dt * 3)); camera.lookAt(specCam.look); }
+    else if (specCam && Date.now() < specCam.until && world.loc === specCam.loc) {  camera.position.lerp(specCam.pos, Math.min(1, dt * 3)); camera.lookAt(specCam.look); }
     else if (selfC && !gateSpin) {
       let p = selfC.root.position;
       if (seated?.ht?.c) { p = p.clone().add(seated.ht.c.root.position).multiplyScalar(.5); p.y = 0; }
       const want = new THREE.Vector3(p.x + Math.sin(camYaw) * camDist, camH, p.z + Math.cos(camYaw) * camDist);
-      if (['phong', 'tamcung', 'lanhcung'].includes(world.loc)) { const b = world.bounds, m = .3; want.x = Math.min(b.maxX + m, Math.max(b.minX - m, want.x)); want.z = Math.min(b.maxZ + m, Math.max(b.minZ - m, want.z)); }
+      if (['phong', 'tamcung', 'lanhcung', 'ngutien'].includes(world.loc)) { const b = world.bounds, m = .3; want.x = Math.min(b.maxX + m, Math.max(b.minX - m, want.x)); want.z = Math.min(b.maxZ + m, Math.max(b.minZ - m, want.z)); }
       if (!Number.isFinite(camera.position.x + camera.position.y + camera.position.z)) snapCam = true;
       if (!Number.isFinite(want.x + want.y + want.z)) { want.set(0, 1.6, 3); }
       if (snapCam) { camera.position.copy(want); snapCam = false; } else camera.position.lerp(want, Math.min(1, dt * 6)); camera.lookAt(p.x, seated ? (world.bedTop || .4) + .32 : .85, p.z);
@@ -301,13 +305,14 @@ function renderHud() {
   const tb = $('todayBtn'); if (tb) tb.onclick = openToday; const bb = $('bigBtn'); if (bb) bb.onclick = openBig; const fb = $('festBtn'); if (fb) fb.onclick = openFest;
   const hb = $('hhBtn'); if (hb) hb.onclick = openHH; const vb = $('voteBtn'); if (vb) vb.onclick = openVote;
 }
-const LOCNAMES = { yentiec: '🎎 Yến tiệc', hoavien: 'Ngự hoa viên', tuninh: 'Từ Ninh cung', duongtam: 'Dưỡng Tâm điện', phong: 'Phòng riêng', tamcung: 'Tẩm cung', lanhcung: 'Lãnh cung' };
+const LOCNAMES = { yentiec: '🎎 Yến tiệc', hoavien: 'Ngự hoa viên', tuninh: 'Từ Ninh cung', duongtam: 'Dưỡng Tâm điện', phong: 'Phòng riêng', tamcung: 'Tẩm cung', lanhcung: 'Lãnh cung', ngutien: '🍳 Ngự thiện phòng' };
 function renderMap() {
   if (!me) return;
   const m = $('map'); m.innerHTML = '';
   const list = me.lanh ? ['lanhcung'] : me.camTuc ? ['phong'] : ['hoavien', 'tuninh', 'duongtam', 'phong'];
   if (latTheMe && !me.lanh) list.push('tamcung');
   if (feast && !me.lanh) list.push('yentiec');
+  if (!me.lanh && !me.camTuc && me.rank >= 4) list.splice(3, 0, 'ngutien');
   for (const l of list) { const b = document.createElement('button'); b.textContent = l === 'phong' && me.hasPalace ? 'Cung riêng' : LOCNAMES[l]; b.classList.toggle('on', world?.loc === l); b.onclick = () => socket.emit('goto', l); m.appendChild(b); }
 }
 function act(type, extra = {}) { socket.emit('action', { type, ...extra }); }
@@ -319,6 +324,8 @@ function renderActs() {
   if (L === 'tuninh' && !me.lanh) add('🔍 Tra án giúp Quế ma ma', me.detDay ? 'Hôm nay đã nhận · mai quay lại' : 'Mỗi ngày 1 vụ · phá đúng được 20 công trạng, 50 bạc · sai không bị phạt', () => socket.emit('npc', { npc: 'mama', op: 'tran' }), me.detDay || me.cases?.length);
   if (L === 'tuninh') { add('🙇 Thỉnh an Thái hậu', me.thinhAn ? 'Hôm nay đã thỉnh an' : 'Miễn phí, mỗi ngày 1 lần · trả lời khéo được thêm điểm', thinhAn, me.thinhAn); if (me.group) for (const m of me.group.members) if (m.id !== me.id && (m.lanh || m.camTuc)) add(`🙏 Cầu tình cho ${esc(m.name)}`, `1 lượt · 50 bạc · ${m.lanh ? 'giúp tiến độ phục vị' : 'giảm 8 giờ cấm túc'}`, () => socket.emit('sis', { op: 'cautinh', who: m.id })); }
   if (L === 'duongtam' && me.goldFish > 0) add(`🐟 Dâng cá chép vàng (${me.goldFish})`, 'Điềm lành · sủng ái +10', () => { emote('cui_chao'); act('dangca'); });
+  if (L === 'duongtam' && me.dish) add(`🍽 Dâng ${me.dish.name} tự tay nấu`, Date.now() - me.dish.t > 2 * 3600e3 ? 'Đã nguội · sủng ái giảm nhiều' : `Còn nóng · ${me.dish.q > .85 ? 'tuyệt hảo' : me.dish.q > .6 ? 'ngon' : 'hơi vụng'}`, () => { emote('cui_chao'); act('dangmon'); });
+  if (L === 'ngutien') { if (me.dish) add(`🍽 ${me.dish.name} đã xong`, 'Mang lên Dưỡng Tâm điện dâng Hoàng thượng', () => socket.emit('goto', 'duongtam')); else add('📖 Bí kíp nhà bếp · nấu món', `1 lượt · 40 bạc · còn ${3 - (me.cookN || 0)} lần hôm nay`, () => openBiKip(), cooking); }
   if (L === 'duongtam') add('🍲 Dâng canh Hoàng thượng', '1 lượt · 30 bạc · nấu đúng món người thèm được sủng nhiều', gameCanh);
   if (L === 'yentiec') { if (!feast?.mine) add('🎎 Dâng tiết mục', 'Đàn, múa quạt, múa lụa, kiếm vũ, ngâm thơ, hát', performFeast); add('🍶 Kính rượu', 'Kính Hoàng thượng hoặc các tỷ muội trong tiệc', openRuou); add('💃 Ra múa cùng mọi người', 'Đủ người cùng múa thì Hoàng thượng thưởng', danceTogether); add('🍶 Tửu lệnh', 'Mỗi 4 phút một câu: gõ vế sau thành ngữ vào chat, ai nhanh nhất thắng', () => toast('Chờ Tửu lệnh hiện ở trên màn hình rồi gõ đáp án vào ô chat.')); add('🚪 Rời yến tiệc', '', () => socket.emit('goto', 'hoavien')); }
   if (L === 'hoavien') { if (feast) add('🎎 Dự yến tiệc', 'Đang có yến tiệc, vào ngồi cùng mọi người', () => socket.emit('goto', 'yentiec')); add('🎣 Câu cá ở hồ', `Miễn phí · cá bán lấy bạc${me.fishN >= 15 ? ' (hôm nay đã bán đủ)' : ''}, hiếm khi gặp cá chép vàng`, gameFish); add('👂 Dò tin', '1 lượt · nghe sở thích Hoàng thượng, chuyện trong cung', () => act('dotin')); add('🎐 Luyện tài nghệ', '1 lượt · chơi càng hay càng nhiều điểm', () => chooseTai(t => gameRhythm(t, q => act('luyen', { tai: t, q })))); }
@@ -356,6 +363,7 @@ function openEmotes() {
 function talk(n) {
   const c = me.cases[0];
   if (NPC_OF[n.talk]) return npcMenu(n);
+  if (n.talk === 'ngutru') { bubble(n.label, me.dish ? `${me.dish.name} xong rồi, chủ tử mau mang lên Dưỡng Tâm điện kẻo nguội!` : 'Chủ tử muốn tự tay nấu món dâng Hoàng thượng? Nô tài chuẩn bị bếp ngay!'); if (!me.dish && !cooking) setTimeout(() => openBiKip(), 900); return; }
   if (n.talk === 'thinhan') { if (world.loc === 'tuninh') thinhAn(); }
   else if (n.talk === 'dangcanh') gameCanh();
   else if (n.talk === 'dotin') act('dotin');
@@ -491,7 +499,7 @@ async function playCut(d) {
 }
 socket.on('latthe', d => {
   if (d.id === me?.id) { latTheMe = true; renderMap(); showScroll('Lật thẻ bài', `Tổng quản thái giám đến truyền: đêm nay Hoàng thượng lật thẻ bài của <b>${esc(d.name)}</b>.<br>Mời chủ tử tắm gội, thay áo, đến tẩm cung hầu giá.`, [['Để sau', hideCut], ['Đến tẩm cung', () => { hideCut(); socket.emit('goto', 'tamcung'); }]]); }
-  else toast(`🏮 Đêm nay Hoàng thượng lật thẻ bài của ${d.name}.`);
+  else toast(`🏮 ${d.when || 'Đêm nay'} Hoàng thượng lật thẻ bài của ${d.name}.`);
 });
 
 async function runSacPhong(d) {
@@ -1225,6 +1233,15 @@ function taiStart(c, tai) {
     const fan = makeFan(); world.group.add(fan); c._taiProp = fan;
     const hp = new THREE.Vector3(), q = new THREE.Quaternion();
     c.post = (cc, t) => { cc.B.rHand.getWorldPosition(hp); cc.B.rHand.getWorldQuaternion(q); fan.position.copy(hp); fan.quaternion.copy(q); fan.rotateX(-Math.PI / 2); fan.rotateZ(Math.PI / 2 + Math.sin(t * 3) * .3); fan.translateY(.02); };
+  } else if (tai === 'thai') {
+    c.play('dung_cho'); const k = makeCleaver(); world.group.add(k); c._taiProp = k; const hp = new THREE.Vector3();
+    c.post = (cc, t) => { const ch = Math.abs(Math.sin(t * 11)); aim(cc.root, cc.B.rArm, cc.B.rFore, v3([-.2, -.55, .8])); aim(cc.root, cc.B.rFore, cc.B.rHand, v3([.25, -.4 + ch * .8, .85])); aim(cc.root, cc.B.lArm, cc.B.lFore, v3([.25, -.6, .75])); aim(cc.root, cc.B.lFore, cc.B.lHand, v3([-.4, -.3, .85])); cc.root.updateMatrixWorld(true); cc.B.rHand.getWorldPosition(hp); k.position.copy(hp); k.rotation.set(Math.PI / 2, cc.root.rotation.y, 0); };
+  } else if (tai === 'nau') {
+    c.play('dung_cho'); const l = makeLadle(); world.group.add(l); c._taiProp = l; const hp = new THREE.Vector3();
+    c.post = (cc, t) => { aim(cc.root, cc.B.rArm, cc.B.rFore, v3([-.15, -.35, .9])); aim(cc.root, cc.B.rFore, cc.B.rHand, v3([Math.sin(t * 5) * .45, -.35, .8 + Math.cos(t * 5) * .2])); aim(cc.root, cc.B.lArm, cc.B.lFore, v3([.3, -.7, .5])); cc.root.updateMatrixWorld(true); cc.B.rHand.getWorldPosition(hp); l.position.copy(hp); l.rotation.set(-.9, cc.root.rotation.y, Math.sin(t * 5) * .3); };
+  } else if (tai.startsWith('bung')) {
+    c.play('dung_cho'); const rr = RECIPES[+tai.split(':')[1]] || RECIPES[0]; const b = makeDish(rr.name); world.group.add(b); c._taiProp = b; dishLabel(b, rr.name); const a = new THREE.Vector3(), b2 = new THREE.Vector3();
+    c.post = (cc) => { aim(cc.root, cc.B.rArm, cc.B.rFore, v3([-.15, -.5, .85])); aim(cc.root, cc.B.rFore, cc.B.rHand, v3([.5, .1, .85])); aim(cc.root, cc.B.lArm, cc.B.lFore, v3([.15, -.5, .85])); aim(cc.root, cc.B.lFore, cc.B.lHand, v3([-.5, .1, .85])); cc.root.updateMatrixWorld(true); cc.B.rHand.getWorldPosition(a); cc.B.lHand.getWorldPosition(b2); b.position.copy(a).add(b2).multiplyScalar(.5); b.position.y += .05; };
   } else if (tai === 'lụa') {
     c.play('mua', { restart: true });
     const g = new THREE.Group(); world.group.add(g); c._taiProp = g;
@@ -1791,3 +1808,148 @@ async function runNpcShow(at) {
   } finally { showOn = false; if (world === w) [...showChars].forEach(c => { c.root.parent?.remove(c.root); }); }
 }
 socket.on('npcShow', d => { if (d && Date.now() < d.at + 30000) runNpcShow(d.at).catch(e => { console.error('npcShow', e); showOn = false; }); });
+
+// =====================================================================
+// NGỰ THIỆN PHÒNG: tự tay nấu món dâng Hoàng thượng (từ Quý nhân)
+// =====================================================================
+const RECIPES = [
+  { name: 'Canh sen hạt', nl: ['hạt sen', 'táo đỏ', 'đường phèn'], cut: [], vessel: 'nồi', dish: 'chén' },
+  { name: 'Canh gà hầm sâm', nl: ['gà', 'nhân sâm', 'táo đỏ'], cut: ['gà'], vessel: 'nồi', dish: 'chén' },
+  { name: 'Chè tổ yến', nl: ['tổ yến', 'đường phèn', 'long nhãn'], cut: [], vessel: 'nồi', dish: 'chén' },
+  { name: 'Canh cá chép', nl: ['cá chép', 'gừng', 'hành'], cut: ['cá chép', 'gừng'], vessel: 'nồi', dish: 'chén' },
+  { name: 'Canh bí đao', nl: ['bí đao', 'tôm khô', 'hành'], cut: ['bí đao', 'hành'], vessel: 'nồi', dish: 'chén' },
+  { name: 'Chè long nhãn', nl: ['long nhãn', 'hạt sen', 'đường phèn'], cut: [], vessel: 'nồi', dish: 'chén' },
+  { name: 'Gà xào Cung Bảo', nl: ['gà', 'ớt khô', 'đậu phộng'], cut: ['gà', 'ớt khô'], vessel: 'chảo', dish: 'dĩa' },
+  { name: 'Cá chép hấp gừng', nl: ['cá chép', 'gừng', 'hành'], cut: ['gừng', 'hành'], vessel: 'xửng', dish: 'dĩa' },
+];
+const NL_ICON = { 'hạt sen': '🪷', 'táo đỏ': '🔴', 'đường phèn': '🧊', 'gà': '🐔', 'nhân sâm': '🌿', 'tổ yến': '🪺', 'long nhãn': '🟤', 'cá chép': '🐟', 'gừng': '🫚', 'hành': '🧅', 'bí đao': '🍈', 'tôm khô': '🦐', 'ớt khô': '🌶️', 'đậu phộng': '🥜' };
+const VESSEL = { 'chảo': ['🥘', 'Chảo gang (xào)', 0], 'nồi': ['🍲', 'Nồi đất (hầm, nấu canh)', 1], 'xửng': ['🧺', 'Xửng tre (hấp)', 2] };
+function startSteam(o) {
+  let t = 0; FX.push(dt => { if (world !== o) return false; t += dt; if (t > .35) { t = 0; for (const p of o.steamAt) burst(p.x + (Math.random() - .5) * .15, p.y, p.z, 6, .18, [0xffffff, 0xf0ece4], 1.8, -.35, .14); } });
+}
+const cookWalk = st => new Promise(res => { if (!selfC || !st) return res(); selfC.target = { x: st.x, z: st.z }; let n = 0; const iv = setInterval(() => { if (!selfC?.target || ++n > 70) { if (selfC) { if (selfC.target) selfC.root.position.set(st.x, 0, st.z); selfC.target = null; if (st.ry != null) selfC.root.rotation.y = st.ry; sendMove('dung_cho'); } clearInterval(iv); res(); } }, 100); });
+// ---------- vòng xanh chỉ chỗ, thanh tiến độ trên đầu bếp ----------
+let cookTarget = null;
+function ringAt(x, y, z, r = .32) {
+  const g = new THREE.Group(); g.position.set(x, y, z);
+  const ring = new THREE.Mesh(new THREE.TorusGeometry(r, .022, 8, 40), new THREE.MeshBasicMaterial({ color: 0x5dff4a, transparent: true, opacity: .95, depthTest: false }));
+  ring.rotation.x = Math.PI / 2; ring.renderOrder = 10; g.add(ring);
+  const hit = new THREE.Mesh(new THREE.CylinderGeometry(r * 1.3, r * 1.3, .9, 12), new THREE.MeshBasicMaterial({ visible: false })); hit.position.y = -.3; g.add(hit);
+  world.group.add(g); let t = 0; FX.push(dt => { if (!g.parent) return false; t += dt; const k = 1 + Math.sin(t * 5) * .08; ring.scale.set(k, k, k); ring.rotation.z += dt * 1.2; });
+  return { g, hit };
+}
+function setCookTarget(pos, label, fn) {
+  clearCookTarget(); const R = ringAt(pos.x, pos.y, pos.z, pos.r);
+  const d = document.createElement('div'); d.className = 'cktip'; d.textContent = label; const lb = new CSS2DObject(d); lb.position.set(pos.x, pos.y + .4, pos.z); world.group.add(lb);
+  cookTarget = { ...R, lb, fn: () => { const f = fn; clearCookTarget(); f(); } };
+}
+function clearCookTarget() { if (!cookTarget) return; cookTarget.lb.element.remove(); cookTarget.lb.parent?.remove(cookTarget.lb); cookTarget.g.parent?.remove(cookTarget.g); cookTarget = null; }
+function worldBar(pos, ms, label) {
+  return new Promise(res => {
+    const d = document.createElement('div'); d.className = 'ckwbar'; d.innerHTML = `<i></i><span>${esc(label)}</span>`; const o = new CSS2DObject(d); o.position.set(pos.x, pos.y + .45, pos.z); world.group.add(o);
+    const bar = d.querySelector('i'); bar.style.width = '100%'; requestAnimationFrame(() => requestAnimationFrame(() => { bar.style.transition = `width ${ms}ms linear`; bar.style.width = '0%'; }));
+    setTimeout(() => { d.remove(); o.parent?.remove(o); res(); }, ms);
+  });
+}
+function propAt(obj, pos) { obj.position.set(pos.x, pos.y, pos.z); world.group.add(obj); return obj; }
+function flyTo(obj, to, ms) { const from = obj.position.clone(); let t = 0; return new Promise(res => FX.push(dt => { t += dt * 1000 / ms; const k = Math.min(1, t); obj.position.lerpVectors(from, to, k); obj.position.y += Math.sin(k * Math.PI) * .25; if (k >= 1) { res(); return false; } })); }
+function dishLabel(obj, name) { const d = document.createElement('div'); d.className = 'cktip dish'; d.textContent = '🍽 ' + name; const lb = new CSS2DObject(d); lb.position.set(0, .16, 0); obj.add(lb); obj.userData.lb = lb; return lb; }
+// ảnh món ăn cho bí kíp
+let dishR = null; const dishCache = new Map();
+function dishSnap(name) {
+  if (dishCache.has(name)) return dishCache.get(name);
+  if (!dishR) { dishR = new THREE.WebGLRenderer({ antialias: true, alpha: true, preserveDrawingBuffer: true }); dishR.setSize(220, 150); dishR.toneMapping = THREE.ACESFilmicToneMapping; dishR.outputColorSpace = THREE.SRGBColorSpace; }
+  const sc = new THREE.Scene(); sc.add(new THREE.HemisphereLight(0xfff4e0, 0x664433, 2.2)); const dl = new THREE.DirectionalLight(0xffffff, 1.6); dl.position.set(.5, 2, 1.2); sc.add(dl);
+  const d = makeDish(name); sc.add(d); const cam = new THREE.PerspectiveCamera(32, 220 / 150, .01, 5); cam.position.set(0, .3, .32); cam.lookAt(0, .02, 0);
+  dishR.render(sc, cam); const url = dishR.domElement.toDataURL('image/png'); dishCache.set(name, url); return url;
+}
+// ---------- bí kíp nhà bếp ----------
+const RECIPE_TIP = ['Hầm lửa nhỏ đến khi hạt sen bở tơi, ngọt thanh mát gan.', 'Gà ta chặt miếng, hầm cùng sâm và táo đỏ cho nước trong, bổ khí huyết.', 'Tổ yến ngâm mềm, chưng cách thủy với đường phèn, thêm long nhãn cho thơm.', 'Cá chép làm sạch, nấu cùng gừng hành cho hết tanh, nước canh trắng sữa.', 'Bí đao thái miếng, nấu với tôm khô, rắc hành xanh, giải nhiệt mùa hè.', 'Long nhãn và hạt sen nấu cùng đường phèn, an thần dễ ngủ.', 'Gà thái hạt lựu xào lửa lớn cùng ớt khô và đậu phộng, đậm đà cay thơm.', 'Cá chép để nguyên con, phủ gừng hành thái sợi, hấp cách thủy cho ngọt thịt.'];
+function recipeSteps(R) { return [`🧺 Lấy nguyên liệu ở kệ: ${R.nl.join(', ')}`, `🔪 Sơ chế ở thớt: ${R.cut.length ? 'thái ' + R.cut.join(', ') : 'rửa sạch'}${R.cut.length < 3 ? ', rửa phần còn lại' : ''}`, `${VESSEL[R.vessel][0]} Cho vào ${VESSEL[R.vessel][1].toLowerCase()} trên bếp lò`, `🔥 ${R.vessel === 'chảo' ? 'Xào' : R.vessel === 'xửng' ? 'Hấp' : 'Hầm'} rồi tắt bếp đúng lúc vừa chín`, `🍽 Bày ra ${R.dish} ở bàn dọn món`, '🙇 Mang lên Dưỡng Tâm điện dâng Hoàng thượng']; }
+function openBiKip(sel = null) {
+  const fav = me.htKnown?.canh; let i = sel ?? Math.max(0, RECIPES.findIndex(r => r.name === fav));
+  const draw = () => { const R = RECIPES[i];
+    modal(`<button class="close" onclick="window._close()">✕</button><h3>📖 Bí kíp Ngự thiện</h3>
+    <div class="bk"><div class="bkl">${RECIPES.map((r, k) => `<button data-i="${k}" class="${k === i ? 'on' : ''}">${r.dish === 'dĩa' ? '🍽' : '🥣'} ${esc(r.name)}${r.name === fav ? ' <b>★</b>' : ''}</button>`).join('')}</div>
+    <div class="bkp"><img class="bkimg" src="${dishSnap(R.name)}" alt=""><div class="bkn">${esc(R.name)}${R.name === fav ? '<small>★ Hôm nay Hoàng thượng đang thèm</small>' : ''}</div><div class="bkt">${esc(RECIPE_TIP[i])}</div>
+    <div class="bknl">${R.nl.map(n => `<span>${NL_ICON[n]} ${esc(n)}</span>`).join('')}</div>
+    <ol>${recipeSteps(R).map(x => `<li>${esc(x)}</li>`).join('')}</ol>
+    <div class="btns"><button class="gold" id="bkGo" ${me.dish || (me.cookN || 0) >= 3 ? 'disabled' : ''}>🍳 Nấu món này (1 lượt · 40 bạc)</button></div>${me.dish ? `<small style="color:var(--muted)">Đang có ${esc(me.dish.name)} chưa dâng.</small>` : (me.cookN || 0) >= 3 ? '<small style="color:var(--muted)">Hôm nay đã nấu đủ 3 món.</small>' : ''}</div></div>`);
+    $('mcard').classList.add('wide');
+    $('mcard').querySelectorAll('[data-i]').forEach(b => b.onclick = () => { i = +b.dataset.i; draw(); });
+    const go = $('bkGo'); if (go) go.onclick = () => { closeModal(); gameCook(i); };
+  };
+  draw();
+}
+// ---------- thanh công thức dưới màn hình ----------
+const ckBar = document.createElement('div'); ckBar.id = 'cookbar'; ckBar.className = 'hidden'; document.body.appendChild(ckBar);
+function drawCookBar(R, got, step) {
+  ckBar.classList.remove('hidden');
+  ckBar.innerHTML = `<img src="${dishSnap(R.name)}" alt=""><div class="cki"><b>${esc(R.name)}</b><div class="ckn">${R.nl.map(n => `<span class="${got.has(n) ? 'ok' : ''}">${NL_ICON[n]}${got.has(n) ? '✓' : ''}</span>`).join('')}</div><div class="cks">Bước ${step + 1}/6 · ${esc(recipeSteps(R)[step])}</div></div><div class="ckb"><button id="ckBook">📖</button><button id="ckQuit">✕</button></div>`;
+  $('ckBook').onclick = () => openBiKip(RECIPES.indexOf(R)); $('ckQuit').onclick = () => cookAbort && cookAbort();
+}
+let cooking = false, cookAbort = null;
+async function gameCook(ri) {
+  if (ri == null) return openBiKip();
+  if (mgOn || cooking || world?.loc !== 'ngutien' || !selfC) return;
+  if (me.dish) return toast(`Đang có ${me.dish.name}, mang lên Dưỡng Tâm điện dâng trước đã.`);
+  if ((me.cookN || 0) >= 3) return toast('Hôm nay đã nấu 3 món rồi.'); if (me.turns < 1) return toast('Hết lượt.', 'bad'); if (me.silver < 40) return toast('Cần 40 bạc mua nguyên liệu.', 'bad');
+  const R = RECIPES[ri], K = world.kst, w = world; let mistakes = 0, step = 0; const got = new Set(), props = [];
+  cooking = true; kitchenCam(true);
+  let aborted = false; cookAbort = () => { aborted = true; done(); };
+  const done = () => { cooking = false; cookAbort = null; kitchenCam(false); clearCookTarget(); ckBar.classList.add('hidden'); props.forEach(p => p.parent?.remove(p)); if (mgOn) mgClose(); if (selfC && taiOn) { taiEnd(selfC); socket.emit('emote', 'dung_cho'); } };
+  const goStation = async (st, ring, label) => { drawCookBar(R, got, step); await new Promise(res => setCookTarget(ring, label, res)); if (aborted || world !== w) throw 'quit'; await cookWalk(st); if (aborted || world !== w) throw 'quit'; };
+  const board = w.board, serve = w.servePt, vIdx = VESSEL[R.vessel][2], vPos = { x: K.stove[vIdx].x, y: R.vessel === 'nồi' ? 1.3 : 1.1, z: w.steamAt[vIdx].z };
+  try {
+    // 1) kệ nguyên liệu
+    await goStation(K.shelf, { x: K.shelf.x + .35, y: 1.05, z: K.shelf.z, r: .45 }, 'Lấy nguyên liệu');
+    const pool = Object.keys(NL_ICON).sort(() => Math.random() - .5);
+    await new Promise((res, rej) => {
+      const draw = () => { mgOpen(`<div class="mgt">🧺 Lấy đủ nguyên liệu cho <b>${esc(R.name)}</b> <small>(${got.size}/3${mistakes ? ` · lấy nhầm ${mistakes}` : ''})</small></div><div class="row wrap nlgrid">${pool.map(k => `<button data-n="${esc(k)}" ${got.has(k) ? 'class="gold" disabled' : ''}><span>${NL_ICON[k]}</span>${esc(k)}</button>`).join('')}<button data-x>✕</button></div>`);
+        mgEl.querySelector('[data-x]').onclick = () => rej('quit');
+        mgEl.querySelectorAll('[data-n]').forEach(b => b.onclick = () => { const k = b.dataset.n; if (R.nl.includes(k)) { got.add(k); drawCookBar(R, got, step); selfC.play('cui_chao', { restart: true }); if (got.size >= 3) { mgClose(); res(); } else draw(); } else { mistakes++; b.classList.add('wrong'); b.disabled = true; toast(`Ngự trù: "${k} không có trong bí kíp món này đâu chủ tử!"`); } }); };
+      draw();
+    });
+    // 2) thớt: nguyên liệu hiện ra, thái từng thứ
+    step = 1; await goStation(K.board, { x: board.x, y: board.y + .02, z: board.z, r: .4 }, 'Sơ chế');
+    const items = R.nl.map((n, k) => propAt(makeIngredient(n), { x: board.x - .15 + k * .15, y: board.y, z: board.z + (k - 1) * .12 }));
+    props.push(...items);
+    for (let k = 0; k < 3; k++) { const n = R.nl[k], cut = R.cut.includes(n);
+      taiStart(selfC, 'thai'); socket.emit('emote', 'tai:thai');
+      await worldBar({ x: board.x, y: board.y, z: board.z }, cut ? 1600 : 900, cut ? `Thái ${n}` : `Rửa ${n}`);
+      taiEnd(selfC); socket.emit('emote', 'dung_cho'); if (aborted) throw 'quit';
+      if (cut) { const p = items[k]; const c = makeIngredient(n, true); c.position.copy(p.position); p.parent?.remove(p); w.group.add(c); items[k] = c; props.push(c); }
+    }
+    // 3) bếp lò: cho vào nồi/chảo/xửng
+    step = 2; await goStation(K.stove[vIdx], { ...vPos, r: .42 }, `Cho vào ${R.vessel}`);
+    // nguyên liệu bay từ thớt vào nồi
+    await Promise.all(items.map((p, k) => new Promise(r => setTimeout(() => flyTo(p, new THREE.Vector3(vPos.x, vPos.y - .1, vPos.z), 700).then(() => { p.visible = false; r(); }), k * 180))));
+    step = 3; drawCookBar(R, got, step);
+    taiStart(selfC, 'nau'); socket.emit('emote', 'tai:nau');
+    const steamOn = { on: true }; let st = 0; FX.push(dt => { if (!steamOn.on || world !== w) return false; st += dt; if (st > .15) { st = 0; burst(vPos.x, vPos.y + .05, vPos.z, 8, .3, [0xffffff, 0xfff0d8], 1.4, -.5, .16); } });
+    await worldBar(vPos, 2000, R.vessel === 'chảo' ? 'Đang xào' : R.vessel === 'xửng' ? 'Đang hấp' : 'Đang hầm');
+    const heat = await new Promise(res => {
+      let k = 0, dir = 1, raf; const zone = .45 + Math.random() * .25;
+      mgOpen(`<div class="mgt">🔥 Canh lửa: bấm <b>Tắt bếp</b> khi kim vào vùng xanh (vừa chín) · phím cách</div><div class="heat"><div class="ok"></div><div class="nd"></div></div><div class="row"><button class="gold" id="ckOff">Tắt bếp</button></div>`);
+      mgEl.querySelector('.ok').style.left = (zone - .1) * 100 + '%'; const nd = mgEl.querySelector('.nd');
+      const loop = () => { k += dir * .016; if (k > 1) { k = 1; dir = -1; } if (k < 0) { k = 0; dir = 1; } nd.style.left = k * 100 + '%'; raf = requestAnimationFrame(loop); };
+      const stop = () => { cancelAnimationFrame(raf); removeEventListener('keydown', key); const h = Math.max(0, 1 - Math.abs(k - zone) * 4); mgEl.querySelector('.heat').classList.add(h > .6 ? 'good' : 'bad'); toast(h > .8 ? 'Vừa chín tới, thơm nức!' : h > .5 ? 'Chín rồi, hơi lố một chút.' : k < zone ? 'Hơi sống…' : 'Cháy mất rồi!'); setTimeout(() => { mgClose(); res(h); }, 700); };
+      const key = e => { if (e.code === 'Space') { e.preventDefault(); stop(); } }; addEventListener('keydown', key);
+      mgEl.querySelector('#ckOff').onclick = stop; raf = requestAnimationFrame(loop);
+    });
+    steamOn.on = false; taiEnd(selfC); socket.emit('emote', 'dung_cho');
+    // 4) bàn dọn món: món hiện ra trong chén/dĩa
+    step = 4; await goStation(K.serve, { x: serve.x, y: serve.y + .02, z: serve.z, r: .35 }, `Bày ra ${R.dish}`);
+    await worldBar(serve, 1200, `Bày ra ${R.dish}`);
+    const dish = propAt(makeDish(R.name), { x: serve.x, y: serve.y, z: serve.z }); props.push(dish); dishLabel(dish, R.name);
+    burst(serve.x, serve.y + .15, serve.z, 40, .7, [0xffd77a, 0xffffff], 1.3, .3, .06);
+    const q = Math.max(0, Math.min(1, .4 + heat * .6 - mistakes * .15));
+    act('nauan', { r: ri, q }); step = 5; drawCookBar(R, got, step);
+    await new Promise(r => setTimeout(r, 1300));
+    dish.userData.lb?.element.remove(); dish.parent?.remove(dish);
+    taiStart(selfC, 'bung:' + ri); socket.emit('emote', 'tai:bung:' + ri);
+    mgOpen(`<div class="mgt">✨ <b>${esc(R.name)}</b> đã xong · ${q > .85 ? 'tuyệt hảo' : q > .6 ? 'ngon' : 'hơi vụng'}. Mang lên Dưỡng Tâm điện dâng Hoàng thượng trong 2 giờ kẻo nguội.</div><div class="row"><button class="gold" id="ckGo">Mang lên Dưỡng Tâm điện ➜</button><button id="ckStay">Ở lại</button></div>`);
+    await new Promise(res => { mgEl.querySelector('#ckGo').onclick = () => { socket.emit('goto', 'duongtam'); res(); }; mgEl.querySelector('#ckStay').onclick = res; });
+    done();
+  } catch (e) { done(); if (e !== 'quit') console.error(e); }
+}

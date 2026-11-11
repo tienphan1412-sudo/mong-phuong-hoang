@@ -329,6 +329,31 @@ body.staging #tuulenh { display:none !important; }
 #reactbar .rbar { height:3px; background:rgba(255,255,255,.1); border-radius:3px; margin-top:6px; overflow:hidden; } #reactbar .rbar i { display:block; height:100%; background:#e2bf6b; }
 body.staging #reactbar { display:none !important; }
 @media (max-width:760px) { #reactbar { bottom:52px; left:6px; right:6px; transform:none; } #reactbar button { min-width:0; flex:1; } }
+
+.ckbar { position:relative; height:26px; background:rgba(0,0,0,.35); border:1px solid var(--line); border-radius:999px; overflow:hidden; margin:8px 4px; }
+.ckbar i { position:absolute; left:0; top:0; bottom:0; background:linear-gradient(90deg,#b8862e,#ffd77a); }
+.ckbar span { position:relative; display:block; text-align:center; line-height:26px; font-size:12.5px; color:#fff; text-shadow:0 1px 2px #000; }
+.nlgrid button { display:flex; flex-direction:column; align-items:center; gap:1px; min-width:74px; font-size:11.5px; padding:5px 6px; }
+.nlgrid button span { font-size:20px; } .nlgrid button.wrong { border-color:#c0503a; opacity:.5; }
+
+.cktip { background:#2f8a2a; color:#fff; font-weight:700; font-size:12px; padding:3px 9px; border-radius:999px; border:2px solid #b8ff9a; white-space:nowrap; box-shadow:0 2px 8px rgba(0,0,0,.4); animation:ckb 1s ease-in-out infinite; }
+.cktip.dish { background:#7a1210; border-color:#e8c25a; color:#ffe39a; animation:none; }
+@keyframes ckb { 50% { transform:translateY(-4px); } }
+.ckwbar { position:relative; width:120px; height:16px; background:rgba(0,0,0,.6); border:2px solid #fff; border-radius:6px; overflow:hidden; }
+.ckwbar i { position:absolute; left:0; top:0; bottom:0; background:linear-gradient(90deg,#2f7ad9,#7ac0ff); }
+.ckwbar span { position:relative; display:block; text-align:center; font-size:10.5px; line-height:12px; color:#fff; font-weight:700; text-shadow:0 1px 2px #000; }
+#cookbar { position:fixed; left:50%; bottom:72px; transform:translateX(-50%); z-index:8; display:flex; gap:10px; align-items:center; background:var(--panel); border:2px solid #e2bf6b; border-radius:16px; padding:6px 10px; box-shadow:0 6px 20px rgba(0,0,0,.45); max-width:94vw; }
+#cookbar img { width:84px; height:57px; border-radius:10px; background:radial-gradient(#5a2a20,#2a1410); }
+#cookbar .cki b { color:var(--gold2); font-family:'Noto Serif',serif; } #cookbar .ckn span { display:inline-block; font-size:20px; margin-right:6px; opacity:.55; } #cookbar .ckn span.ok { opacity:1; }
+#cookbar .cks { font-size:12px; color:#f3e2b4; } #cookbar .ckb { display:flex; flex-direction:column; gap:4px; } #cookbar .ckb button { padding:3px 9px; }
+body.staging #cookbar { display:none !important; }
+.bk { display:flex; gap:12px; margin-top:8px; } .bkl { display:flex; flex-direction:column; gap:4px; min-width:170px; } .bkl button { text-align:left; font-size:12.5px; } .bkl button.on { border-color:var(--gold); background:rgba(160,90,30,.55); } .bkl b { color:#ffd77a; }
+.bkp { flex:1; background:linear-gradient(#f8ecd2,#ecd7a6); color:#3a1408; border-radius:12px; padding:10px 14px; border:2px solid #b8862d; }
+.bkimg { display:block; margin:0 auto; width:220px; height:150px; border-radius:12px; background:radial-gradient(#7a4a30,#3a1a10); }
+.bkn { font-family:'Noto Serif',serif; font-size:20px; color:#8a1a17; font-weight:700; text-align:center; margin-top:4px; } .bkn small { display:block; font-size:12px; color:#b8862d; }
+.bkt { font-style:italic; font-size:13px; text-align:center; margin:4px 0 8px; } .bknl { display:flex; gap:8px; justify-content:center; flex-wrap:wrap; } .bknl span { background:rgba(120,70,20,.12); border-radius:8px; padding:2px 8px; font-size:13px; }
+.bkp ol { font-size:13px; line-height:1.6; margin:8px 0 4px; padding-left:20px; }
+@media (max-width:760px) { .bk { flex-direction:column; } .bkl { flex-direction:row; flex-wrap:wrap; min-width:0; } #cookbar { bottom:52px; } }
 </style>
 </head>
 <body>

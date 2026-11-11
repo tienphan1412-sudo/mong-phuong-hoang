@@ -147,6 +147,7 @@ function selfView(p) {
     isHH: isHH(p), hhDay: p.hhDay || {}, hhVote: hhVoteView(p), hhName: DB.state.hh ? P(DB.state.hh.id)?.name || null : null,
     event: { ...curEvent(), done: p.evDay === dayKey() }, streak: p.streak || 0, ach: achView(p), titleSel: p.titleSel || '',
     big: bigView(p), fest: festView(p),
+    dish: p.dish ? { name: p.dish.name, q: p.dish.q, t: p.dish.t, dish: p.dish.dish } : null, cookN: p.cookDay?.d === dayKey() ? p.cookDay.n : 0,
     quest: questView(p), jewels: p.jewels || [], mcDay: p.mcDay === dayKey(),
     relDayMach: !!(p.relDay || {})['thaiy:mach'], detDay: p.detDay === dayKey(),
   };
@@ -495,6 +496,7 @@ const ACH = [
   { id: 'hoadong', name: 'Trên thuận dưới hòa', desc: 'Thân thiết với cả 4 người: Thái hậu, Quế ma ma, Thái y, Tổng quản', need: 4, cur: p => ['thaihau', 'mama', 'thaiy', 'tonggiam'].filter(n => rel(p, n) >= 30).length },
   { id: 'thantham', name: 'Thần thám hậu cung', desc: 'Giúp Quế ma ma phá 5 vụ án', need: 5, cur: p => p.cnt?.det || 0 },
   { id: 'tuuluong', name: 'Tửu lượng hơn người', desc: 'Thắng tửu lệnh 5 lần', need: 5, cur: p => p.cnt?.tuulenh || 0 },
+  { id: 'ngutru', name: 'Bàn tay ngự trù', desc: 'Tự tay nấu 10 món ở Ngự thiện phòng', need: 10, cur: p => p.cnt?.cook || 0 },
   { id: 'thanco', name: 'Thần cơ diệu toán', desc: 'Bỏ phiếu đúng thủ phạm một đại án', need: 1, cur: p => p.cnt?.bigRight || 0 },
   { id: 'hieutam', name: 'Hiếu tâm cảm động', desc: 'Góp sức nhiều nhất một kỳ đại lễ', need: 1, cur: p => p.cnt?.festTop || 0 },
   { id: 'mau', name: 'Mẫu bằng tử quý', desc: 'Hạ sinh hoàng tự', need: 1, cur: p => (p.children || []).length },
@@ -941,7 +943,7 @@ function nightTick() {
 }
 
 // ---------------- vị trí, phòng ----------------
-const LOCS = ['tuninh', 'hoavien', 'duongtam', 'phong', 'tamcung', 'lanhcung', 'yentiec'];
+const LOCS = ['tuninh', 'hoavien', 'duongtam', 'phong', 'tamcung', 'lanhcung', 'yentiec', 'ngutien'];
 // ghế ngồi: loc -> { seatId: playerId }
 const SEATS = {}; const SEAT_IDS = { hoavien: ['hv0', 'hv1', 'hv2'], yentiec: ['f0', 'f1', 'f2', 'f3', 'f4', 'f5', 'f6', 'f7'] };
 function freeSeat(p) { for (const loc in SEATS) for (const k in SEATS[loc]) if (SEATS[loc][k] === p.id) delete SEATS[loc][k]; p.seat = null; }
@@ -1024,6 +1026,7 @@ io.on('connection', sock => {
     if (loc === 'tamcung' && !(me.tamCungUntil > now())) return toast(me, 'Chỉ người được lật thẻ mới vào tẩm cung đêm nay.');
     if ((me.camTucUntil || 0) > now() && loc !== 'phong') return toast(me, 'Đang bị cấm túc, chưa được ra khỏi phòng.', 'bad');
     if (loc === 'yentiec' && !(DB.state.feast && !DB.state.feast.done)) return toast(me, 'Hiện không có yến tiệc.');
+    if (loc === 'ngutien' && me.rank < C.FIGHT_RANK) return toast(me, `Từ ${C.RANKS[C.FIGHT_RANK].name} mới được vào Ngự thiện phòng.`);
     if (loc === 'tamcung') me.outfit = 'aongu';
     else if (me.outfit === 'aongu' && loc !== 'phong') me.outfit = me.lanh ? 'tunu' : C.RANKS[me.rank].outfit;
     enter(me, loc, sock); push(me);
@@ -1148,6 +1151,22 @@ io.on('connection', sock => {
       const tq = DB.state.hhVote?.votes?.[t.id]; if (tq) lines.push(`Kỳ bầu phượng ấn này, chủ tử tiến cử ${P(tq)?.name}.`);
       if (Math.random() < .25) { toast(t, '🕵️ Cung nữ trong cung bổn cung có vẻ lén lút, hình như vừa nhận bạc của ai đó…', 'bad'); }
       const s = sockOf(me.id); if (s) s.emit('npcSay', { who: `Cung nữ của ${t.name}`, text: lines.join(' '), long: true });
+    } else if (a === 'nauan') {
+      if (me.loc !== 'ngutien') return toast(me, 'Vào Ngự thiện phòng mới nấu được.'); if (me.rank < C.FIGHT_RANK) return;
+      const R = C.RECIPES[+d.r]; if (!R) return; if (me.dish) return toast(me, 'Đang có món chưa dâng, mang lên Dưỡng Tâm điện trước đã.');
+      me.cookDay = me.cookDay?.d === dayKey() ? me.cookDay : { d: dayKey(), n: 0 }; if (me.cookDay.n >= C.COOK.perDay) return toast(me, `Hôm nay đã nấu ${C.COOK.perDay} món rồi.`);
+      if (!useTurn(C.COOK.turn, C.COOK.silver)) return;
+      const q = Math.max(0, Math.min(1, +d.q || 0)); me.cookDay.n++; cnt(me, 'cook');
+      me.dish = { r: +d.r, name: R.name, q, t: now(), dish: R.dish }; addPts(me, 4);
+      toast(me, `Đã nấu xong ${R.name}${q > .85 ? ' (tuyệt hảo!)' : q > .6 ? '' : ' (hơi vụng)'}. Mang lên Dưỡng Tâm điện dâng Hoàng thượng trong ${C.COOK.hotHours} giờ kẻo nguội.`, 'good');
+    } else if (a === 'dangmon') {
+      if (me.loc !== 'duongtam') return toast(me, 'Phải đến Dưỡng Tâm điện.'); const D = me.dish; if (!D) return toast(me, 'Chưa có món nào.');
+      const cold = now() - D.t > C.COOK.hotHours * 3600e3, fav = D.name === C.HT.canh[ht().canh];
+      let sung = Math.round((5 + 9 * D.q + (fav ? 8 : 0) + (D.dish === 'dĩa' ? 2 : 0)) * (cold ? .4 : 1)); me.sung += sung; addPts(me, cold ? 4 : 12); me.dish = null;
+      const line = cold ? 'Món này nguội rồi… thôi, nàng có lòng là được.' : fav ? `Đúng món trẫm đang thèm! ${D.name} do chính tay nàng nấu sao? Ngon lắm!` : D.q > .85 ? `${D.name} tuyệt hảo, ngự trù cũng không bằng nàng.` : D.q > .6 ? `${D.name} khá ngon.` : `Hơi ${pick(['mặn', 'nhạt', 'khét'])}… nhưng trẫm vẫn ăn hết.`;
+      const s = sockOf(me.id); if (s) s.emit('npcSay', { who: 'Hoàng thượng', text: line });
+      if (!cold && (fav || D.q > .85)) news(`🍽 ${me.name} tự tay nấu ${D.name} dâng Hoàng thượng, được khen hết lời.`);
+      toast(me, `Dâng ${D.name}${cold ? ' (đã nguội)' : ''}: sủng ái +${sung}.`, cold ? 'info' : 'good');
     } else if (a === 'event') {
       const e = curEvent(); if (!e.loc) return;
       if (me.loc !== e.loc) return toast(me, 'Không đúng chỗ cho sự kiện này.');

@@ -84,6 +84,18 @@ module.exports = {
     vongngoc: { name: 'Vòng ngọc Hòa Điền', desc: 'Mỗi ngày tự được thêm 2 sủng ái', price: 400 },
     tramphuong: { name: 'Trâm phượng vàng', desc: 'Dâng tiết mục ở yến tiệc được cộng điểm', price: 600 },
   },
+  // ---------- Ngự thiện phòng (từ Quý nhân) ----------
+  COOK: { turn: 1, silver: 40, perDay: 3, hotHours: 2 },
+  RECIPES: [
+    { name: 'Canh sen hạt', nl: ['hạt sen', 'táo đỏ', 'đường phèn'], cut: [], vessel: 'nồi', dish: 'chén' },
+    { name: 'Canh gà hầm sâm', nl: ['gà', 'nhân sâm', 'táo đỏ'], cut: ['gà'], vessel: 'nồi', dish: 'chén' },
+    { name: 'Chè tổ yến', nl: ['tổ yến', 'đường phèn', 'long nhãn'], cut: [], vessel: 'nồi', dish: 'chén' },
+    { name: 'Canh cá chép', nl: ['cá chép', 'gừng', 'hành'], cut: ['cá chép', 'gừng'], vessel: 'nồi', dish: 'chén' },
+    { name: 'Canh bí đao', nl: ['bí đao', 'tôm khô', 'hành'], cut: ['bí đao', 'hành'], vessel: 'nồi', dish: 'chén' },
+    { name: 'Chè long nhãn', nl: ['long nhãn', 'hạt sen', 'đường phèn'], cut: [], vessel: 'nồi', dish: 'chén' },
+    { name: 'Gà xào Cung Bảo', nl: ['gà', 'ớt khô', 'đậu phộng'], cut: ['gà', 'ớt khô'], vessel: 'chảo', dish: 'dĩa' },
+    { name: 'Cá chép hấp gừng', nl: ['cá chép', 'gừng', 'hành'], cut: ['gừng', 'hành'], vessel: 'xửng', dish: 'dĩa' },
+  ],
   MUACHUOC_PRICE: 80,          // mua chuộc cung nữ nhà người khác để dò bí mật
   CATCHUP_RANK: 3,             // từ Thường tại trở xuống: công trạng nhận được x1.3
   NEWBIE_DAYS: 3,              // 3 ngày đầu mỗi ngày thêm 2 lượt
