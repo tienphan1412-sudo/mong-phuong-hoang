@@ -1252,7 +1252,7 @@ function taiStart(c, tai) {
     c.play('dung_cho'); const l = makeLadle(); world.group.add(l); c._taiProp = l; const hp = new THREE.Vector3();
     c.post = (cc, t) => { aim(cc.root, cc.B.rArm, cc.B.rFore, v3([-.15, -.35, .9])); aim(cc.root, cc.B.rFore, cc.B.rHand, v3([Math.sin(t * 5) * .45, -.35, .8 + Math.cos(t * 5) * .2])); aim(cc.root, cc.B.lArm, cc.B.lFore, v3([.3, -.7, .5])); cc.root.updateMatrixWorld(true); cc.B.rHand.getWorldPosition(hp); l.position.copy(hp); l.rotation.set(-.9, cc.root.rotation.y, Math.sin(t * 5) * .3); };
   } else if (tai.startsWith('bung')) {
-    c.play('dung_cho'); const rr = RECIPES[+tai.split(':')[1]] || RECIPES[0]; const b = makeDish(rr.name); world.group.add(b); c._taiProp = b; dishLabel(b, rr.name); const a = new THREE.Vector3(), b2 = new THREE.Vector3();
+    c.play('dung_cho'); const rr = RECIPES[+tai.split(':')[1]] || RECIPES[0]; const b = makeDish(rr.name); b.scale.setScalar(.6); world.group.add(b); c._taiProp = b; dishLabel(b, rr.name); const a = new THREE.Vector3(), b2 = new THREE.Vector3();
     c.post = (cc) => { aim(cc.root, cc.B.rArm, cc.B.rFore, v3([-.15, -.5, .85])); aim(cc.root, cc.B.rFore, cc.B.rHand, v3([.5, .1, .85])); aim(cc.root, cc.B.lArm, cc.B.lFore, v3([.15, -.5, .85])); aim(cc.root, cc.B.lFore, cc.B.lHand, v3([-.5, .1, .85])); cc.root.updateMatrixWorld(true); cc.B.rHand.getWorldPosition(a); cc.B.lHand.getWorldPosition(b2); b.position.copy(a).add(b2).multiplyScalar(.5); b.position.y += .05; };
   } else if (tai === 'lụa') {
     c.play('mua', { restart: true });
@@ -1863,7 +1863,7 @@ function worldBar(pos, ms, label) {
     setTimeout(() => { d.remove(); o.parent?.remove(o); res(); }, ms);
   });
 }
-function propAt(obj, pos) { obj.position.set(pos.x, pos.y, pos.z); world.group.add(obj); return obj; }
+function propAt(obj, pos) { obj.scale.multiplyScalar(.6); obj.position.set(pos.x, pos.y, pos.z); world.group.add(obj); return obj; }
 function flyTo(obj, to, ms) { const from = obj.position.clone(); let t = 0; return new Promise(res => FX.push(dt => { t += dt * 1000 / ms; const k = Math.min(1, t); obj.position.lerpVectors(from, to, k); obj.position.y += Math.sin(k * Math.PI) * .25; if (k >= 1) { res(); return false; } })); }
 function dishLabel(obj, name) { const d = document.createElement('div'); d.className = 'cktip dish'; d.textContent = '🍽 ' + name; const lb = new CSS2DObject(d); lb.position.set(0, .16, 0); obj.add(lb); obj.userData.lb = lb; return lb; }
 // ảnh món ăn cho bí kíp
@@ -1911,10 +1911,10 @@ async function gameCook(ri) {
   let aborted = false; cookAbort = () => { aborted = true; done(); };
   const done = () => { cooking = false; cookAbort = null; kitchenCam(false); clearCookTarget(); ckBar.classList.add('hidden'); props.forEach(p => p.parent?.remove(p)); if (mgOn) mgClose(); if (selfC && taiOn) { taiEnd(selfC); socket.emit('emote', 'dung_cho'); } };
   const goStation = async (st, ring, label) => { drawCookBar(R, got, step); await new Promise(res => setCookTarget(ring, label, res)); if (aborted || world !== w) throw 'quit'; await cookWalk(st); if (aborted || world !== w) throw 'quit'; };
-  const board = w.board, serve = w.servePt, vIdx = VESSEL[R.vessel][2], vPos = { x: K.stove[vIdx].x, y: R.vessel === 'nồi' ? 1.3 : 1.1, z: w.steamAt[vIdx].z };
+  const board = w.board, serve = w.servePt, vIdx = VESSEL[R.vessel][2], vPos = { x: K.stove[vIdx].x, y: R.vessel === 'nồi' ? .8 : .68, z: w.steamAt[vIdx].z };
   try {
     // 1) kệ nguyên liệu
-    await goStation(K.shelf, { x: K.shelf.x + .35, y: 1.05, z: K.shelf.z, r: .45 }, 'Lấy nguyên liệu');
+    await goStation(K.shelf, { x: K.shelf.x + .45, y: .62, z: K.shelf.z, r: .35 }, 'Lấy nguyên liệu');
     const pool = Object.keys(NL_ICON).sort(() => Math.random() - .5);
     await new Promise((res, rej) => {
       const draw = () => { mgOpen(`<div class="mgt">🧺 Lấy đủ nguyên liệu cho <b>${esc(R.name)}</b> <small>(${got.size}/3${mistakes ? ` · lấy nhầm ${mistakes}` : ''})</small></div><div class="row wrap nlgrid">${pool.map(k => `<button data-n="${esc(k)}" ${got.has(k) ? 'class="gold" disabled' : ''}><span>${NL_ICON[k]}</span>${esc(k)}</button>`).join('')}<button data-x>✕</button></div>`);
@@ -1923,17 +1923,17 @@ async function gameCook(ri) {
       draw();
     });
     // 2) thớt: nguyên liệu hiện ra, thái từng thứ
-    step = 1; await goStation(K.board, { x: board.x, y: board.y + .02, z: board.z, r: .4 }, 'Sơ chế');
-    const items = R.nl.map((n, k) => propAt(makeIngredient(n), { x: board.x - .15 + k * .15, y: board.y, z: board.z + (k - 1) * .12 }));
+    step = 1; await goStation(K.board, { x: board.x, y: board.y + .02, z: board.z, r: .25 }, 'Sơ chế');
+    const items = R.nl.map((n, k) => propAt(makeIngredient(n), { x: board.x - .08 + k * .08, y: board.y, z: board.z + (k - 1) * .07 }));
     props.push(...items);
     for (let k = 0; k < 3; k++) { const n = R.nl[k], cut = R.cut.includes(n);
       taiStart(selfC, 'thai'); socket.emit('emote', 'tai:thai');
       await worldBar({ x: board.x, y: board.y, z: board.z }, cut ? 1600 : 900, cut ? `Thái ${n}` : `Rửa ${n}`);
       taiEnd(selfC); socket.emit('emote', 'dung_cho'); if (aborted) throw 'quit';
-      if (cut) { const p = items[k]; const c = makeIngredient(n, true); c.position.copy(p.position); p.parent?.remove(p); w.group.add(c); items[k] = c; props.push(c); }
+      if (cut) { const p = items[k]; const c = makeIngredient(n, true); c.scale.setScalar(.6); c.position.copy(p.position); p.parent?.remove(p); w.group.add(c); items[k] = c; props.push(c); }
     }
     // 3) bếp lò: cho vào nồi/chảo/xửng
-    step = 2; await goStation(K.stove[vIdx], { ...vPos, r: .42 }, `Cho vào ${R.vessel}`);
+    step = 2; await goStation(K.stove[vIdx], { ...vPos, r: .3 }, `Cho vào ${R.vessel}`);
     // nguyên liệu bay từ thớt vào nồi
     await Promise.all(items.map((p, k) => new Promise(r => setTimeout(() => flyTo(p, new THREE.Vector3(vPos.x, vPos.y - .1, vPos.z), 700).then(() => { p.visible = false; r(); }), k * 180))));
     step = 3; drawCookBar(R, got, step);
@@ -1951,7 +1951,7 @@ async function gameCook(ri) {
     });
     steamOn.on = false; taiEnd(selfC); socket.emit('emote', 'dung_cho');
     // 4) bàn dọn món: món hiện ra trong chén/dĩa
-    step = 4; await goStation(K.serve, { x: serve.x, y: serve.y + .02, z: serve.z, r: .35 }, `Bày ra ${R.dish}`);
+    step = 4; await goStation(K.serve, { x: serve.x, y: serve.y + .02, z: serve.z, r: .22 }, `Bày ra ${R.dish}`);
     await worldBar(serve, 1200, `Bày ra ${R.dish}`);
     const dish = propAt(makeDish(R.name), { x: serve.x, y: serve.y, z: serve.z }); props.push(dish); dishLabel(dish, R.name);
     burst(serve.x, serve.y + .15, serve.z, 40, .7, [0xffd77a, 0xffffff], 1.3, .3, .06);
