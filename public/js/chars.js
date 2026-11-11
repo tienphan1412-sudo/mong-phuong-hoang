@@ -110,7 +110,9 @@ export async function spawn(modelName) {
     if (male && !isHT && c.curName === 'dung_cho' && !c.pose) { root.updateMatrixWorld(true); maleStance(c); }
     if (c.pose) { root.updateMatrixWorld(true); POSES[c.pose](c, c.t); }
     if (c.post) { root.updateMatrixWorld(true); c.post(c, c.t); }
+    if (c.braid) c.braid(dt);
   };
+  if (isHT) c.braid = makeBraid(c);
   c.dispose = () => { mixer.stopAllAction(); root.parent && root.parent.remove(root); };
   c.play('dung_cho');
   return c;
@@ -122,4 +124,59 @@ export function seatPlacement(c) {
   c.B.hips.getWorldPosition(hp); c.B.kneeL.getWorldPosition(kl); c.B.kneeR.getWorldPosition(kr);
   const fwd = kl.add(kr).multiplyScalar(.5).sub(hp); fwd.y = 0; fwd.normalize();
   return { x: hp.x + fwd.x * .05, z: hp.z + fwd.z * .05, y: hp.y - .07, ry: Math.atan2(fwd.x, fwd.z) };
+}
+
+// ---------------- bím tóc dài sau lưng (Hoàng thượng) ----------------
+// chuỗi điểm có trọng lực, tính trong hệ toạ độ của nhân vật, không xuyên qua lưng
+const BRAID_MAT = new THREE.MeshStandardMaterial({ color: 0x17100c, roughness: .42, metalness: .05 });
+function makeBraid(c) {
+  const root = c.root, B = c.B, N = 14;
+  const lobe = new THREE.SphereGeometry(1, 10, 8);
+  const inst = new THREE.InstancedMesh(lobe, BRAID_MAT, N * 2); inst.frustumCulled = false; inst.castShadow = true;
+  const tassel = new THREE.Mesh(new THREE.ConeGeometry(1, 1, 10), BRAID_MAT);
+  const tie = new THREE.Mesh(new THREE.CylinderGeometry(1, 1, 1, 10), new THREE.MeshStandardMaterial({ color: 0x0c0806, roughness: .6 }));
+  root.add(inst, tassel, tie);
+  const inv = new THREE.Matrix4(), v = new THREE.Vector3(), w = new THREE.Vector3();
+  const loc = (bone, out) => { bone.getWorldPosition(out); return out.applyMatrix4(inv); };
+  let P = null, O = null, L = 1, seg = 0;
+  const head = new THREE.Vector3(), neck = new THREE.Vector3(), hips = new THREE.Vector3(), sp = new THREE.Vector3();
+  const m = new THREE.Matrix4(), q = new THREE.Quaternion(), up = new THREE.Vector3(0, 1, 0), dir = new THREE.Vector3(), sc = new THREE.Vector3();
+  return (dt) => {
+    root.updateMatrixWorld(true); inv.copy(root.matrixWorld).invert();
+    loc(B.head, head); loc(B.neck, neck); loc(B.hips, hips); loc(B.spine2, sp);
+    if (!P) { L = Math.max(.2, head.y - hips.y); seg = L * 1.45 / N; P = []; O = [];
+      for (let i = 0; i <= N; i++) { const p = new THREE.Vector3(head.x, head.y - L * .06 - i * seg, head.z - L * .2); P.push(p); O.push(p.clone()); } }
+    const anchor = new THREE.Vector3(head.x, head.y + L * .02, head.z - L * .15);
+    const back = L * .2; // độ dày lưng
+    P[0].copy(anchor); c._bt = (c._bt || 0) + dt;
+    const sway = Math.sin(c._bt * 1.3) * .06;
+    for (let i = 1; i <= N; i++) {
+      const p = P[i], a = P[i - 1];
+      // hướng rủ xuống, hơi đung đưa; mượt theo khung trước để có quán tính nhẹ
+      dir.set(sway * i / N, -1, -.05).normalize();
+      w.copy(a).addScaledVector(dir, seg);
+      const t = THREE.MathUtils.clamp((sp.y - w.y) / Math.max(.01, sp.y - hips.y), 0, 1);
+      const bz = THREE.MathUtils.lerp(sp.z, hips.z, t) - back;
+      if (w.z > bz) w.z = bz;
+      v.copy(w).sub(a).setLength(seg); w.copy(a).add(v);
+      p.lerp(w, Math.min(1, dt * 12)); v.copy(p).sub(a).setLength(seg); p.copy(a).add(v);
+    }
+    // vẽ: mỗi đoạn hai múi lệch trái phải như bím tết
+    const r = L * .05;
+    for (let i = 0; i < N; i++) {
+      const a = P[i], b = P[i + 1]; dir.copy(b).sub(a).normalize(); q.setFromUnitVectors(up, dir);
+      const taper = 1 - i / N * .35;
+      for (let k = 0; k < 2; k++) {
+        const side = (k === 0 ? 1 : -1) * (i % 2 ? 1 : -1);
+        v.copy(a).lerp(b, k ? .75 : .25); v.x += side * r * .18;
+        const tilt = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 0, 1), side * .25);
+        sc.set(r * .68 * taper, seg * .62, r * .6 * taper);
+        m.compose(v, q.clone().multiply(tilt), sc); inst.setMatrixAt(i * 2 + k, m);
+      }
+    }
+    inst.instanceMatrix.needsUpdate = true;
+    const e = P[N], e1 = P[N - 1]; dir.copy(e).sub(e1).normalize(); q.setFromUnitVectors(new THREE.Vector3(0, -1, 0), dir);
+    tassel.position.copy(e).addScaledVector(dir, L * .035); tassel.quaternion.copy(q); tassel.scale.set(r * .8, L * .08, r * .8);
+    tie.position.copy(e).addScaledVector(dir, -L * .005); tie.quaternion.copy(q); tie.scale.set(r * .55, L * .02, r * .55);
+  };
 }
