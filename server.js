@@ -74,6 +74,20 @@ function regen(p) {
   const step = C.TURN_REGEN_MIN * 60e3, k = Math.floor((now() - p.turnAt) / step);
   if (k > 0) { p.turns = Math.min(C.TURN_CAP, p.turns + k); p.turnAt += k * step; if (p.turns >= C.TURN_CAP) p.turnAt = now(); }
 }
+// ---------------- NPC có trí nhớ ----------------
+const NPCS = { thaihau: 'Thái hậu', mama: 'Quế ma ma', thaiy: 'Thái y', tonggiam: 'Tổng quản Lý Đức Toàn' };
+function rel(p, n) { p.rel = p.rel || {}; return p.rel[n] || 0; }
+function relAdd(p, n, d, memo) {
+  p.rel = p.rel || {}; p.rel[n] = Math.max(-100, Math.min(100, (p.rel[n] || 0) + d));
+  if (memo) { p.relLog = p.relLog || {}; const L = (p.relLog[n] = p.relLog[n] || []); L.unshift({ t: now(), d, memo }); L.length = Math.min(L.length, 4); }
+}
+const caseHoursFor = (v, h) => h + (rel(v, 'mama') >= 30 ? 6 : rel(v, 'mama') <= -30 ? -6 : 0);
+// tỷ muội
+const GROUP_MAX = 4;
+const grp = p => p.sis && DB.state.groups?.[p.sis];
+const sisters = (a, b) => a.sis && a.sis === b.sis;
+function groupView(g) { if (!g) return null; return { id: g.id, name: g.name, fund: g.fund, goal: g.goal, members: g.members.map(id => { const q = P(id); return q && { id, name: q.name, rankName: C.RANKS[q.rank].name, online: online.has(id), loc: q.loc, lanh: !!q.lanh, camTuc: (q.camTucUntil || 0) > now() }; }).filter(Boolean) }; }
+function pushGroup(g) { if (!g) return; for (const id of g.members) { const q = P(id); if (q) push(q); } }
 function freshDay(p) {
   const k = dayKey();
   if (p.day === k) return;
@@ -83,7 +97,7 @@ function freshDay(p) {
   p.attacks = 0; p.targeted = 0;
   p.tasks = { thinhan: false, luyen: false, dotin: false };
   p.taskBonus = false;
-  p.lanhToday = false; p.samToday = false; p.phephiToday = false;
+  p.lanhToday = false; p.samToday = false; p.phephiToday = false; p.fishN = 0; p.relDay = {}; p.cauTinhDay = null; p.thQ = null;
   p.silver += 20 + p.rank * 15;
 }
 function allowedOutfits(p) {
@@ -102,6 +116,7 @@ function selfView(p) {
     stats: p.stats, tasks: p.tasks, thinhAn: p.thinhAn, waiting: p.waiting || false, lanh: p.lanh || null,
     outfits: allowedOutfits(p), decor: p.decor || [], hasPalace: p.rank >= C.PALACE_RANK, cases: open,
     protectedUntil: p.protectUntil || 0, admin: !!p.admin, canFight: !p.lanh && p.rank >= C.FIGHT_RANK,
+    rel: { thaihau: rel(p, 'thaihau'), mama: rel(p, 'mama'), thaiy: rel(p, 'thaiy'), tonggiam: rel(p, 'tonggiam') }, goldFish: p.goldFish || 0, fishN: p.fishN || 0, group: groupView(grp(p)), relDay: p.relDay || {},
     camTuc: (p.camTucUntil || 0) > now() ? p.camTucUntil : 0, loyal: p.loyal ?? 50, sick: !!p.sick,
     attacksLeft: C.ATTACK_PER_DAY - (p.attacks || 0), latThe: (p.tamCungUntil || 0) > now(),
     htKnown: htKnownView(p), decorOwned: p.decorOwned || [], huong: !!p.huong, feast: feastView(p), htTalked: p.htTalked === p.tamCungUntil && !!p.tamCungUntil,
@@ -197,12 +212,12 @@ function createCase(victim, culprit /* player or null for NPC */, opts = {}) {
     id, victim: victim.id, victimName: title(victim), culprit: culpritEntry.id, culpritName: culpritEntry.name,
     method: method.id, methodName: method.name, crime: method.crime,
     suspects, found: [], blurred: opts.blur ? pick(['gio', 'cung', 'dau']) : null, witness: null,
-    status: 'open', created: now(), hours: opts.hours ?? C.CASE_HOURS, deadline: online.has(victim.id) ? now() + (opts.hours ?? C.CASE_HOURS) * 3600e3 : null, npc: !culprit,
+    status: 'open', created: now(), hours: opts.hours ?? C.CASE_HOURS, deadline: online.has(victim.id) ? now() + caseHoursFor(victim, opts.hours ?? C.CASE_HOURS) * 3600e3 : null, npc: !culprit,
   };
   DB.state.cases[id] = c;
   news(`Ma ma khám xét phòng ${victim.name} và tìm thấy ${method.name}. ${victim.name} bị gọi lên Từ Ninh cung.`, 'an');
   const s = sockOf(victim.id);
-  if (s) s.emit('cutscene', { type: 'phatgiac', caseId: id, method: method.id, methodName: method.name, crime: method.crime, hours: opts.hours ?? C.CASE_HOURS });
+  if (s) s.emit('cutscene', { type: 'phatgiac', caseId: id, method: method.id, methodName: method.name, crime: method.crime, hours: caseHoursFor(victim, opts.hours ?? C.CASE_HOURS), mama: rel(victim, 'mama') });
   push(victim); save();
   return c;
 }
@@ -266,10 +281,12 @@ function caseOp(p, data) {
     const freeMuu = p.path === 'muuke' && !c.muuFree;
     if (!freeMuu) {
       if (p.turns < clue.turn) return toast(p, 'Hết lượt hôm nay.', 'bad');
-      if (p.silver < clue.cost) return toast(p, 'Không đủ bạc.', 'bad');
-      p.turns -= clue.turn; p.silver -= clue.cost;
+      let cost = clue.cost; if (data.kind === 'thaiy' && rel(p, 'thaiy') >= 30) cost = Math.round(cost / 2); if (data.kind === 'so' && rel(p, 'tonggiam') >= 30) cost = 0;
+      if (p.silver < cost) return toast(p, 'Không đủ bạc.', 'bad');
+      p.turns -= clue.turn; p.silver -= cost;
     } else c.muuFree = true;
     revealClue(c, data.kind, p);
+    if (data.kind === 'thaiy') relAdd(p, 'thaiy', 3, 'nhờ thần kiểm nghiệm tang vật'); if (data.kind === 'so') relAdd(p, 'tonggiam', 3, 'nhờ nô tài tra sổ quà');
     toast(p, freeMuu ? 'Nhờ mưu kế, manh mối này không tốn gì.' : 'Đã có thêm manh mối.', 'good');
   } else if (op === 'witness') {
     if (c.witness || c.witnessReq) return toast(p, 'Đã nhờ người làm chứng rồi.');
@@ -301,14 +318,16 @@ function caseOp(p, data) {
       p.sung += 10;
       if (isReopen) phucVi(p, p.lanh.from, 'sau khi kêu oan thành công');
       else { addPts(p, 20); }
-      if (culprit) { culprit.offenses = (culprit.offenses || 0) + 1; if (culprit.rank >= C.FIGHT_RANK + 1) demote(culprit, 2, 'vu oan ' + p.name); else sendToLanhCung(culprit, 'vu oan ' + p.name, null); }
+      if (culprit) { relAdd(culprit, 'thaihau', -15, 'bị lật án vì vu oan ' + p.name); relAdd(culprit, 'mama', -15, 'giấu tang vật hại người'); culprit.offenses = (culprit.offenses || 0) + 1; if (culprit.rank >= C.FIGHT_RANK + 1) demote(culprit, 2, 'vu oan ' + p.name); else sendToLanhCung(culprit, 'vu oan ' + p.name, null); }
       const sk = sockOf(p.id); if (sk) sk.emit('cutscene', { type: 'latan', name: p.name, culprit: s.name });
     } else {
       if (isReopen) { toast(p, `Kêu oan sai người. ${s.name} vô can.`, 'bad'); c.reopenFail = (c.reopenFail || 0) + 1; }
       else {
         closeCase(c, 'vucao', `Chỉ sai người: ${s.name} vô can. Bị phạt thêm tội vu cáo.`);
         news(`${p.name} tố sai ${s.name} trong vụ ${c.methodName}, bị phạt thêm tội vu cáo.`, 'phat');
-        punishVictim(c, 1, 'vu cáo ' + s.name);
+        relAdd(p, 'thaihau', -10, 'tố sai ' + s.name);
+        if (rel(p, 'thaihau') >= 30 && now() - (p.pardonAt || 0) > 7 * 864e5) { p.pardonAt = now(); news(`Thái hậu nể tình ${p.name} hiếu thuận, tha tội vu cáo lần này.`, 'an'); }
+        else punishVictim(c, 1, 'vu cáo ' + s.name);
       }
     }
   }
@@ -379,6 +398,28 @@ function latThe(when = 'Đêm nay') {
   save();
   return picked[0];
 }
+// ---------------- thỉnh an: Thái hậu trọng hiếu đạo, tiết kiệm, mộ Phật; ghét xa hoa, đố kỵ ----------------
+const TH_Q = [
+  { q: 'Dạo này con đọc sách gì?', opts: [{ t: 'Thần thiếp chép Kinh Kim Cang cầu phúc cho Thái hậu.', s: 4, r: 'Con có lòng hiếu thảo, ai gia rất vui.' }, { t: 'Thần thiếp đọc thơ Lý Bạch cho khuây khỏa.', s: 1, r: 'Thơ phú cũng tốt, nhưng đừng sa đà.' }, { t: 'Thần thiếp bận may áo mới cho kịp yến tiệc.', s: -2, r: 'Hừ, trong cung không thiếu áo đẹp, thiếu người biết giữ mình.' }] },
+  { q: 'Nghe nói Nội vụ phủ chi tiêu nhiều quá…', opts: [{ t: 'Thần thiếp xin giảm phần bổng lộc của mình.', s: 4, r: 'Biết tiết kiệm, đúng là phúc của hậu cung.' }, { t: 'Thần thiếp không rõ chuyện này ạ.', s: 0, r: 'Ừ, con cứ lo bổn phận là được.' }, { t: 'Chắc tại các cung khác xa hoa quá.', s: -2, r: 'Đừng đem chuyện người khác ra nói trước mặt ai gia.' }] },
+  { q: 'Hoàng thượng dạo này hay lui tới cung nào?', opts: [{ t: 'Thần thiếp chỉ mong Hoàng thượng khỏe mạnh, không dám dò xét.', s: 4, r: 'Biết giữ phận, tốt lắm.' }, { t: 'Nghe nói cung Tần phi được sủng ái lắm.', s: -2, r: 'Lòng đố kỵ là đại kỵ trong cung, nhớ lấy.' }, { t: 'Thần thiếp không để ý ạ.', s: 1, r: 'Ừ.' }] },
+  { q: 'Ai gia hơi đau đầu mấy hôm nay.', opts: [{ t: 'Thần thiếp xin hầu hạ thuốc thang bên cạnh Thái hậu.', s: 4, r: 'Con ngoan lắm. Ai gia thấy đỡ hơn rồi.' }, { t: 'Để thần thiếp gọi thái y tới ngay.', s: 2, r: 'Ừ, cũng được.' }, { t: 'Chắc tại trời nóng thôi ạ.', s: -1, r: '…' }] },
+  { q: 'Mùng một này ai gia lên chùa dâng hương, con có muốn theo không?', opts: [{ t: 'Thần thiếp xin được theo hầu, ăn chay ba ngày trước.', s: 4, r: 'Thành tâm như vậy, Phật tổ sẽ phù hộ con.' }, { t: 'Thần thiếp xin theo ạ.', s: 2, r: 'Được.' }, { t: 'Hôm đó thần thiếp lỡ hẹn tập đàn mất rồi.', s: -2, r: 'Đàn sáo quan trọng hơn lễ Phật sao?' }] },
+  { q: 'Con thấy hậu cung bây giờ thế nào?', opts: [{ t: 'Nhờ Thái hậu dạy dỗ, các tỷ muội hòa thuận.', s: 4, r: 'Phải, hòa thuận là quý nhất.' }, { t: 'Có vài người hay gây chuyện thị phi.', s: -1, r: 'Ai gia tự có chừng mực, con đừng xen vào.' }, { t: 'Thần thiếp mới vào, chưa dám đánh giá.', s: 1, r: 'Biết khiêm tốn.' }] },
+];
+const INVITES = {};
+function npcLine(p, n) {
+  const r = rel(p, n), log = (p.relLog || {})[n] || [], last = log[0];
+  const mem = last ? (last.d > 0 ? `Lần trước ${n === 'thaihau' ? 'con' : 'nương nương'} ${last.memo}, ${n === 'thaihau' ? 'ai gia' : n === 'tonggiam' ? 'nô tài' : n === 'thaiy' ? 'thần' : 'lão nô'} vẫn nhớ.` : `Chuyện ${last.memo} hôm trước… ${n === 'thaihau' ? 'ai gia' : 'lão nô'} chưa quên đâu.`) : '';
+  const L = {
+    thaihau: r >= 30 ? 'Con đến rồi à, lại đây ngồi gần ai gia.' : r <= -30 ? 'Có chuyện gì thì nói nhanh, ai gia mệt.' : 'Ừ, con đến thỉnh an đấy à.',
+    mama: r >= 30 ? 'Nương nương cứ yên tâm, có chuyện gì lão nô sẽ nương tay.' : r <= -30 ? 'Hừ, lão nô để mắt tới nương nương đấy.' : 'Quy củ trong cung nghiêm ngặt, nương nương nhớ giữ mình.',
+    thaiy: r >= 30 ? 'Nương nương cần gì cứ sai bảo, thuốc thử thần lấy nửa giá thôi.' : r <= -30 ? 'Thần đang bận, nương nương đợi chút.' : 'Nương nương khí sắc tốt lắm.',
+    tonggiam: r >= 30 ? 'Chủ tử muốn tra sổ quà cứ nói, nô tài không lấy tiền.' : r <= -30 ? 'Nô tài bận hầu Hoàng thượng.' : 'Chủ tử có việc gì sai bảo ạ?',
+  }[n];
+  return (mem ? mem + ' ' : '') + L;
+}
+
 // ---------------- yến tiệc ----------------
 function feastView() {
   const f = DB.state.feast; if (!f || f.done || now() > f.end + 5000) return null;
@@ -391,7 +432,9 @@ function startFeast(min = C.FEAST_MIN, venue = 'out') {
 }
 function endFeast() {
   const f = DB.state.feast; if (!f || f.done) return; f.done = true; const h = ht();
-  const list = Object.entries(f.entries).map(([id, e]) => ({ id, ...e, score: e.q * 100 + (e.tai === C.HT.tai[h.tai] ? 25 : 0) + (e.color ? 15 : 0) + Math.random() * 10 }));
+  const ids = Object.keys(f.entries); const duet = id => { const q = P(id); return q && q.sis && ids.some(x => x !== id && P(x)?.sis === q.sis); };
+  const list = Object.entries(f.entries).map(([id, e]) => ({ id, ...e, duet: duet(id), score: e.q * 100 + (e.tai === C.HT.tai[h.tai] ? 25 : 0) + (e.color ? 15 : 0) + (duet(id) ? 15 : 0) + Math.random() * 10 }));
+  const gs = new Set(list.filter(e => e.duet).map(e => P(e.id).sis)); for (const gid of gs) { const g = DB.state.groups[gid]; if (g) news(`🎶 Tỷ muội "${g.name}" cùng dâng tiết mục hợp tấu, Hoàng thượng vỗ tay khen hay.`); }
   list.sort((a, b) => b.score - a.score);
   if (list.length) {
     const w = P(list[0].id); if (w) { w.sung += 12; w.silver += 80; w.turns += 2; addPts(w, 20); push(w); }
@@ -471,8 +514,8 @@ io.on('connection', sock => {
     sock.emit('feast', feastView());
     sock.emit('schedule', { latThe: C.LAT_THE_SLOTS, feast: C.FEAST_SLOTS, tz: C.TZ_OFFSET_H ?? 7, lead: C.NOTICE_LEAD_MIN });
     for (const c of Object.values(DB.state.cases)) if (c.victim === p.id && c.status === 'open' && !c.deadline) {
-      c.deadline = now() + c.hours * 3600e3;
-      setTimeout(() => sock.emit('cutscene', { type: 'phatgiac', caseId: c.id, method: c.method, methodName: c.methodName, crime: c.crime, hours: c.hours }), 2500);
+      c.deadline = now() + caseHoursFor(p, c.hours) * 3600e3;
+      setTimeout(() => sock.emit('cutscene', { type: 'phatgiac', caseId: c.id, method: c.method, methodName: c.methodName, crime: c.crime, hours: caseHoursFor(p, c.hours), mama: rel(p, 'mama') }), 2500);
     }
     push(p);
     if (p.sick) { p.sick = false; news(`${p.name} đã khỏi bệnh, trở lại hầu hạ.`); }
@@ -534,12 +577,14 @@ io.on('connection', sock => {
   sock.on('emote', a => { if (me) { me.anim = String(a).slice(0, 20); sock.to(roomOf(me)).emit('pmove', { id: me.id, x: me.x, z: me.z, ry: me.ry, anim: me.anim, once: true }); } });
   sock.on('chat', t => {
     if (!me) return;
+    const d_ch = t && typeof t === 'object' ? t.ch : null; if (t && typeof t === 'object') t = t.text;
     let text = String(t || '').trim().slice(0, 200); if (!text) return;
     if (text.startsWith('/') && me.admin) return admin(me, text);
     // xưng hô cung đình cho vui
     const self = me.rank >= C.FIGHT_RANK ? 'bổn cung' : 'thần thiếp';
     text = text.replace(/(^|[\s,.!?;:"'(])(tui|tôi|tao)(?=$|[\s,.!?;:"')])/giu, (m, a) => a + self)
                .replace(/(^|[\s,.!?;:"'(])(bà|mày)(?=$|[\s,.!?;:"')])/giu, (m, a) => a + 'tỷ tỷ');
+    if (d_ch === 'tm') { const g = grp(me); if (!g) return toast(me, 'Chưa kết nghĩa tỷ muội.'); for (const id of g.members) { const sk = sockOf(id); if (sk) sk.emit('chat', { id: me.id, name: title(me), text, ch: 'tm' }); } return; }
     io.to(roomOf(me)).emit('chat', { id: me.id, name: title(me), text });
   });
 
@@ -548,7 +593,7 @@ io.on('connection', sock => {
     freshDay(me);
     const a = d.type;
     if (me.lanh && !['lanh', 'tangqua', 'phephi'].includes(a)) return toast(me, 'Ở lãnh cung chỉ có thể làm nhiệm vụ lãnh cung.', 'bad');
-    if ((me.camTucUntil || 0) > now() && !['luyen', 'thuongcn', 'shop'].includes(a)) return toast(me, 'Đang bị cấm túc: chỉ được luyện tài nghệ trong phòng.', 'bad');
+    if ((me.camTucUntil || 0) > now() && !['luyen', 'thuongcn', 'shop', 'cauca'].includes(a)) return toast(me, 'Đang bị cấm túc: chỉ được luyện tài nghệ trong phòng.', 'bad');
     regen(me);
     const useTurn = (n, silver = 0) => {
       if (me.turns < n) { toast(me, 'Hết lượt hôm nay. Mai quay lại nhé.', 'bad'); return false; }
@@ -562,10 +607,12 @@ io.on('connection', sock => {
     if (a === 'thinhan') {
       if (me.loc !== 'tuninh') return toast(me, 'Phải đến Từ Ninh cung mới thỉnh an được.');
       if (me.thinhAn) return toast(me, 'Hôm nay đã thỉnh an rồi.');
-      me.thinhAn = true; const h = C.THINH_AN.haiLong * (me.path === 'duchanh' ? 2 : 1) + Math.floor(me.stats.duc / 10);
+      const Q = TH_Q[me.thQ ?? 0], o = Q && Q.opts[+d.ans]; const bonus = o ? o.s : 0;
+      relAdd(me, 'thaihau', 2 + bonus, bonus >= 3 ? 'trả lời khéo khi thỉnh an' : bonus < 0 ? 'nói lời khiến ai gia phật ý' : null);
+      me.thinhAn = true; const h = Math.max(1, C.THINH_AN.haiLong * (me.path === 'duchanh' ? 2 : 1) + Math.floor(me.stats.duc / 10) + bonus + (rel(me, 'thaihau') <= -30 ? -2 : 0));
       me.haiLong = Math.min(100, me.haiLong + h); taskDone('thinhan'); addPts(me, C.THINH_AN.pts);
       toast(me, `Thái hậu hài lòng (+${h}). Công trạng +${C.THINH_AN.pts}.`, 'good');
-      const s = sockOf(me.id); if (s) s.emit('npcSay', { who: 'Thái hậu', text: pick(['Đứng lên đi. Hậu cung yên ổn là nhờ các con biết giữ bổn phận.', 'Ai gia nghe nói dạo này con chăm chỉ lắm. Tốt.', 'Trong cung nhiều chuyện, con nên cẩn thận lời ăn tiếng nói.']) });
+      const s = sockOf(me.id); if (s) s.emit('npcSay', { who: 'Thái hậu', text: o ? o.r : 'Đứng lên đi.' });
     } else if (a === 'luyen') {
       if (!useTurn(1)) return;
       const q = Math.max(0, Math.min(1, +d.q || 0)), tai = C.HT.tai.includes(d.tai) ? d.tai : 'múa';
@@ -614,6 +661,7 @@ io.on('connection', sock => {
       if (me.rank < C.FIGHT_RANK) return toast(me, `Từ ${C.RANKS[C.FIGHT_RANK].name} mới được ra tay.`, 'bad');
       const t = P(d.target);
       if (!t || t.id === me.id || t.lanh || t.rank < C.FIGHT_RANK) return toast(me, `Chỉ nhắm được người từ ${C.RANKS[C.FIGHT_RANK].name} trở lên.`, 'bad');
+      if (sisters(me, t)) return toast(me, 'Đã kết nghĩa tỷ muội, sao nỡ ra tay.', 'bad');
       if ((me.attacks || 0) >= C.ATTACK_PER_DAY) return toast(me, 'Hôm nay đã ra tay đủ số lần.', 'bad');
       if ((t.targeted || 0) >= C.TARGETED_PER_DAY || (t.protectUntil || 0) > now()) return toast(me, 'Người này đang được bảo hộ, chưa thể ra tay.', 'bad');
       if (Object.values(DB.state.cases).some(c => c.victim === t.id && c.status === 'open')) return toast(me, 'Người này đang dính một vụ án khác.', 'bad');
@@ -635,6 +683,19 @@ io.on('connection', sock => {
         if (me.silver < C.DECOR_PRICE[it]) return toast(me, 'Không đủ bạc.', 'bad');
         me.silver -= C.DECOR_PRICE[it]; me.decorOwned.push(it); toast(me, 'Nội vụ phủ đã đưa đồ tới phòng.', 'good');
       } else return;
+    } else if (a === 'cauca') {
+      if (me.loc !== 'hoavien') return toast(me, 'Ra hồ ở Ngự hoa viên mới câu cá được.');
+      if (now() - (me.fishAt || 0) < 2500) return; me.fishAt = now();
+      me.fishN = (me.fishN || 0) + 1;
+      if (!(+d.q >= .5)) return toast(me, 'Cá cắn câu rồi sổng mất…');
+      const r = Math.random(); const F = r < .05 ? ['Cá chép vàng', 0, 'gold'] : r < .2 ? ['Cá chép đỏ', 15] : r < .55 ? ['Cá diếc', 8] : ['Cá mè', 5];
+      if (F[2] === 'gold') { me.goldFish = (me.goldFish || 0) + 1; news(`🐟 ${me.name} câu được cá chép vàng hiếm ở Ngự hoa viên!`); toast(me, 'Cá chép vàng! Điềm lành, mang dâng Hoàng thượng ở Dưỡng Tâm điện.', 'good'); }
+      else { const pay = me.fishN <= C.FISH_PAID ? F[1] : 0; me.silver += pay; toast(me, `Câu được ${F[0]}${pay ? `, bán cho ngự thiện phòng được ${pay} bạc` : ' (hôm nay đã bán đủ, thả lại hồ)'}.`, 'good'); }
+      const s = sockOf(me.id); if (s) s.emit('fishGot', { name: F[0], gold: F[2] === 'gold' });
+    } else if (a === 'dangca') {
+      if (me.loc !== 'duongtam') return toast(me, 'Phải đến Dưỡng Tâm điện.'); if (!(me.goldFish > 0)) return toast(me, 'Chưa có cá chép vàng.');
+      me.goldFish--; me.sung += 10; addPts(me, 10); news(`${me.name} dâng cá chép vàng, Hoàng thượng khen là điềm lành.`, 'an');
+      const s = sockOf(me.id); if (s) s.emit('npcSay', { who: 'Hoàng thượng', text: 'Cá chép vàng! Điềm lành cho xã tắc, nàng có lòng lắm.' });
     } else if (a === 'thuongcn') {
       if (me.loc !== 'phong') return toast(me, 'Về phòng riêng mới ban thưởng được.');
       if (me.cnDay === dayKey()) return toast(me, 'Hôm nay đã ban thưởng rồi.');
@@ -681,6 +742,66 @@ io.on('connection', sock => {
   });
   sock.on('case', d => { if (me) caseOp(me, d); });
   sock.on('refresh', () => { if (me) push(me); });
+  sock.on('thQ', () => { if (!me) return; if (me.thQ == null) me.thQ = rnd(TH_Q.length); const Q = TH_Q[me.thQ]; sock.emit('thQ', { q: Q.q, opts: Q.opts.map(o => o.t) }); });
+  sock.on('npc', d => {
+    if (!me || !d || !NPCS[d.npc]) return; freshDay(me); const n = d.npc; me.relDay = me.relDay || {};
+    if (d.op === 'talk') {
+      const k = n + ':talk'; const first = !me.relDay[k]; if (first) { me.relDay[k] = 1; relAdd(me, n, 3); }
+      sock.emit('npcTalk', { npc: n, rel: rel(me, n), line: npcLine(me, n), first });
+    } else if (d.op === 'gift') {
+      const k = n + ':gift'; if (me.relDay[k]) return toast(me, 'Hôm nay đã biếu quà rồi.'); if (me.silver < 30) return toast(me, 'Không đủ 30 bạc.', 'bad');
+      me.silver -= 30; me.relDay[k] = 1; relAdd(me, n, 10, 'biếu ' + pick(['trà Long Tỉnh', 'một xấp lụa', 'bánh hạnh nhân', 'một hộp yến sào']));
+      sock.emit('npcTalk', { npc: n, rel: rel(me, n), line: pick(['Nương nương có lòng quá, lão nô xin nhận.', 'Đa tạ nương nương, ân tình này xin ghi nhớ.', 'Món quà thật hợp ý.']), gift: true });
+    }
+    save(); push(me);
+  });
+  sock.on('sis', d => {
+    if (!me || !d) return; freshDay(me); const op = d.op;
+    if (op === 'invite') {
+      const t = P(d.who); if (!t || t.id === me.id) return;
+      if (sisters(me, t)) return toast(me, 'Đã là tỷ muội rồi.');
+      if (t.sis) return toast(me, `${t.name} đã kết nghĩa với nhóm khác.`, 'bad');
+      const g = grp(me); if (g && g.members.length >= GROUP_MAX) return toast(me, `Nhóm tỷ muội tối đa ${GROUP_MAX} người.`, 'bad');
+      const sk = sockOf(t.id); if (!sk) return toast(me, 'Người này đang offline.', 'bad');
+      INVITES[t.id] = { from: me.id, name: g ? g.name : String(d.name || '').trim().slice(0, 20) || 'Kim Lan', at: now() };
+      sk.emit('sisInvite', { from: me.id, fromName: title(me), name: INVITES[t.id].name, members: g ? g.members.map(id => P(id)?.name).filter(Boolean) : [me.name] });
+      toast(me, `Đã gửi lời kết nghĩa tới ${t.name}.`);
+    } else if (op === 'accept' || op === 'decline') {
+      const inv = INVITES[me.id]; delete INVITES[me.id]; if (!inv) return; const f = P(inv.from); if (!f) return;
+      if (op === 'decline') { toast(f, `${me.name} khéo léo từ chối lời kết nghĩa.`); return; }
+      if (me.sis) return toast(me, 'Đã ở nhóm khác.');
+      let g = grp(f);
+      if (!g) { DB.state.groups = DB.state.groups || {}; const id = 'g' + now().toString(36); g = DB.state.groups[id] = { id, name: inv.name, members: [f.id], fund: 0, goal: 300, created: now() }; f.sis = id; }
+      if (g.members.length >= GROUP_MAX) return toast(me, 'Nhóm đã đủ người.', 'bad');
+      g.members.push(me.id); me.sis = g.id;
+      news(`🌸 ${g.members.map(id => P(id)?.name).join(', ')} thắp hương kết nghĩa tỷ muội: "${g.name}".`);
+      pushGroup(g); save();
+    } else if (op === 'leave') {
+      const g = grp(me); if (!g) return; g.members = g.members.filter(x => x !== me.id); me.sis = null;
+      news(`✂️ ${me.name} cắt áo đoạn nghĩa, rời nhóm tỷ muội "${g.name}".`);
+      if (g.members.length < 2) { for (const id of g.members) { const q = P(id); if (q) { q.sis = null; push(q); } } delete DB.state.groups[g.id]; } else pushGroup(g);
+      push(me); save();
+    } else if (op === 'donate') {
+      const g = grp(me); if (!g) return; const amt = Math.max(10, Math.min(500, Math.floor(+d.amount || 0)));
+      if (me.silver < amt) return toast(me, 'Không đủ bạc.', 'bad'); me.silver -= amt; g.fund += amt;
+      if (g.fund >= g.goal) {
+        g.fund -= g.goal; g.goal = Math.min(1000, g.goal + 100);
+        for (const id of g.members) { const q = P(id); if (q) { q.haiLong = Math.min(100, q.haiLong + 10); addPts(q, 30); relAdd(q, 'thaihau', 8, 'cùng tỷ muội may áo dâng ai gia'); toast(q, '🧵 Áo gấm tỷ muội may xong, dâng Thái hậu: hài lòng +10, công trạng +30.', 'good'); } }
+        news(`🧵 Tỷ muội "${g.name}" góp lụa may áo gấm dâng Thái hậu. Thái hậu khen ngợi cả nhóm.`, 'an');
+      } else toast(me, `Đã góp ${amt} bạc. Quỹ may áo: ${g.fund}/${g.goal}.`, 'good');
+      pushGroup(g); save();
+    } else if (op === 'cautinh') {
+      const t = P(d.who); if (!t || !sisters(me, t)) return;
+      if (me.cauTinhDay === dayKey()) return toast(me, 'Hôm nay đã cầu tình rồi.');
+      if (me.loc !== 'tuninh') return toast(me, 'Phải đến Từ Ninh cung cầu tình với Thái hậu.');
+      if (me.turns < 1 || me.silver < 50) return toast(me, 'Cần 1 lượt và 50 bạc.', 'bad');
+      if (t.lanh) { me.turns--; me.silver -= 50; me.cauTinhDay = dayKey(); t.lanh.tasks++; news(`${me.name} quỳ ở Từ Ninh cung cầu tình cho tỷ muội ${t.name}.`);
+        toast(t, `Tỷ muội ${me.name} đã cầu tình cho bổn cung. Tiến độ phục vị ${t.lanh.tasks}/3.`, 'good'); if (t.lanh.tasks >= 3) phucVi(t, 2, 'nhờ tỷ muội cầu tình'); }
+      else if ((t.camTucUntil || 0) > now()) { me.turns--; me.silver -= 50; me.cauTinhDay = dayKey(); t.camTucUntil -= 8 * 3600e3; toast(t, `Tỷ muội ${me.name} cầu tình, Thái hậu giảm 8 giờ cấm túc.`, 'good'); }
+      else return toast(me, 'Tỷ muội không bị phạt, không cần cầu tình.');
+      push(t); pushGroup(grp(me)); save();
+    }
+  });
   sock.on('htTalkQ', () => { if (me) sock.emit('htTalkQ', { mood: C.HT.mood[ht().mood], qs: HT_TALK.map(q => ({ q: q.q, opts: q.opts.map(o => o.t) })) }); });
   sock.on('witnessAnswer', d => {
     if (!me || !d) return; const c = DB.state.cases[d.caseId]; if (!c || !c.witnessReq || c.witnessReq.who !== me.id) return;
