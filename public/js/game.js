@@ -270,7 +270,12 @@ function addNews(n) { const d = document.createElement('div'); d.className = 'n'
 $('newsbtn').onclick = () => $('news').classList.toggle('hidden');
 socket.on('toast', t => toast(t.text, t.kind));
 socket.on('npcSay', d => { const n = world?.npcs.find(x => x.name === d.who); if (d.long) { say(n?.model || 'aongu', d.who, esc(d.text), [['Đa tạ', 0, 'gold']]).then(dlgClose); return; } if (n?.label) bubble(n.label, d.text); else toast(`${d.who}: ${d.text}`); });
-function toast(text, kind = 'info') { const d = document.createElement('div'); d.className = 'toast ' + kind; d.textContent = text; $('toasts').appendChild(d); setTimeout(() => d.remove(), /🎁|🏮|lật thẻ/.test(text) ? 12000 : 5200); }
+function toast(text, kind = 'info') {
+  const d = document.createElement('div'); d.className = 'toast ' + kind; d.textContent = text;
+  const long = /🎁|🏮|lật thẻ/.test(text);
+  if (long) { d.classList.add('sticky'); const x = document.createElement('button'); x.className = 'tx'; x.textContent = '✕'; x.title = 'Đóng'; x.onclick = () => d.remove(); d.appendChild(x); }
+  $('toasts').appendChild(d); setTimeout(() => d.remove(), long ? 5 * 60e3 : 5200);
+}
 
 // ---------------- HUD, bản đồ, hành động ----------------
 function renderHud() {
@@ -1268,7 +1273,7 @@ async function runDonCung(d) {
 // =====================================================================
 // THÔNG BÁO SỰ KIỆN SẮP DIỄN RA (hiện trước 15 phút, mất khi tới giờ)
 // =====================================================================
-let sched = null; const noticeEl = document.createElement('div'); noticeEl.id = 'notice'; noticeEl.className = 'hidden'; document.body.appendChild(noticeEl);
+let sched = null; const noticeEl = document.createElement('div'); noticeEl.id = 'notice'; noticeEl.className = 'hidden'; $('toasts').prepend(noticeEl);
 const announced = new Set();
 socket.on('schedule', d => { sched = d; tickNotice(); });
 function tickNotice() {
