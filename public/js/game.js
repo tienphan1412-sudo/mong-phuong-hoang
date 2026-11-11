@@ -57,7 +57,7 @@ function bubble(label, text) {
 }
 
 function clearWorld() {
-  feastHT = null;
+  feastHT = null; FX.length = 0; showChars.forEach(c => c.dispose?.()); showChars.length = 0; reactHide();
   if (!world) return;
   scene.remove(world.group);
   for (const n of world.npcs) if (n.c) { n.c.dispose(); }
@@ -135,7 +135,7 @@ function removeOther(id) { const o = others.get(id); if (!o) return; if (o.c) { 
 // ---------------- di chuyển ----------------
 const ray = new THREE.Raycaster(), ndc = new THREE.Vector2();
 let drag = null;
-canvas.addEventListener('pointerdown', e => { drag = { x: e.clientX, y: e.clientY, yaw: camYaw, moved: false }; });
+canvas.addEventListener('pointerdown', e => { specCam = null; drag = { x: e.clientX, y: e.clientY, yaw: camYaw, moved: false }; });
 addEventListener('pointermove', e => { if (!drag) return; const dx = e.clientX - drag.x; if (Math.abs(dx) > 4) drag.moved = true; camYaw = drag.yaw - dx * 0.006; });
 addEventListener('pointerup', e => { const d = drag; drag = null; if (!d || d.moved || e.target !== canvas) return; clickWorld(e); });
 canvas.addEventListener('wheel', e => { camDist = Math.min(7, Math.max(1.4, camDist + e.deltaY * 0.002)); }, { passive: true });
@@ -182,6 +182,9 @@ function sendMove(anim) { lastSend = performance.now(); const r = selfC.root; so
 function emote(a) { if (!selfC) return; if (seated) standUp(); if (chairSeat && world.loc !== 'yentiec') standChair(); selfC.target = null; selfC.play(a, { restart: true }); socket.emit('emote', a); }
 
 // ---------------- vòng lặp ----------------
+let specCam = null; // camera khán giả: nhìn sân khấu yến tiệc
+function watchStage(z, ms) { if (world?.loc !== 'yentiec' || taiOn || dancing || mgOn) return; specCam = { pos: new THREE.Vector3(.4, 2.05, z + 4.4), look: new THREE.Vector3(0, .95, z), until: Date.now() + ms }; }
+const FX = []; // hiệu ứng: hàm(dt) trả false khi xong
 const clock = new THREE.Clock(); let T = 0;
 renderer.setAnimationLoop(() => {
   const dt = Math.min(clock.getDelta(), 0.05); T += dt;
@@ -191,8 +194,10 @@ renderer.setAnimationLoop(() => {
     for (const n of world.npcs) if (n.c) n.c.update(dt);
     for (const [, o] of others) if (o.c && o.seated) o.c.update(dt); else if (o.c) { const r = o.c.root; r.position.y = world.floorAt ? world.floorAt(r.position.x, r.position.z) : 0; r.position.x += (o.tx - r.position.x) * Math.min(1, dt * 8); r.position.z += (o.tz - r.position.z) * Math.min(1, dt * 8); let diff = o.try - r.rotation.y; diff = Math.atan2(Math.sin(diff), Math.cos(diff)); r.rotation.y += diff * Math.min(1, dt * 8); o.c.update(dt); }
     if (selfC) selfC.update(dt);
+    for (let i = FX.length; i--;) if (FX[i](dt) === false) FX.splice(i, 1);
     if (world.flicker) for (const L of world.flicker) L.intensity = 2 + Math.sin(T * 9 + L.id) * .25 + Math.random() * .2;
     if (stage) stage.update(dt);
+    else if (specCam && Date.now() < specCam.until && world.loc === 'yentiec') { camera.position.lerp(specCam.pos, Math.min(1, dt * 3)); camera.lookAt(specCam.look); }
     else if (selfC && !gateSpin) {
       let p = selfC.root.position;
       if (seated?.ht?.c) { p = p.clone().add(seated.ht.c.root.position).multiplyScalar(.5); p.y = 0; }
@@ -1191,7 +1196,10 @@ function applyAnim(o, anim, once) {
   if (anim === 'tai:rượu') { cheers(c); return; }
   if (String(anim).startsWith('sit:')) { const st = world?.seats?.find(x => x.id === anim.slice(4)); if (st) { o.seated = st; seatPose(c, st); return; } }
   if (o.seated) { o.seated = null; c.pose = null; c.root.position.set(o.tx, world?.floorAt ? world.floorAt(o.tx, o.tz) : 0, o.tz); c.root.rotation.y = o.try; }
-  if (String(anim).startsWith('tai:')) { o.taiK = anim.slice(4); c.root.position.set(o.tx, 0, o.tz); c.root.rotation.y = o.try; taiStart(c, o.taiK); return; }
+  if (String(anim).startsWith('tai:')) { o.taiK = anim.slice(4); c.root.position.set(o.tx, 0, o.tz); c.root.rotation.y = o.try; taiStart(c, o.taiK);
+    // người ngồi dưới: quay camera về phía người đang biểu diễn
+    if (world?.loc === 'yentiec' && selfC && !taiOn && !dancing && !mgOn && o.taiK !== 'câu') { watchStage(o.tz, 12000); const nm = (TMS.find(x => x[0] === o.taiK) || [])[1]; if (nm) toast(`🎎 ${o.p.name} đang biểu diễn ${nm.replace(/^\S+\s/, '')}`); }
+    return; }
   c.play(anim, { restart: once });
 }
 // =====================================================================
@@ -1568,7 +1576,7 @@ async function openPush() {
 const CAMNANG = [
   ['🌱 Bắt đầu', 'Làm theo dòng <b>🎯 nhiệm vụ tân thủ</b> dưới tên nhân vật. Mỗi ngày: thỉnh an Thái hậu, luyện tài nghệ, dò tin là 3 nhiệm vụ ngày, làm đủ được thêm lượt. Lượt hồi 1 mỗi 30 phút. 3 ngày đầu mỗi ngày được thêm 2 lượt, người từ Thường tại trở xuống được thêm 30% công trạng.'],
   ['👑 Hoàng thượng', 'Mỗi ngày Hoàng thượng thèm một món canh, thích một màu áo, muốn xem một tài nghệ. Dò tin ở Ngự hoa viên để biết. Dâng đúng canh được nhiều sủng ái. Hoàng thượng <b>lật thẻ mỗi 2 tiếng từ 8h tới 22h</b>: mặc đúng màu, dâng hương mê điệp, đeo trâm phỉ thúy để dễ được chọn. Được lật thẻ thì vào tẩm cung trong 2 giờ, hầu chuyện khéo được thêm sủng.'],
-  ['🎎 Yến tiệc', 'Mỗi ngày 9h, 11h (ngoài trời ở Ngự hoa viên), 15h, 17h (trong điện), mỗi buổi 20 phút. Vào ngồi, bước ra dâng tiết mục (đàn tranh, múa quạt, múa lụa, kiếm vũ, ngâm thơ, hát): hay nhất được thưởng lớn, tiệc có từ 3 loại tiết mục trở lên thì mọi người diễn được thêm sủng ái. <b>Kính rượu</b> Hoàng thượng và các tỷ muội. <b>Ra múa cùng mọi người</b>: đủ người múa cùng lúc thì Hoàng thượng thưởng. <b>Tửu lệnh</b> mỗi 4 phút: Hoàng thượng ra nửa câu thành ngữ, ai gõ vế sau vào chat nhanh nhất được thưởng rượu.'],
+  ['🎎 Yến tiệc', 'Mỗi ngày 9h, 11h (ngoài trời ở Ngự hoa viên), 15h, 17h (trong điện), mỗi buổi 20 phút. Vào ngồi, bước ra dâng tiết mục (đàn tranh, múa quạt, múa lụa, kiếm vũ, ngâm thơ, hát): hay nhất được thưởng lớn, tiệc có từ 3 loại tiết mục trở lên thì mọi người diễn được thêm sủng ái. <b>Kính rượu</b> Hoàng thượng và các tỷ muội. <b>Ra múa cùng mọi người</b>: đủ người múa cùng lúc thì Hoàng thượng thưởng. Diễn xong có <b>pháo hoa</b>, người ngồi dưới chọn <b>👏 vỗ tay, 🌸 tung hoa</b> (cộng điểm cho người diễn) hoặc <b>😒 chề môi, 🙄 quay mặt</b> (trừ điểm), nhân vật làm động tác đó. Giữa tiệc có <b>Đoàn ca vũ Giáo phường</b> biểu diễn: thị vệ múa kiếm rồi xoay người hóa áo trắng, cung nữ múa lụa. <b>Tửu lệnh</b> mỗi 4 phút: Hoàng thượng ra nửa câu thành ngữ, ai gõ vế sau vào chat nhanh nhất được thưởng rượu.'],
   ['🔍 Phá án', 'Ở Từ Ninh cung, mỗi ngày <b>nhận tra án giúp Quế ma ma</b>. Mỗi manh mối cho biết một đặc điểm thật của thủ phạm, ai không khớp bị đóng dấu LOẠI. Còn một người thì ra phiên xử. Từ Quý nhân, bổn cung có thể bị người khác vu oan: khi đó phải tự điều tra để minh oan, sai là bị giáng cấp.'],
   ['📜 Đại án (cả cung cùng tra)', 'Mỗi tuần một vụ án lớn cho cả cung. Mỗi ngày tra 2 lần ở Ngự hoa viên, Từ Ninh cung, Dưỡng Tâm điện: mỗi người nhận <b>manh mối khác nhau, chỉ mình thấy</b>. Công bố cho cả cung hoặc kể trong chat (người khác có thể nói dối!). Tin đồn ⚠️ có thể sai. Cuối hạn người bị nhiều phiếu nhất bị xử: đúng thì ai góp sức cũng được 100 bạc, 40 công trạng (bỏ phiếu đúng thêm 20).'],
   ['🏮 Đại lễ (cả cung góp sức)', '2 tuần một lần, 5 ngày. Góp bạc, thêu gấm ở phòng, chép kinh ở Từ Ninh cung, câu cá, dâng tiết mục ở yến tiệc đều cộng vào thanh tiến độ chung. Đạt 25%, 50%, 75%, 100% thì cả cung có quà (người đã góp nhận đủ, chưa góp nhận một nửa). Đủ 100% Hoàng thượng mở đại yến.'],
@@ -1677,3 +1685,109 @@ function renderTL() {
   tlEl.innerHTML = `<div class="tt">🍶 TỬU LỆNH · còn <b>${Math.max(0, Math.ceil((tl.end - Date.now()) / 1000))}</b> giây</div><div class="tq">${esc(tl.q)} <span>…?</span></div><div class="th">Gõ vế còn lại vào ô chat rồi Enter. Ai nhanh nhất được Hoàng thượng thưởng rượu!</div>`;
 }
 setInterval(() => { if (tl) renderTL(); }, 1000);
+window.__mph = { get renderer() { return renderer; }, get cam() { return camera.position.toArray(); }, get others() { return others; }, get selfC() { return selfC; }, get camYaw() { return camYaw; } };
+
+// =====================================================================
+// PHÁO HOA, PHẢN ỨNG KHÁN GIẢ, ĐOÀN CA VŨ GIÁO PHƯỜNG
+// =====================================================================
+let dotTex = null; function getDot() { if (dotTex) return dotTex; const c = document.createElement('canvas'); c.width = c.height = 64; const x = c.getContext('2d'); const g = x.createRadialGradient(32, 32, 0, 32, 32, 32); g.addColorStop(0, 'rgba(255,255,255,1)'); g.addColorStop(.35, 'rgba(255,255,255,.85)'); g.addColorStop(1, 'rgba(255,255,255,0)'); x.fillStyle = g; x.fillRect(0, 0, 64, 64); dotTex = new THREE.CanvasTexture(c); return dotTex; }
+const PALETTE = [0xffd77a, 0xff5a5a, 0xff9ad5, 0x9ae6ff, 0xb6ff9a, 0xffffff, 0xffa63d];
+function burst(x, y, z, n = 90, speed = 1.6, colors = PALETTE, life = 1.8, grav = 1.2, size = .07) {
+  if (!world) return;
+  const pos = new Float32Array(n * 3), col = new Float32Array(n * 3), vel = [];
+  const base = new THREE.Color(colors[Math.floor(Math.random() * colors.length)]);
+  for (let i = 0; i < n; i++) {
+    pos.set([x, y, z], i * 3); const u = Math.random() * 2 - 1, th = Math.random() * Math.PI * 2, r = Math.sqrt(1 - u * u), sp = speed * (.6 + Math.random() * .5);
+    vel.push(new THREE.Vector3(r * Math.cos(th) * sp, u * sp, r * Math.sin(th) * sp));
+    const c = Math.random() < .3 ? new THREE.Color(colors[Math.floor(Math.random() * colors.length)]) : base; col.set([c.r, c.g, c.b], i * 3);
+  }
+  const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(pos, 3)); g.setAttribute('color', new THREE.BufferAttribute(col, 3));
+  const m = new THREE.PointsMaterial({ size: size * 1.6, map: getDot(), vertexColors: true, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false });
+  const pts = new THREE.Points(g, m); pts.frustumCulled = false; world.group.add(pts); let t = 0;
+  FX.push(dt => { t += dt; const a = g.attributes.position.array; for (let i = 0; i < n; i++) { vel[i].y -= grav * dt; vel[i].multiplyScalar(1 - dt * .8); a[i * 3] += vel[i].x * dt; a[i * 3 + 1] += vel[i].y * dt; a[i * 3 + 2] += vel[i].z * dt; } g.attributes.position.needsUpdate = true; m.opacity = Math.max(0, 1 - t / life); if (t > life) { pts.parent?.remove(pts); g.dispose(); m.dispose(); return false; } });
+}
+function fireworks(x, z, big) {
+  const k = big ? 6 : 3;
+  for (let i = 0; i < k; i++) setTimeout(() => burst(x + (Math.random() - .5) * 2.4, 2.2 + Math.random() * 1.3, z + (Math.random() - .5) * 1.2, big ? 110 : 80), i * 380);
+  // kim tuyến vàng rơi
+  burst(x, 1.9, z, 70, .9, [0xffd77a, 0xffe9b0, 0xff9ad5], 2.6, .5, .05);
+  if (music?.gong) try { music.gong(); } catch {}
+}
+function puff(x, z) { burst(x, .9, z, 60, .9, [0xffffff, 0xfff1d0, 0xffd77a], 1.1, -.2, .12); }
+
+// ----- phản ứng khán giả -----
+const REACTS = { khen: ['👏', 'Vỗ tay'], hoa: ['🌸', 'Tung hoa'], che: ['😒', 'Chề môi'], quay: ['🙄', 'Quay mặt đi'] };
+function playReact(c, r) {
+  if (!c) return; const prev = c.post; const e = REACTS[r];
+  if (c.label) bubble(c.label, `${e[0]} ${r === 'khen' ? 'Hay quá!' : r === 'hoa' ? 'Tuyệt!' : r === 'che' ? 'Xì… thường thôi.' : 'Hừ!'}`);
+  const hp = new THREE.Vector3(); let oldRy = null;
+  if (r === 'quay') { oldRy = c.root.rotation.y; c.root.rotation.y += Math.PI; }
+  c.post = (cc, t) => {
+    if (prev) prev(cc, t);
+    if (r === 'khen') { const s = Math.abs(Math.sin(t * 14)) * .22; aim(cc.root, cc.B.rArm, cc.B.rFore, v3([-.2, -.35, .9])); aim(cc.root, cc.B.rFore, cc.B.rHand, v3([.55 + s, .25, .7])); aim(cc.root, cc.B.lArm, cc.B.lFore, v3([.2, -.35, .9])); aim(cc.root, cc.B.lFore, cc.B.lHand, v3([-.55 - s, .25, .7])); }
+    else if (r === 'hoa') { aim(cc.root, cc.B.rArm, cc.B.rFore, v3([-.2, .7, .6])); aim(cc.root, cc.B.rFore, cc.B.rHand, v3([0, 1, .3])); }
+    else if (r === 'che') { aim(cc.root, cc.B.rArm, cc.B.rFore, v3([-.3, -.5, .6])); aim(cc.root, cc.B.rFore, cc.B.rHand, v3([.8, .5, .2])); aim(cc.root, cc.B.lArm, cc.B.lFore, v3([.3, -.5, .6])); aim(cc.root, cc.B.lFore, cc.B.lHand, v3([-.8, .4, .2])); }
+    else if (r === 'quay') { aim(cc.root, cc.B.rArm, cc.B.rFore, v3([-.4, -.6, .5])); aim(cc.root, cc.B.lArm, cc.B.lFore, v3([.4, -.6, .5])); }
+  };
+  if (r === 'hoa') setTimeout(() => { if (!c.B?.rHand) return; c.root.updateMatrixWorld(true); c.B.rHand.getWorldPosition(hp); burst(hp.x, hp.y + .1, hp.z, 50, 1.1, [0xff9ad5, 0xffc2e2, 0xffffff, 0xffd77a], 2.4, .7, .06); }, 300);
+  setTimeout(() => { if (c.post !== prev) c.post = prev; if (oldRy !== null) c.root.rotation.y = oldRy; }, 3200);
+}
+const reactEl = document.createElement('div'); reactEl.id = 'reactbar'; reactEl.className = 'hidden'; document.body.appendChild(reactEl);
+let reactT = null;
+function reactHide() { reactEl.classList.add('hidden'); clearTimeout(reactT); }
+function reactAsk(target, label, key) {
+  if (world?.loc !== 'yentiec') return;
+  reactEl.innerHTML = `<div class="rt">${esc(label)} vừa diễn xong. Bổn cung thấy sao?</div><div class="rb">${Object.entries(REACTS).map(([k, [ic, n]]) => `<button data-r="${k}" class="${k === 'khen' || k === 'hoa' ? 'good' : 'bad'}"><span>${ic}</span>${n}</button>`).join('')}</div><div class="rbar"><i></i></div>`;
+  reactEl.classList.remove('hidden'); const bar = reactEl.querySelector('.rbar i'); bar.style.transition = 'none'; bar.style.width = '100%'; requestAnimationFrame(() => { bar.style.transition = 'width 15s linear'; bar.style.width = '0%'; });
+  reactEl.querySelectorAll('[data-r]').forEach(b => b.onclick = () => { socket.emit('react', { r: b.dataset.r, to: target, k: key }); reactHide(); });
+  clearTimeout(reactT); reactT = setTimeout(reactHide, 15000);
+}
+socket.on('react', d => { if (d.id === me?.id) playReact(selfC, d.r); else playReact(others.get(d.id)?.c, d.r); });
+socket.on('perfDone', d => {
+  if (world?.loc !== 'yentiec') return; const S = world.stage || { x: 0, z: -2.6 };
+  fireworks(S.x, S.z, d.q > .8);
+  if (d.id !== me?.id) { setTimeout(() => reactAsk(d.id, `${d.name} (${d.tai})`, String(Date.now())), 1200); watchStage(S.z, 5000); }
+  else toast(d.q > .8 ? '🎆 Tiết mục xuất sắc! Pháo hoa rợp trời.' : '🎆 Diễn xong rồi! Chờ mọi người khen chê…', 'good');
+});
+
+// ----- Đoàn ca vũ Giáo phường (NPC biểu diễn) -----
+const showChars = []; let showOn = false;
+async function runNpcShow(at) {
+  if (showOn || world?.loc !== 'yentiec') return; showOn = true;
+  const w = world, S = world.stage || { x: 0, z: -2.6, ry: Math.PI }, base = S.z + 1.1;
+  let t0 = at; const sleepUntil = ms => new Promise(r => setTimeout(r, Math.max(0, t0 + ms - Date.now())));
+  watchStage(base, 60000); toast('🎭 Đoàn ca vũ Giáo phường vào diễn: thị vệ kiếm vũ, cung nữ múa lụa!', 'good');
+  const alive = () => world === w;
+  // tải trước toàn bộ diễn viên (ẩn), tới lượt thì hiện ra
+  const gx = [-.9, 0, .9], cx = [-.55, .55, 0], cz = [base + .9, base + .9, base + 1.5];
+  const load = (model, x, z) => spawn(model).then(c => { if (!alive()) { c.dispose(); return null; } c.root.position.set(x, 0, z); c.root.rotation.y = S.ry ?? Math.PI; c.root.visible = false; w.group.add(c.root); showChars.push(c); FX.push(dt => { if (!c.root.parent) return false; if (c.root.visible) c.update(dt); }); return c; });
+  const [G, W, Gi] = await Promise.all([Promise.all(gx.map(x => load('thive', x, base))), Promise.all(gx.map(x => load('hoangthuong_dem', x, base))), Promise.all(cx.map((x, i) => load('cungnu', x, cz[i])))]);
+  t0 = Math.max(at, Date.now()); watchStage(base, 40000);
+  const put = c => { if (c) { c.root.visible = true; puff(c.root.position.x, c.root.position.z); } return c; };
+  const drop = c => { if (!c) return; taiEnd(c); c.root.parent?.remove(c.root); c.dispose?.(); const i = showChars.indexOf(c); if (i >= 0) showChars.splice(i, 1); };
+  try {
+    await sleepUntil(0); if (!alive()) return;
+    // 1) ba thị vệ múa kiếm
+    const guards = G.map(put);
+    guards.forEach(c => c && taiStart(c, 'kiếm'));
+    await sleepUntil(12000); if (!alive()) return;
+    // 2) xoay một vòng, khói trắng, hóa thành bộ đồ trắng của Hoàng thượng
+    guards.forEach(c => { if (!c) return; taiEnd(c); c.play('dung_cho'); const r0 = c.root.rotation.y; let t = 0; FX.push(dt => { t += dt; c.root.rotation.y = r0 + Math.min(1, t / 1.2) * Math.PI * 4; return t < 1.2; }); });
+    await sleepUntil(13000); if (!alive()) return;
+    const whites = [];
+    for (let i = 0; i < 3; i++) { burst(gx[i], 1.2, base, 40, 1.2, [0xffffff, 0xffd77a], 1, .4, .09); drop(guards[i]); whites.push(put(W[i])); }
+    whites.forEach(c => c && c.play('mua', { restart: true }));
+    await sleepUntil(18000); if (!alive()) return;
+    // 3) cung nữ múa lụa phía trước
+    const girls = Gi.map(put);
+    girls.forEach(c => c && taiStart(c, 'lụa'));
+    await sleepUntil(32000); if (!alive()) return;
+    // 4) cúi chào, pháo hoa
+    [...whites, ...girls].forEach(c => { if (!c) return; taiEnd(c); c.play('hanh_le', { restart: true }); });
+    fireworks(S.x, base, true);
+    await sleepUntil(36000); if (!alive()) return;
+    [...whites, ...girls].forEach(c => { if (c) { puff(c.root.position.x, c.root.position.z); drop(c); } });
+    reactAsk('giaophuong', 'Đoàn ca vũ Giáo phường', 'show' + at);
+  } finally { showOn = false; if (world === w) [...showChars].forEach(c => { c.root.parent?.remove(c.root); }); }
+}
+socket.on('npcShow', d => { if (d && Date.now() < d.at + 30000) runNpcShow(d.at).catch(e => { console.error('npcShow', e); showOn = false; }); });

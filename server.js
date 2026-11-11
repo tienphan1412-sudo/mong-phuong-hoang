@@ -852,7 +852,7 @@ function startFeast(min = C.FEAST_MIN, venue = 'out') {
 function endFeast() {
   const f = DB.state.feast; if (!f || f.done) return; f.done = true; const h = ht();
   const ids = Object.keys(f.entries); const duet = id => { const q = P(id); return q && q.sis && ids.some(x => x !== id && P(x)?.sis === q.sis); };
-  const list = Object.entries(f.entries).map(([id, e]) => ({ id, ...e, duet: duet(id), score: e.q * 100 + (TM_CAT(e.tai) === C.HT.tai[h.tai] ? 25 : 0) + (e.color ? 15 : 0) + (duet(id) ? 15 : 0) + (P(id)?.jewels?.includes('tramphuong') ? 10 : 0) + Math.random() * 10 }));
+  const list = Object.entries(f.entries).map(([id, e]) => ({ id, ...e, duet: duet(id), score: e.q * 100 + (TM_CAT(e.tai) === C.HT.tai[h.tai] ? 25 : 0) + (e.color ? 15 : 0) + (duet(id) ? 15 : 0) + (P(id)?.jewels?.includes('tramphuong') ? 10 : 0) + (e.bonus || 0) + Math.random() * 10 }));
   const gs = new Set(list.filter(e => e.duet).map(e => P(e.id).sis)); for (const gid of gs) { const g = DB.state.groups[gid]; if (g) news(`🎶 Tỷ muội "${g.name}" cùng dâng tiết mục hợp tấu, Hoàng thượng vỗ tay khen hay.`); }
   list.sort((a, b) => b.score - a.score);
   const kinds = new Set(list.map(e => e.tai)); if (kinds.size >= 3) { for (const e of list) { const q = P(e.id); if (q) q.sung += 5; } news(`🎊 Yến tiệc phong phú ${kinds.size} loại tiết mục (${[...kinds].map(TM_NAME).join(', ')}), Hoàng thượng thưởng mọi người dâng tiết mục thêm 5 sủng ái.`); }
@@ -887,8 +887,15 @@ function feastLive() {
     const [q, a] = pick(THANH_NGU).split('|'); f.tl = { q, a, end: now() + 45e3, done: false }; f.tlNext = now() + 4 * 60e3;
     roomSay(`TỬU LỆNH! Nối tiếp câu: "${q} …" Ai gõ đúng vào ô chat trước được Hoàng thượng thưởng rượu!`, '🍶 Tửu lệnh'); io.to('yentiec').emit('tuulenh', { q, end: f.tl.end });
   }
+  if (!f.showAt) f.showAt = f.start + 150e3;
+  if (!f.show && now() >= f.showAt && now() < f.end - 60e3) startNpcShow(f);
   if (!f.htNext) f.htNext = now() + 60e3;
   if (now() >= f.htNext) { f.htNext = now() + (70 + rnd(50)) * 1000; htSay(pick(HT_FEAST)); }
+}
+function startNpcShow(f) {
+  f.show = { at: now() + 2500 };
+  roomSay('Đoàn ca vũ Giáo phường xin dâng tiết mục: Thị vệ kiếm vũ, cung nữ múa lụa! Mời các vị chủ tử thưởng thức.', '🎭 Giáo phường');
+  io.to('yentiec').emit('npcShow', f.show); htSay('Tốt! Cho vào biểu diễn.');
 }
 function tuuLenhAnswer(p, text) {
   const f = DB.state.feast, t = f?.tl; if (!t || t.done || p.loc !== 'yentiec') return;
@@ -950,6 +957,7 @@ function enter(p, loc, sock) {
   let seat = null;
   if (loc === 'yentiec') { const free = SEAT_IDS.yentiec.find(id => !(SEATS.yentiec || {})[id] || !online.has(SEATS.yentiec[id])); if (free) { takeSeat(p, free); seat = free; } }
   sock.emit('scene', { loc, players: others, venue: DB.state.feast?.venue || 'out', seat });
+  if (loc === 'yentiec' && DB.state.feast?.show && now() < DB.state.feast.show.at + 38e3) setTimeout(() => sock.emit('npcShow', DB.state.feast.show), 2000);
   if (loc === 'yentiec') { const t = DB.state.feast?.tl; setTimeout(() => sock.emit('tuulenh', t && !t.done ? { q: t.q, end: t.end } : null), 1500); }
   sock.to(room).emit('pjoin', publicView(p));
 }
@@ -1198,6 +1206,7 @@ io.on('connection', sock => {
       htSay(q > .8 ? pick(['Tuyệt diệu! Thưởng rượu!', 'Hay! Trẫm chưa từng thấy ai ' + TM_NAME(tai).toLowerCase() + ' đẹp như vậy.', 'Xuất sắc!']) : q > .5 ? pick(['Khá lắm.', 'Cũng được, uống một chén nào.']) : pick(['Hơi vụng… nhưng có lòng là được.', 'Lần sau tập thêm nhé.']));
       f.entries[me.id] = { name: title(me), q, tai, color: colorMatch(me) }; cnt(me, 'feast'); festAdd(me, 20, 'dâng tiết mục');
       addPts(me, 5); toast(me, `Đã dâng tiết mục ${TM_NAME(tai)}. Chờ Hoàng thượng ban thưởng khi tiệc tàn.`, 'good');
+      io.to('yentiec').emit('perfDone', { id: me.id, name: me.name, tai: TM_NAME(tai), q });
       io.emit('feastUpdate', feastView());
     } else if (a === 'ruou' || a === 'dance') {
       const f = DB.state.feast; if (!f || f.done || now() > f.end || me.loc !== 'yentiec') return toast(me, 'Chỉ làm được trong yến tiệc.');
@@ -1372,6 +1381,16 @@ io.on('connection', sock => {
     }
     save(); push(me);
   });
+  sock.on('react', d => {
+    if (!me || !d || me.loc !== 'yentiec') return; const f = DB.state.feast; if (!f || f.done) return;
+    const r = ['khen', 'hoa', 'che', 'quay'].includes(d.r) ? d.r : null; if (!r) return;
+    const key = String(d.to || '').slice(0, 30) + ':' + String(d.k || '').slice(0, 20); f.reacted = f.reacted || {}; if (f.reacted[me.id + '|' + key]) return; f.reacted[me.id + '|' + key] = 1;
+    track(me, 'react:' + r); io.to('yentiec').emit('react', { id: me.id, r });
+    const t = P(d.to), e = t && f.entries[t.id];
+    if (t && e && t.id !== me.id) { e.bonus = Math.max(-15, Math.min(15, (e.bonus || 0) + (r === 'khen' || r === 'hoa' ? 3 : -2)));
+      toast(t, { khen: `👏 ${me.name} vỗ tay khen tiết mục của bổn cung!`, hoa: `🌸 ${me.name} tung hoa khen bổn cung!`, che: `😒 ${me.name} chề môi chê tiết mục…`, quay: `🙄 ${me.name} quay mặt đi, không thèm xem…` }[r], r === 'khen' || r === 'hoa' ? 'good' : 'bad'); }
+    if (r === 'khen' || r === 'hoa') addPts(me, 1);
+  });
   sock.on('pushKey', () => sock.emit('pushKey', vapid()));
   sock.on('pushSub', sub => { if (!me || !sub?.endpoint) return; me.pushSubs = (me.pushSubs || []).filter(x => x.endpoint !== sub.endpoint).concat([{ endpoint: String(sub.endpoint), keys: sub.keys }]).slice(-3); save(); push(me); sendPush(me, 'Đã bật thông báo', 'Khi bổn cung offline mà có chuyện trong cung, thông báo sẽ hiện ở đây.'); });
   sock.on('pushOff', () => { if (!me) return; me.pushSubs = []; save(); push(me); });
@@ -1487,6 +1506,7 @@ function admin(p, text) {
   else if (cmd === '/cothai') { const who = [arg, ...rest].filter(Boolean).join(' ').toLowerCase(); const q = who ? findP(who) : p; if (!q) return toast(p, 'Không tìm thấy.', 'bad'); q.thai = { since: now() - 1000, known: false }; revealThai(q, 'mach'); }
   else if (cmd === '/sinh') { const who = [arg, ...rest].filter(Boolean).join(' ').toLowerCase(); const q = who ? findP(who) : p; if (!q?.thai) return toast(p, 'Người này không mang thai.', 'bad'); if (!q.thai.known) revealThai(q); birth(q); }
   else if (cmd === '/baucu') { if (DB.state.hhVote) endHHVote(); else { DB.state.hhNext = 0; if (!hhEligible().length) return toast(p, `Chưa có ai từ ${C.RANKS[C.HH_MIN_RANK].name} trở lên để ứng cử.`, 'bad'); startHHVote(); } }
+  else if (cmd === '/bieudien') { const f = DB.state.feast; if (!f || f.done) return toast(p, 'Chưa có yến tiệc.'); startNpcShow(f); }
   else if (cmd === '/tuulenh') { const f = DB.state.feast; if (!f || f.done) return toast(p, 'Chưa có yến tiệc.'); if (f.tl) f.tl.done = true; f.tlNext = 0; feastLive(); }
   else if (cmd === '/daian') { const B = DB.state.bigCase; if (B && !B.done) { B.end = now(); endBigCase(); } else startBigCase(+arg || C.BIG_HOURS); }
   else if (cmd === '/daile') { const F = DB.state.fest; if (F && !F.done) festFinish(F.pts >= F.goal); else startFest(+arg || C.FEST_HOURS); }
@@ -1507,7 +1527,7 @@ function admin(p, text) {
     if (rest[0] !== 'xacnhan') return toast(p, `Khôi phục sẽ đưa cả cung về ngày ${arg}, mất mọi thứ sau đó. Gõ: /khoiphuc ${arg} xacnhan`, 'bad');
     restore(arg).then(ok => { if (!ok) toast(p, 'Không có bản sao lưu ngày ' + arg, 'bad'); else console.log('restored', arg); }); return;
   }
-  else return toast(p, 'Lệnh: /latthe [trua] /yentiec [phút] /diem N /diemcho N tên /bac N /ngay /vuan /hethan /lanhcung /rakhoi [tên] /cothai [tên] /sinh [tên] /baucu /sukien [hoadang|disan|phatdan|dichbenh|hoica] /tuulenh /daian [giờ] /daile [giờ] /dailediem N /xoaacc tên /saoluu /khoiphuc [ngày xacnhan]');
+  else return toast(p, 'Lệnh: /latthe [trua] /yentiec [phút] /diem N /diemcho N tên /bac N /ngay /vuan /hethan /lanhcung /rakhoi [tên] /cothai [tên] /sinh [tên] /baucu /sukien [hoadang|disan|phatdan|dichbenh|hoica] /tuulenh /bieudien /daian [giờ] /daile [giờ] /dailediem N /xoaacc tên /saoluu /khoiphuc [ngày xacnhan]');
   toast(p, 'Đã chạy ' + cmd); push(p); save();
 }
 
