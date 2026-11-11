@@ -374,6 +374,7 @@ function latThe(when = 'Đêm nay') {
   }
   // an ủi: người không được chọn nhận quà Hoàng thượng ban
   const G = C.LAT_THE_GIFT;
+  if (pool.length > picked.length) news(`🎁 Hoàng thượng ban quà an ủi cho ${pool.length - picked.length} phi tần không được lật thẻ (+${C.LAT_THE_GIFT.silver} bạc, +${C.LAT_THE_GIFT.sung} sủng ái).`, 'an');
   for (const p of pool) if (!picked.includes(p)) { p.silver += G.silver; p.sung += G.sung; toast(p, `🎁 Hoàng thượng ban ${pick(['một hộp điểm tâm', 'một xấp lụa', 'một cây trâm bạc', 'một bình trà ngon'])} an ủi: +${G.silver} bạc, +${G.sung} sủng ái.`, 'good'); push(p); }
   save();
   return picked[0];

@@ -270,7 +270,7 @@ function addNews(n) { const d = document.createElement('div'); d.className = 'n'
 $('newsbtn').onclick = () => $('news').classList.toggle('hidden');
 socket.on('toast', t => toast(t.text, t.kind));
 socket.on('npcSay', d => { const n = world?.npcs.find(x => x.name === d.who); if (d.long) { say(n?.model || 'aongu', d.who, esc(d.text), [['Đa tạ', 0, 'gold']]).then(dlgClose); return; } if (n?.label) bubble(n.label, d.text); else toast(`${d.who}: ${d.text}`); });
-function toast(text, kind = 'info') { const d = document.createElement('div'); d.className = 'toast ' + kind; d.textContent = text; $('toasts').appendChild(d); setTimeout(() => d.remove(), 5200); }
+function toast(text, kind = 'info') { const d = document.createElement('div'); d.className = 'toast ' + kind; d.textContent = text; $('toasts').appendChild(d); setTimeout(() => d.remove(), /🎁|🏮|lật thẻ/.test(text) ? 12000 : 5200); }
 
 // ---------------- HUD, bản đồ, hành động ----------------
 function renderHud() {
