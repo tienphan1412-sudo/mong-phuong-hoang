@@ -4,6 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
 <title>MỘNG PHƯỢNG HOÀNG · Phượng khởi thâm cung</title>
+<link rel="manifest" href="/manifest.json"><link rel="icon" href="/img/icon192.png"><link rel="apple-touch-icon" href="/img/icon192.png"><meta name="theme-color" content="#7a1210"><meta name="apple-mobile-web-app-capable" content="yes">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Noto+Serif:ital,wght@0,400;0,700;1,400&family=Be+Vietnam+Pro:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
@@ -273,6 +274,31 @@ body.staging #notice { display:none !important; }
 #decorbar { position:fixed; bottom:10px; left:50%; transform:translateX(-50%); display:flex; gap:6px; flex-wrap:wrap; justify-content:center; background:var(--panel); border:1px solid var(--line); border-radius:14px; padding:8px; z-index:7; max-width:94vw; }
 #decorbar button { font-size:12px; padding:7px 9px; }
 #decorbar button.on { border-color:var(--gold); background:rgba(160,90,30,.55); }
+
+/* ---- giai đoạn 4: thanh công cụ, hôm nay, thư, cẩm nang ---- */
+#menubar { position:fixed; left:max(382px, calc(50% - 240px)); bottom:10px; z-index:6; display:flex; gap:4px; background:var(--panel); border:1px solid var(--line); border-radius:14px; padding:4px; box-shadow:0 4px 16px rgba(0,0,0,.4); }
+#menubar button { position:relative; display:flex; flex-direction:column; align-items:center; gap:1px; padding:5px 6px; min-width:52px; border-radius:10px; font-size:11px; line-height:1.1; }
+#menubar .ic { font-size:18px; } #menubar .lb { color:var(--muted); }
+#menubar .bd { position:absolute; top:-4px; right:-2px; background:#d23b2a; color:#fff; font-style:normal; font-size:10.5px; font-weight:700; border-radius:999px; min-width:17px; height:17px; line-height:17px; padding:0 4px; box-sizing:border-box; }
+body.staging #menubar, body.mgopen #menubar { display:none !important; }
+#hQuest { margin-top:6px; padding-top:5px; border-top:1px solid rgba(255,255,255,.08); font-size:11.5px; color:#f3e2b4; max-width:250px; line-height:1.35; }
+#hQuest b { color:var(--gold2); }
+.today { background:rgba(255,255,255,.04); border:1px solid var(--line); border-radius:10px; padding:8px 11px; margin-top:8px; font-size:13px; line-height:1.5; }
+.today b { color:var(--gold2); display:block; margin-bottom:2px; } .today small { color:var(--muted); }
+.mails { max-height:60vh; overflow-y:auto; margin-top:8px; display:flex; flex-direction:column; gap:8px; }
+.mail { border:1px solid var(--line); border-radius:10px; padding:8px 11px; background:rgba(255,255,255,.03); }
+.mail.nacdanh { border-color:#6b5a8a; background:rgba(60,40,90,.25); } .mail.moi { border-color:#f3a6c8; } .mail.he { border-color:#c0503a; }
+.mail .mh { display:flex; gap:6px; align-items:baseline; } .mail .mh small { margin-left:auto; color:var(--muted); font-size:11px; }
+.mail .mt { font-size:13px; margin:5px 0; white-space:pre-wrap; line-height:1.45; } .mail .ma { display:flex; gap:6px; } .mail .ma button { padding:4px 10px; font-size:12px; }
+details.cn { border:1px solid var(--line); border-radius:10px; padding:7px 11px; margin-top:7px; } details.cn summary { cursor:pointer; color:var(--gold2); font-weight:600; } details.cn div { font-size:13px; line-height:1.55; margin-top:6px; }
+@media (max-width:760px) {
+  #menubar { left:6px; right:6px; bottom:6px; transform:none; justify-content:space-between; padding:3px; gap:2px; }
+  #menubar button { min-width:0; flex:1; padding:4px 2px; } #menubar .lb { display:none; } #menubar .ic { font-size:17px; }
+  #map { bottom:52px !important; }
+  #acts { bottom:130px !important; } #chat { bottom:130px !important; }
+  #top5 { bottom:calc(130px + 38vh + 8px) !important; }
+  #hQuest { font-size:10.5px; max-width:58vw; }
+}
 </style>
 </head>
 <body>

@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="vi"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Thống kê · Mộng Phượng Hoàng</title>
+<style>
+body{margin:0;background:#2a0f0d;color:#f3e6c8;font:14px/1.45 system-ui,-apple-system,"Segoe UI",sans-serif}
+.wrap{max-width:1180px;margin:0 auto;padding:20px}
+h1{font:600 22px Georgia,serif;color:#ffd77a;margin:0 0 4px}h2{font:600 16px Georgia,serif;color:#ffd77a;margin:26px 0 10px}
+.sub{color:#c9b38c;font-size:12.5px}
+.tiles{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px;margin-top:14px}
+.tile{background:#3d1714;border:1px solid #6b2a22;border-radius:10px;padding:10px 12px}.tile b{display:block;font-size:22px;color:#fff}.tile span{color:#c9b38c;font-size:12px}
+.bars{display:flex;gap:6px;align-items:flex-end;height:140px;background:#3d1714;border:1px solid #6b2a22;border-radius:10px;padding:12px 12px 26px;position:relative}
+.bar{flex:1;background:linear-gradient(#e8c25a,#b8862e);border-radius:4px 4px 0 0;position:relative;min-height:2px}
+.bar i{position:absolute;top:-17px;left:0;right:0;text-align:center;font-style:normal;font-size:11px;color:#fff}
+.bar u{position:absolute;bottom:-20px;left:-4px;right:-4px;text-align:center;text-decoration:none;font-size:10.5px;color:#c9b38c}
+table{width:100%;border-collapse:collapse;background:#3d1714;border:1px solid #6b2a22;border-radius:10px;overflow:hidden}
+th,td{padding:7px 9px;border-bottom:1px solid #55211b;text-align:left;vertical-align:top}th{background:#4d1d18;color:#ffd77a;font-weight:600;font-size:12.5px}
+tr.cold td{color:#e59a8c}.dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:#666;margin-right:6px}.dot.on{background:#3fcf6a}
+.chip{display:inline-block;background:#55211b;border-radius:999px;padding:0 8px;margin:1px 3px 1px 0;font-size:12px}
+.note{background:#3d1714;border-left:3px solid #e8c25a;padding:10px 12px;border-radius:6px;margin-top:10px;color:#e9dcc0}
+.err{padding:40px;text-align:center}a{color:#ffd77a}
+</style></head><body><div class="wrap" id="app"><div class="err">Đang tải…</div></div>
+<script>
+const NAMES={luyen:'Luyện tài nghệ',dangcanh:'Dâng canh',dotin:'Dò tin',tangqua:'Tặng quà',ratay:'Ra tay',shop:'Nội vụ phủ',cauca:'Câu cá',dangca:'Dâng cá vàng',thuongcn:'Thưởng cung nữ',yentiec:'Dâng tiết mục',thinhan:'Thỉnh an',event:'Sự kiện tuần',httalk:'Hầu chuyện HT',lanh:'Việc lãnh cung',phephi:'Hỏi phế phi',chat:'Chat',thu:'Gửi thư',
+'npc:talk':'Nói chuyện NPC','npc:gift':'Biếu quà NPC','npc:tran':'Nhận tra án','npc:mach':'Bắt mạch','npc:antai':'Uống an thai','sis:invite':'Mời kết nghĩa','sis:accept':'Nhận kết nghĩa','sis:donate':'Góp quỹ tỷ muội','sis:cautinh':'Cầu tình','sis:leave':'Rời tỷ muội','case:clue':'Tìm manh mối','case:accuse':'Buộc tội','case:witness':'Nhờ làm chứng','case:confess':'Nhận tội',
+'goto:hoavien':'Đến Ngự hoa viên','goto:tuninh':'Đến Từ Ninh','goto:duongtam':'Đến Dưỡng Tâm','goto:phong':'Về phòng','goto:tamcung':'Vào tẩm cung','goto:yentiec':'Vào yến tiệc','goto:lanhcung':'Lãnh cung'};
+const nm=k=>NAMES[k]||k, esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const ago=t=>{const m=Math.round((Date.now()-t)/60e3);return m<2?'vừa xong':m<60?m+' phút trước':m<1440?Math.round(m/60)+' giờ trước':Math.round(m/1440)+' ngày trước'};
+async function load(){
+  const t=localStorage.getItem('mph_token'); const app=document.getElementById('app');
+  if(!t){app.innerHTML='<div class="err">Chưa đăng nhập. <a href="/">Vào game</a> bằng tài khoản quản trị rồi quay lại trang này.</div>';return}
+  const r=await fetch('/api/stats?token='+encodeURIComponent(t)); const d=await r.json();
+  if(!r.ok){app.innerHTML=`<div class="err">${esc(d.err)} <a href="/">Về game</a></div>`;return}
+  const T=d.totals, D=d.daily, max=Math.max(1,...D.map(x=>x.players));
+  const all={}; for(const x of D.slice(-7)) for(const[k,n] of Object.entries(x.acts)) if(!k.startsWith('goto:')) all[k]=(all[k]||0)+n;
+  const top=Object.entries(all).sort((a,b)=>b[1]-a[1]);
+  const cold=d.players.filter(p=>!p.online&&Date.now()-p.lastSeen>3*864e5);
+  const today=D[D.length-1]||{players:0,minutes:0};
+  app.innerHTML=`<h1>📊 Thống kê hậu cung</h1><div class="sub">Cập nhật ${new Date(d.now).toLocaleString('vi-VN')} · <a href="#" onclick="load();return false">Tải lại</a> · <a href="/">Về game</a></div>
+  <div class="tiles">
+   <div class="tile"><b>${T.players}</b><span>tài khoản</span></div>
+   <div class="tile"><b>${T.online}</b><span>đang online</span></div>
+   <div class="tile"><b>${today.players}</b><span>người vào hôm nay</span></div>
+   <div class="tile"><b>${today.players?Math.round(today.minutes/today.players):0}′</b><span>phút chơi trung bình hôm nay</span></div>
+   <div class="tile"><b>${cold.length}</b><span>bỏ đi ≥ 3 ngày</span></div>
+   <div class="tile"><b>${T.players?Math.round(T.silver/T.players):0}</b><span>bạc trung bình mỗi người</span></div>
+   <div class="tile"><b>${T.openCases}</b><span>vụ án đang mở</span></div>
+   <div class="tile"><b>${esc(T.hh||'—')}</b><span>Hoàng hậu · ${esc(T.event)}</span></div>
+  </div>
+  <h2>Số người vào mỗi ngày</h2>
+  <div class="bars">${D.map(x=>`<div class="bar" style="height:${x.players/max*100}%" title="${x.minutes} phút chơi"><i>${x.players}</i><u>${x.day.slice(8)}/${x.day.slice(5,7)}</u></div>`).join('')||'<div class="sub">Chưa có dữ liệu, chờ người chơi vào.</div>'}</div>
+  <h2>Mọi người làm gì nhiều nhất (7 ngày)</h2>
+  <div>${top.map(([k,n])=>`<span class="chip">${esc(nm(k))} · ${n}</span>`).join('')||'<span class="sub">Chưa có dữ liệu.</span>'}</div>
+  ${top.length?`<div class="note">Việc ít ai làm là việc người chơi không thấy, thấy khó, hoặc thấy không đáng. Việc bị làm nhiều là chỗ nên thêm nội dung.</div>`:''}
+  <h2>Cấp bậc</h2><div>${T.ranks.filter(r=>r.n).map(r=>`<span class="chip">${esc(r.name)} · ${r.n}</span>`).join('')}</div>
+  <h2>Người chơi</h2>
+  <table><tr><th>Người chơi</th><th>Cấp bậc</th><th>Lần cuối</th><th>Ngày chơi /14</th><th>Phút /7 ngày</th><th>Điểm danh</th><th>Bạc</th><th>Làm nhiều nhất (7 ngày)</th></tr>
+  ${d.players.map(p=>`<tr class="${!p.online&&Date.now()-p.lastSeen>3*864e5?'cold':''}"><td><span class="dot ${p.online?'on':''}"></span>${esc(p.name)} <span class="sub">${esc(p.user)}</span>${p.thai?' 🤰':''}${p.children?' 👶'+p.children:''}${p.sis?`<br><span class="sub">💞 ${esc(p.sis)}</span>`:''}</td><td>${esc(p.rank)}<br><span class="sub">${p.pts} công trạng</span></td><td>${p.online?'đang chơi':ago(p.lastSeen)}</td><td>${p.activeDays}</td><td>${p.minutes7}</td><td>${p.streak}</td><td>${p.silver}</td><td>${p.topActs.map(([k,n])=>`<span class="chip">${esc(nm(k))} ${n}</span>`).join('')}</td></tr>`).join('')}</table>
+  <div class="sub" style="margin-top:8px">Dòng đỏ: đã 3 ngày không vào. Thống kê bắt đầu tính từ bản cập nhật này, giữ 30 ngày.</div>`;
+}
+load();
+</script></body></html>

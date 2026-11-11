@@ -2,7 +2,7 @@
 module.exports = {
   TZ_OFFSET_H: 7,              // giờ Việt Nam
   NIGHT_HOUR: 21,              // (cũ) giờ lật thẻ mỗi tối
-  LAT_THE_SLOTS: [[11, 30, 'Trưa nay'], [21, 0, 'Đêm nay']], // giờ:phút lật thẻ mỗi ngày (giờ VN)
+  LAT_THE_SLOTS: [[8, 0, 'Sáng nay'], [10, 0, 'Sáng nay'], [12, 0, 'Trưa nay'], [14, 0, 'Chiều nay'], [16, 0, 'Chiều nay'], [18, 0, 'Tối nay'], [20, 0, 'Tối nay'], [22, 0, 'Đêm nay']], // giờ:phút lật thẻ mỗi ngày (giờ VN)
   FEAST_SLOTS: [[9, 30, 'out'], [12, 30, 'out'], [17, 0, 'in'], [20, 0, 'in']], // giờ bắt đầu yến tiệc; out = ngoài trời, in = trong điện
   FEAST_MIN: 20,
   FISH_PAID: 15,                // mỗi ngày bán được 15 con cá lấy bạc
@@ -77,10 +77,20 @@ module.exports = {
     huong: { name: 'Hương mê điệp', desc: 'Lần lật thẻ tới dễ được chọn hơn', price: 120 },
     le:    { name: 'Lễ vật tiến Thái hậu', desc: 'Thái hậu hài lòng +8', price: 60 },
   },
+  // trang sức: mua một lần, lợi ích vĩnh viễn
+  JEWELS: {
+    hoatai: { name: 'Hoa tai trân châu', desc: 'Mỗi lần thỉnh an Thái hậu hài lòng thêm 1', price: 250 },
+    tramthuy: { name: 'Trâm phỉ thúy', desc: 'Luôn dễ được lật thẻ hơn một chút', price: 300 },
+    vongngoc: { name: 'Vòng ngọc Hòa Điền', desc: 'Mỗi ngày tự được thêm 2 sủng ái', price: 400 },
+    tramphuong: { name: 'Trâm phượng vàng', desc: 'Dâng tiết mục ở yến tiệc được cộng điểm', price: 600 },
+  },
+  MUACHUOC_PRICE: 80,          // mua chuộc cung nữ nhà người khác để dò bí mật
+  CATCHUP_RANK: 3,             // từ Thường tại trở xuống: công trạng nhận được x1.3
+  NEWBIE_DAYS: 3,              // 3 ngày đầu mỗi ngày thêm 2 lượt
   DECOR_PRICE: { denlong: 60, binhsu: 80, luhuong: 100, tham: 40, giuong: 200 }, // món không có tên ở đây là miễn phí
   LAT_THE: { pts: 25, sung: 20, turns: 2 },
   LAT_THE_CROWD: 10,          // cung đông hơn số này thì mỗi lần lật 2 thẻ
-  LAT_THE_GIFT: { silver: 15, sung: 2 }, // quà an ủi cho người không được lật thẻ
+  LAT_THE_GIFT: { silver: 6, sung: 1 }, // quà an ủi cho người không được lật thẻ
 
   WITNESS_WAIT_MS: 5 * 60e3, // chờ nhân chứng khai tối đa 5 phút, quá hạn thì tự khai
   METHODS: [
@@ -90,7 +100,7 @@ module.exports = {
     { id: 'bua', name: 'Bùa yểm có tên Thái hậu', crime: 'yểm bùa nguyền rủa Thái hậu' },
   ],
   // ---------- giai đoạn 3 ----------
-  THAI_CHANCE: 0.3,            // tỉ lệ mang long thai sau mỗi lần được lật thẻ
+  THAI_CHANCE: 0.15,            // tỉ lệ mang long thai sau mỗi lần được lật thẻ
   THAI_DAYS: 3,                // thai kỳ (ngày thật) tính từ lúc Thái y báo hỷ
   THAI_CASE_HOURS: 12,         // thời hạn tìm kẻ hãm hại long thai
   THAI_METHODS: [
@@ -98,6 +108,15 @@ module.exports = {
     { id: 'xahuong2', name: 'Gối thêu nhồi xạ hương', crime: 'mưu hại long thai' },
   ],
   CHILD_NAMES: { trai: ['Vĩnh Kỳ', 'Vĩnh Hoằng', 'Vĩnh Diễm', 'Vĩnh Thành', 'Vĩnh Tinh', 'Vĩnh Lân'], gai: ['Hòa Kính', 'Hòa Gia', 'Cố Luân', 'Hòa Thạc', 'Minh Châu', 'Ngọc Dung'] },
+  DET_CASES: [
+    { id: 'tram', name: 'Trâm phượng của Thái hậu bị mất', crime: 'trộm trâm phượng của Thái hậu' },
+    { id: 'thuoc', name: 'Thuốc bổ ở Thái y viện bị tráo', crime: 'tráo thuốc Thái y viện' },
+    { id: 'thumat', name: 'Thư mật ở Dưỡng Tâm điện bị lấy cắp', crime: 'lấy cắp thư mật' },
+    { id: 'meo', name: 'Mèo Ba Tư của Thái hậu bị thả mất', crime: 'thả mèo của Thái hậu' },
+    { id: 'lua', name: 'Gấm Tô Châu ở Nội vụ phủ bị cắt nát', crime: 'phá hoại gấm tiến cống' },
+  ],
+  DET_HOURS: 2,                // thời hạn tra án giúp Quế ma ma
+  DET_REWARD: { pts: 20, silver: 50 },
   HH_MIN_RANK: 5,              // từ Tần trở lên được ứng cử Hoàng hậu
   HH_CYCLE_DAYS: 14,           // bao lâu bầu phượng ấn một lần
   HH_VOTE_HOURS: 24,           // thời gian tiến cử
