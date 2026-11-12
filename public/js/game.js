@@ -345,9 +345,9 @@ function renderActs() {
   if (L === 'hoavien') { if (feast) add('🎎 Dự yến tiệc', 'Đang có yến tiệc, vào ngồi cùng mọi người', () => socket.emit('goto', 'yentiec')); add('🎣 Câu cá ở hồ', `Miễn phí · cá bán lấy bạc${me.fishN >= 15 ? ' (hôm nay đã bán đủ)' : ''}, hiếm khi gặp cá chép vàng`, gameFish); add('👂 Dò tin', '1 lượt · nghe sở thích Hoàng thượng, chuyện trong cung', () => act('dotin')); add('🎐 Luyện tài nghệ', '1 lượt · chơi càng hay càng nhiều điểm', () => chooseTai(t => gameRhythm(t, q => act('luyen', { tai: t, q })))); }
   if (L === 'phong') { add('🎐 Luyện tài nghệ', '1 lượt · chơi càng hay càng nhiều điểm', () => chooseTai(t => gameRhythm(t, q => act('luyen', { tai: t, q })))); add('🎁 Ban thưởng cung nữ', `20 bạc · trung thành ${me.loyal ?? 50}/100 · mỗi ngày 1 lần`, () => act('thuongcn')); add('👘 Thay trang phục', '', openWardrobe); add('🏮 Bài trí ' + (me.hasPalace ? 'cung' : 'phòng'), 'Đặt, xoay đồ nội thất', openDecor); }
   if (L === 'phong' && !me.visit && me.rank >= 6 && !me.lanh) { const cc = me.ccDay || {};
-    add('📒 Hiệp lý lục cung', cc.so ? 'Hôm nay đã duyệt sổ' : 'Duyệt sổ chi tiêu, tìm khoản khai khống · mỗi ngày 1 lần', () => socket.emit('caocap', { op: 'so' }), cc.so);
-    add('📚 Dạy dỗ người mới', cc.day ? 'Hôm nay đã dạy' : 'Chỉ bảo một người từ Thường tại trở xuống (họ +15 công trạng)', openDay, cc.day);
-    add('🎎 Thiết yến', me.ccFeastOk ? '150 bạc · 15 phút · mỗi tiết mục +4 công trạng cho chủ tiệc' : 'Mỗi 2 ngày một lần', () => socket.emit('caocap', { op: 'yentiec' }), !me.ccFeastOk); }
+    add('📒 Hiệp lý lục cung', (cc.so || 0) >= 5 ? 'Hôm nay đã duyệt đủ 5 lần' : `Tìm khoản chi khai khống · còn ${5 - (cc.so || 0)}/5 lần hôm nay`, () => socket.emit('caocap', { op: 'so' }), (cc.so || 0) >= 5);
+    add('📚 Dạy dỗ người mới', (cc.day || 0) >= 5 ? 'Hôm nay đã dạy đủ 5 lần' : `Người được dạy +15 công trạng · còn ${5 - (cc.day || 0)}/5 lần hôm nay`, openDay, (cc.day || 0) >= 5);
+    add('🎎 Thiết yến', me.ccFeastOk ? '150 bạc · 15 phút · mỗi tiết mục +4 công trạng cho chủ tiệc · mỗi ngày 1 lần' : 'Hôm nay đã thiết yến', () => socket.emit('caocap', { op: 'yentiec' }), !me.ccFeastOk); }
   if (L === 'phong') { if (!me.visit) { add('🍵 Mời bạn bè thưởng trà', 'Mời sang cung riêng, ngồi đôn uống trà', inviteTra); add('🫖 Pha trà mời khách', 'Khách mới đến được +5 công trạng (mỗi người 1 lần/ngày)', () => socket.emit('tra', { op: 'serve' })); } else add('🚪 Cáo từ về cung', '', () => socket.emit('goto', 'phong'));
     if (world?.myBed && !me.visit) add(lying ? '🧍 Ngồi dậy' : '🛏 Lên giường', lying ? (me.selfSick ? 'Ngồi dậy là khỏi bệnh' : '') : 'Ngồi mép giường · nằm nghỉ · cáo bệnh', lying ? getUp : openMyBed); }
   if (L === 'tamcung') { const N = me.night || {};
@@ -2227,19 +2227,21 @@ function openDay() {
 // =====================================================================
 // THÁNH CHỈ CẬP NHẬT: hiện một lần cho mỗi bản mới
 // =====================================================================
-const UPDATE_VER = 'u2026-11-12';
+const UPDATE_VER = 'u2026-11-12b';
 const UPDATE_NOTES = [
+  ['🎉 Ân điển cho hậu cung', 'Mỗi ngày nay có 8 lượt (trước 5), hồi 1 lượt mỗi 30 phút, tích tối đa 20. Hoàng thượng ưu tiên lật thẻ người chơi, phi tần NPC rất hiếm khi được chọn và chỉ khi các nương nương đều đã được sủng hạnh hôm đó.'],
+  ['📒 Việc riêng bậc cao', 'Từ Phi trở lên, tại cung riêng: Hiệp lý lục cung và Dạy dỗ người mới mỗi việc 5 lần/ngày (mỗi người chỉ được dạy 1 lần/ngày). Thiết yến nay mỗi ngày 1 lần.'],
   ['🎭 Hậu cung có thêm 6 phi tần', 'Tuệ Quý phi, Mẫn Phi, Uyển Tần, Lệ Tần, Hân Quý nhân, Mai Thường tại cũng tranh ghế, tranh lật thẻ. Gặp họ ở Ngự hoa viên, Từ Ninh cung, yến tiệc, bấm vào tên để trò chuyện: có người nói khích, có người lấy lòng. Thân thì được mách sở thích Hoàng thượng.'],
   ['✋ Tát, đá, đẩy ngã, quỳ lạy, xin lỗi', 'Bấm vào tên người chơi khác hoặc phi tần NPC (chọn Hành động…) để ra tay hay làm lành. Gây sự tối đa 3 lần/ngày; làm loạn ở Từ Ninh cung, yến tiệc bị Thái hậu trách; đánh người cấp cao hơn là phạm thượng. NPC đanh đá có thể tát trả!'],
   ['🗡 Ân oán có trả có vay', 'Hãm hại phi tần NPC trong Danh sách hậu cung (từ Quý nhân). Nhưng họ nhớ mặt: vài ngày sau sẽ gài tang vật trả thù. Tìm đúng hung thủ thì họ bị giáng cấp, chỉ sai thì chủ tử bị phạt.'],
   ['🪑 Ghế có hạn, phải vượt mặt mà lên', 'Mỗi cấp có số ghế. Ghế đầy thì phải có công trạng cao hơn phi tần NPC đang ngồi, họ sẽ bị giáng để nhường chỗ. Lên Quý phi giờ cần 1300 công trạng, Hoàng quý phi 2000.'],
-  ['👑 Việc riêng cho Phi trở lên', 'Ở cung riêng: Hiệp lý lục cung (bắt sổ sách gian lận), Dạy dỗ người mới (người được dạy +15 công trạng), Thiết yến mời cả cung.'],
+  ['👑 Việc riêng cho Phi trở lên', 'Ở cung riêng: Hiệp lý lục cung và Dạy dỗ người mới, mỗi việc 5 lần/ngày; Thiết yến mời cả cung mỗi ngày 1 lần.'],
   ['🌙 Thị tẩm nhiều chuyện hơn', 'Lật thẻ mỗi 2 tiếng (8h–22h). Chuẩn bị tắm hoa, áo ngủ, hương xông; nghe Hoàng thượng tâm sự; gối đầu tâu chuyện; ngắm trăng đối thơ; nhận tín vật; nhật ký sủng hạnh. Coi chừng người khác giả bệnh kéo Hoàng thượng đi, nhớ níu tay giữ lại!'],
   ['🍳 Ngự thiện phòng (từ Quý nhân)', 'Mở Bí kíp nhà bếp, chọn món, lấy nguyên liệu, thái, nấu, bày ra chén rồi bưng lên Dưỡng Tâm điện dâng Hoàng thượng. Món Hoàng thượng đang thèm được thưởng nhiều nhất.'],
   ['🏠 Cung riêng ấm cúng hơn', 'Giường mới: ngồi, nằm nghỉ, cáo bệnh (2 giờ không ai hại được). Đôn sứ ngồi được. Mời bạn bè sang thưởng trà. Nội vụ phủ có thêm Sập La Hán để ngồi đánh cờ vây với tỷ muội hoặc cung nữ.'],
   ['🎎 Yến tiệc rộn ràng', 'Giờ yến tiệc: 9h, 11h, 15h, 17h. Thêm múa lụa, kiếm vũ, hát; kính rượu; ra múa cùng nhau; tửu lệnh nối thành ngữ; pháo hoa sau tiết mục và khen chê; đoàn ca vũ Giáo phường biểu diễn.'],
   ['📜 Đại án và 🏮 Đại lễ', 'Mỗi tuần một đại án cả cung cùng tra, mỗi người giữ một mảnh manh mối. Đại lễ thì cả cung góp sức, đạt mốc là ai cũng có quà.'],
-  ['✨ Lặt vặt', 'Lượt hồi mỗi 30 phút. Trang phục mới: Phi · xanh lam thêu vàng. Thư từ, thông báo về điện thoại (bấm 🔔), danh hiệu, nhiệm vụ tân thủ, điểm danh 7 ngày.'],
+  ['✨ Lặt vặt', 'Mỗi ngày 8 lượt, hồi 1 lượt mỗi 30 phút, tích tối đa 20. Hoàng thượng ưu tiên lật thẻ người chơi. Trang phục mới: Phi · xanh lam thêu vàng. Thư từ, thông báo về điện thoại (bấm 🔔), danh hiệu, nhiệm vụ tân thủ, điểm danh 7 ngày.'],
 ];
 function showUpdate(force) {
   try { if (!force && localStorage.getItem('mph_upd_' + me.id) === UPDATE_VER) return; } catch {}

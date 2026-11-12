@@ -147,7 +147,7 @@ function selfView(p) {
     isHH: isHH(p), hhDay: p.hhDay || {}, hhVote: hhVoteView(p), hhName: DB.state.hh ? P(DB.state.hh.id)?.name || null : null,
     event: { ...curEvent(), done: p.evDay === dayKey() }, streak: p.streak || 0, ach: achView(p), titleSel: p.titleSel || '',
     lying: !!p.lying, visit: p.visit || null, selfSick: !!(p.sick && p.sickUntil > now()), selfSickDay: p.selfSickDay === dayKey(),
-    ccDay: p.ccDay?.d === dayKey() ? p.ccDay : {}, ccFeastOk: now() - (p.ccFeast || 0) >= 2 * 864e5,
+    ccDay: p.ccDay?.d === dayKey() ? p.ccDay : {}, ccFeastOk: now() - (p.ccFeast || 0) >= 864e5,
     big: bigView(p), fest: festView(p), night: nightView(p), diary: (p.diary || []).slice(0, 30), tinvat: p.tinvat || {}, keoDay: p.keoDay === dayKey(),
     dish: p.dish ? { name: p.dish.name, q: p.dish.q, t: p.dish.t, dish: p.dish.dish } : null, cookN: p.cookDay?.d === dayKey() ? p.cookDay.n : 0,
     quest: questView(p), jewels: p.jewels || [], mcDay: p.mcDay === dayKey(),
@@ -815,7 +815,7 @@ function checkDeadlines() {
 function latThe(when = 'Đêm nay') {
   const pool = Object.values(DB.players).filter(p => !p.lanh && !p.thai?.known && !(p.sick && p.sickUntil > now()) && !((p.camTucUntil || 0) > now()) && p.rank >= 1 && (online.has(p.id) || now() - (p.lastSeen || p.created || 0) < 3 * 864e5));
   if (!pool.length) return null;
-  if (Math.random() < C.NPC_LATTHE) { const ns = NPCF().filter(n => n.rank >= 3); const n = ns.sort((a, b) => b.sung * Math.random() - a.sung * Math.random())[0];
+  if (Math.random() < C.NPC_LATTHE && !pool.some(p => online.has(p.id) && !(p.picked1 > 0))) { const ns = NPCF().filter(n => n.rank >= 3); const n = ns.sort((a, b) => b.sung * Math.random() - a.sung * Math.random())[0];
     if (n) { n.sung += 5; n.pts += 15; npcPromote(n); news(`${when} Hoàng thượng lật thẻ bài của ${n.name}.`, 'latthe'); io.emit('latthe', { id: n.id, name: n.name, when }); for (const p of pool) { p.notPicked = (p.notPicked || 0) + 1; } return null; } }
   const weight = p => {
     let m = 1;
@@ -1669,18 +1669,18 @@ io.on('connection', sock => {
     if (!me || !d || me.lanh || me.rank < 6) return toast(me, 'Từ Phi trở lên mới được giao việc này.');
     me.ccDay = me.ccDay?.d === dayKey() ? me.ccDay : { d: dayKey() }; const C2 = me.ccDay;
     if (d.op === 'so') { // hiệp lý lục cung: duyệt sổ chi tiêu
-      if (C2.so) return toast(me, 'Hôm nay đã duyệt sổ rồi.');
+      if ((C2.so || 0) >= C.CC_PER_DAY) return toast(me, `Hôm nay đã duyệt sổ đủ ${C.CC_PER_DAY} lần rồi.`);
       if (d.ok === undefined) { const items = [['Than sưởi cung Tây', 120], ['Gấm vóc cho tú nữ', 300], ['Dầu đèn Ngự hoa viên', 60], ['Lương thực Ngự thiện phòng', 500], ['Thuốc men Thái y viện', 180], ['Hương liệu Từ Ninh cung', 90]].sort(() => Math.random() - .5).slice(0, 4).map(([t, v]) => ({ t, v })); const bad = rnd(4); items[bad].v *= 3; items[bad].bad = 1; me.ccSo = items; return sock.emit('ccSo', items.map(x => ({ t: x.t, v: x.v }))); }
-      C2.so = 1; const ok = me.ccSo?.[+d.ok]?.bad; me.ccSo = null;
+      if (!me.ccSo) return; C2.so = (C2.so || 0) + 1; const ok = me.ccSo[+d.ok]?.bad; me.ccSo = null;
       if (ok) { addPts(me, 12); me.silver += 40; relAdd(me, 'tonggiam', 4, 'phát hiện sổ sách gian lận'); toast(me, 'Phát hiện khoản chi bị khai khống! Tổng quản kính phục: +12 công trạng, +40 bạc.', 'good'); news(`📒 ${me.name} hiệp lý lục cung, bắt được một khoản chi gian lận.`); }
       else toast(me, 'Duyệt sai, khoản gian lận lọt mất. Hôm nay không có thưởng.', 'bad');
     } else if (d.op === 'day') { // dạy dỗ người mới
-      if (C2.day) return toast(me, 'Hôm nay đã dạy dỗ rồi.');
-      const t = d.who && P(d.who); C2.day = 1;
+      if ((C2.day || 0) >= C.CC_PER_DAY) return toast(me, `Hôm nay đã dạy dỗ đủ ${C.CC_PER_DAY} lần rồi.`);
+      const t = d.who && P(d.who); C2.dw = C2.dw || []; if (t && C2.dw.includes(t.id)) return toast(me, `Hôm nay đã dạy ${t.name} rồi, để người khác hoặc dạy tú nữ mới.`); C2.day = (C2.day || 0) + 1; if (t) C2.dw.push(t.id);
       if (t && t.id !== me.id && t.rank <= 3 && !t.lanh) { addPts(t, 15); addPts(me, 10); relAdd(me, 'thaihau', 2, 'dạy dỗ người mới'); toast(t, `📚 ${me.name} dạy bổn cung lễ nghi trong cung: +15 công trạng.`, 'good'); notify(t, '📚 Được dạy dỗ', `${me.name} chỉ bảo bổn cung lễ nghi: +15 công trạng.`); news(`📚 ${me.name} dạy dỗ ${t.name} lễ nghi hậu cung.`); push(t); toast(me, `Đã dạy ${t.name}: +10 công trạng.`, 'good'); }
       else { addPts(me, 8); toast(me, 'Dạy dỗ các tú nữ mới tuyển: +8 công trạng.', 'good'); }
     } else if (d.op === 'yentiec') {
-      if (now() - (me.ccFeast || 0) < 2 * 864e5) return toast(me, 'Mỗi 2 ngày mới được thiết yến một lần.');
+      if (now() - (me.ccFeast || 0) < 864e5) return toast(me, 'Mỗi ngày chỉ thiết yến một lần.');
       if (DB.state.feast && !DB.state.feast.done) return toast(me, 'Đang có yến tiệc rồi.'); if (me.silver < 150) return toast(me, 'Cần 150 bạc.', 'bad');
       me.silver -= 150; me.ccFeast = now(); addPts(me, 10); news(`🎎 ${me.name} bỏ bạc thiết yến mời cả hậu cung.`); startFeast(15, 'in'); DB.state.feast.host = me.id;
       for (const q of Object.values(DB.players)) if (q.id !== me.id) notify(q, '🎎 Yến tiệc', `${me.name} thiết yến mời cả hậu cung, 15 phút.`);

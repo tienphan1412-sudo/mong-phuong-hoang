@@ -7,9 +7,9 @@ module.exports = {
   FEAST_MIN: 20,
   FISH_PAID: 15,                // mỗi ngày bán được 15 con cá lấy bạc
   NOTICE_LEAD_MIN: 15,         // báo trước sự kiện bao nhiêu phút               // yến tiệc kéo dài (phút)
-  TURNS_PER_DAY: 5,           // lượt đầu ngày
+  TURNS_PER_DAY: 8,           // lượt đầu ngày
   TURN_REGEN_MIN: 30,         // cứ 30 phút hồi 1 lượt
-  TURN_CAP: 10,               // hồi tối đa tới 10 lượt
+  TURN_CAP: 20,               // hồi tối đa tới 20 lượt
   TASK_TURNS: 2,              // làm đủ 3 nhiệm vụ ngày được thêm 2 lượt
   CASE_HOURS: 24,              // thời hạn điều tra trước khi xử án
   PROTECT_HOURS: 24,           // bảo hộ sau khi bị giáng cấp
@@ -162,8 +162,9 @@ module.exports = {
     { id: 'npc5', tinh: 'ninh', name: 'Hân Quý nhân', short: 'Lục Hân Nhiên', rank: 4, pts: 300, sung: 40, model: 'quynhan' },
     { id: 'npc6', tinh: 'nhut', name: 'Mai Thường tại', short: 'Diệp Mai Chi', rank: 3, pts: 170, sung: 30, model: 'thuongtai_hong' },
   ],
-  NPC_LATTHE: 0.2,             // tỉ lệ Hoàng thượng lật thẻ phi tần NPC thay vì người chơi
+  NPC_LATTHE: 0.05,             // tỉ lệ Hoàng thượng lật thẻ phi tần NPC thay vì người chơi
   HIGH_RANK_SLOW: 0.7,         // từ Phi trở lên: công trạng nhận được x0.7
+  CC_PER_DAY: 5,               // việc riêng từ Phi trở lên: mỗi việc 5 lần/ngày
   HAMHAI: { silver: 80, turns: 1, ok: 0.6 },
   HH_MIN_RANK: 5,              // từ Tần trở lên được ứng cử Hoàng hậu
   HH_CYCLE_DAYS: 14,           // bao lâu bầu phượng ấn một lần
