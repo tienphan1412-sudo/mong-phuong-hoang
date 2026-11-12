@@ -17,7 +17,7 @@ function lock(clips) {
 }
 export function loadModel(name) {
   if (!cache[name]) cache[name] = loader.loadAsync(`models/${name}.glb`).then(g => {
-    if (name === 'hoangtu1') { const REN = { 'walk.001': 'di', 'run.001': 'chay', 'sit.001': 'ngoi', 'cry.001': 'khoc', 'laugh_01.001': 'cuoi' }; g.animations = g.animations.filter(a => REN[a.name]); g.animations.forEach(a => a.name = REN[a.name]); }
+    if (name === 'hoangtu1' || name === 'congchua3') { const REN = { 'walk.001': 'di', 'female walk.001': 'di', 'run.001': 'chay', 'sit.001': 'ngoi', 'cry.001': 'khoc', 'laugh_01.001': 'cuoi', 'dance_01.001': 'mua' }; g.animations = g.animations.filter(a => REN[a.name]); g.animations.forEach(a => a.name = REN[a.name]); }
     if (name === 'thuongtai') FEMALE = lock(g.animations);
     if (name === 'hoangthuong') MALE = lock(g.animations); else lock(g.animations);
     g.scene.traverse(o => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; o.frustumCulled = false; } });
@@ -76,7 +76,7 @@ export async function spawn(modelName) {
   const male = MALE_MODELS.has(modelName);
   const root = SkeletonUtils.clone(g.scene);
   if (modelName.startsWith('hoangthuong')) root.scale.setScalar(1.08); // Hoàng thượng cao hơn phi tần
-  const KIDC = modelName.startsWith('hoangtu') ? (await loadModel('hoangtu1')).animations : null; // hoàng tử dùng chung động tác trẻ con
+  const KIDC = modelName.startsWith('hoangtu') ? (await loadModel('hoangtu1')).animations : modelName.startsWith('congchua') ? (await loadModel('congchua3')).animations : null; // trẻ con dùng chung động tác
   const B = {};
   root.traverse(o => { if (o.isBone) { const n = o.name.replace(/^mixamorig:?/, ''); if (MAPB[n]) B[MAPB[n]] = o; } if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; o.frustumCulled = false; } });
   const mixer = new THREE.AnimationMixer(root);

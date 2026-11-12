@@ -2243,8 +2243,9 @@ function openDay() {
 // =====================================================================
 // THÁNH CHỈ CẬP NHẬT: hiện một lần cho mỗi bản mới
 // =====================================================================
-const UPDATE_VER = 'u2026-11-12e';
+const UPDATE_VER = 'u2026-11-12f';
 const UPDATE_NOTES = [
+  ['👦👧 Hoàng tử, công chúa có dáng thật', 'Các con giờ là nhân vật 3D mặc thường phục cung đình, biết đi, chạy, khóc, quỳ học. Thái tử mặc áo vàng; công chúa giỏi giang (từ 60 điểm) được mặc áo đỏ thêu phượng.'],
   ['🤰 Mang long thai', 'Bụng to dần theo từng ngày, ai đi ngang cũng thấy, đứng yên thì tay xoa bụng.'],
   ['👶 Em bé sơ sinh (3 ngày đầu)', 'Bé nằm nôi ở cung riêng. Bé khóc thì xem gợi ý mà cho bú, thay tã hay ru ngủ cho đúng; để bé khóc quá 30 phút bé mệt, lâu ngày sinh bệnh phải mời Thái y. Bế con đi khắp cung, ra Dưỡng Tâm điện cho Hoàng thượng bế được sủng ái.'],
   ['👣 Chập chững (ngày 3–7)', 'Dắt con theo, bé lon ton chạy sau lưng mẹ, té ngã thì khóc đòi dỗ, đói thì đòi ăn.'],
@@ -2567,9 +2568,8 @@ function animKid(k, t, moving, mode) {
 // hoàng tử dùng model 3D thật (3 bộ áo, Thái tử mặc áo vàng); công chúa tạm dùng hình tự dựng
 const KID_SC = { chap: .56, hoc: .68 };
 function kidBody(k, e) {
-  if (k.sex !== 'trai') return makeKid(k.sex, k.stage);
   const g = new THREE.Group(); let h = 0; for (const ch of String(k.id || k.cid)) h = (h * 31 + ch.charCodeAt(0)) >>> 0;
-  const model = k.tt ? 'hoangtu3' : h % 2 ? 'hoangtu2' : 'hoangtu1', w = world;
+  const model = k.sex === 'trai' ? (k.tt ? 'hoangtu3' : h % 2 ? 'hoangtu2' : 'hoangtu1') : (k.tt ? 'congchua3' : h % 2 ? 'congchua2' : 'congchua1'), w = world;
   spawn(model).then(c => { if (world !== w || !g.parent) return c.dispose(); c.root.scale.setScalar(KID_SC[k.stage] || .68); g.add(c.root); c.play('dung_cho'); e.char = c; }).catch(() => { g.add(makeKid(k.sex, k.stage)); });
   g.userData = { modelKid: true }; return g;
 }
@@ -2577,7 +2577,7 @@ function kidAnim(e, dt, moving, mode, fast) {
   const c = e.char; if (!c) { if (e.mesh.userData.kid) animKid(e.mesh, kidT, moving, mode); else for (const ch of e.mesh.children) if (ch.userData?.kid) animKid(ch, kidT, moving, mode); return; }
   if (mode === 'sit') { if (!e.sat) { e.sat = true; kneelOn(c, 0, .08, 0, 0); } c.update(dt); return; }
   if (e.sat) { e.sat = false; c.pose = null; c.root.position.set(0, 0, 0); c.root.rotation.set(0, 0, 0); }
-  const want = mode === 'fall' || mode === 'cry' ? 'khoc' : moving ? (fast ? 'chay' : 'di') : 'dung_cho';
+  let want = mode === 'fall' || mode === 'cry' ? 'khoc' : moving ? (fast ? 'chay' : 'di') : 'dung_cho'; if (want === 'chay' && !c.actions?.chay) want = 'di';
   if (c.curName !== want) c.play(want); c.update(dt);
 }
 function makeBelly(c) {
@@ -2599,13 +2599,13 @@ function syncKids() {
     const K = O.kid;
     if (K.tp > .03) kidEnt('belly:' + O.id, () => ({ kind: 'belly', c: O.c, mesh: makeBelly(O.c) })).tp = K.tp;
     if (K.carry) { const e = kidEnt('carry:' + O.id + ':' + K.carry.cid, () => { const m = makeBaby(K.carry.sex); world.group.add(m); const lb = kidLabel(K.carry.name); m.add(lb); lb.position.set(0, .15, 0); return { kind: 'carry', c: O.c, mesh: m, label: lb, cid: K.carry.cid }; }); }
-    if (K.follow) { kidEnt('follow:' + O.id + ':' + K.follow.cid + ':' + K.follow.stage + ':' + !!K.follow.tt, () => { const e = { kind: 'follow', c: O.c, cid: K.follow.cid, stage: K.follow.stage }; const m = e.mesh = kidBody({ ...K.follow, id: K.follow.cid }, e); const p = O.c.root.position; m.position.set(p.x + .5, 0, p.z + .5); world.group.add(m); const lb = e.label = kidLabel(K.follow.name); m.add(lb); lb.position.y = K.follow.sex === 'trai' ? (K.follow.stage === 'chap' ? 1.0 : 1.22) : K.follow.stage === 'chap' ? .75 : 1.0; return e; }); }
+    if (K.follow) { kidEnt('follow:' + O.id + ':' + K.follow.cid + ':' + K.follow.stage + ':' + !!K.follow.tt, () => { const e = { kind: 'follow', c: O.c, cid: K.follow.cid, stage: K.follow.stage }; const m = e.mesh = kidBody({ ...K.follow, id: K.follow.cid }, e); const p = O.c.root.position; m.position.set(p.x + .5, 0, p.z + .5); world.group.add(m); const lb = e.label = kidLabel(K.follow.name); m.add(lb); lb.position.y = K.follow.stage === 'chap' ? 1.0 : 1.22; return e; }); }
   }
   // bé trong cung riêng
   if (world.loc === 'phong') {
     const own = !me.visit, list = own ? (me.children || []).filter(k => !k.ward && k.id !== me.carry && k.id !== me.follow) : (sceneHost?.kids || []);
     const W = world.roomSize?.W || 5, D = world.roomSize?.D || 4.6; let ci = 0;
-    for (const k of list) kidStatic(k, k.stage === 'so' ? { cradle: [-W / 2 + .75, -D / 2 + 1.1 + (ci++) * .95] } : { wander: [W / 2 - 1.3, .2] });
+    let wi = 0; for (const k of list) kidStatic(k, k.stage === 'so' ? { cradle: [-W / 2 + .75, -D / 2 + 1.1 + (ci++) * .95] } : { wander: [W / 2 - 1.3 - (wi % 2) * 1.2, -.6 + (wi++) * .8] });
   }
   if (world.loc === 'acaso') { let ci = 0, di = 3; for (const k of kidAcaso) { if (k.stage === 'so') { const cr = world.cradles?.[ci++]; if (cr) kidStatic(k, { cradle: [cr.x, cr.z], existing: cr.obj }); } else if (k.stage === 'chap') kidStatic(k, { wander: [-3.6, 2.6] }); else { const d = world.kidDesks?.[di++ % 6]; if (d) kidStatic(k, { desk: d }); } } }
   for (const [key, e] of kidEnts) if (!e.seen || e.w !== world) { kidDrop(e); kidEnts.delete(key); }
@@ -2614,7 +2614,7 @@ function kidStatic(k, o) {
   kidEnt('st:' + k.id + ':' + k.stage + ':' + !!k.tt, () => {
     const lb = kidLabel(k.name + (k.mother ? ` · con ${k.mother}` : ''));
     if (o.cradle) { const cr = o.existing || makeCradle(); if (!o.existing) { cr.position.set(o.cradle[0], 0, o.cradle[1]); world.group.add(cr); } const rock = cr.getObjectByName('rock'); const b = makeBaby(k.sex); b.position.set(0, .36, .04); rock.add(b); b.add(lb); lb.position.y = .3; return { kind: 'cradle', mesh: o.existing ? b : cr, extra: o.existing ? null : null, baby: b, rock, label: lb, cid: k.id }; }
-    const e = { cid: k.id, label: lb }; const m = e.mesh = kidBody(k, e); m.add(lb); lb.position.y = k.sex === 'trai' ? (k.stage === 'chap' ? 1.0 : 1.22) : k.stage === 'chap' ? .75 : 1.0; world.group.add(m);
+    const e = { cid: k.id, label: lb }; const m = e.mesh = kidBody(k, e); m.add(lb); lb.position.y = k.stage === 'chap' ? 1.0 : 1.22; world.group.add(m);
     if (o.desk) { m.position.set(o.desk.x, 0, o.desk.z); m.rotation.y = o.desk.ry; return Object.assign(e, { kind: 'desk' }); }
     m.position.set(o.wander[0], 0, o.wander[1]); return Object.assign(e, { kind: 'wander', home: o.wander, tgt: null, next: 0 });
   });
@@ -2626,7 +2626,7 @@ function kidFrame(dt) {
     if (e.w !== world) continue; const cry = e.cid && kidCries(e.cid);
     if (e.label && cry && kidT - (e.bub || 0) > 3.5) { e.bub = kidT; bubble(e.label, rpick(['Oe oe oe… 😭', 'Hu hu… 😢', 'Oaaa! 😭'])); }
     if (e.kind === 'belly') { const c = e.c; if (!c.root.parent) { e.mesh.visible = false; continue; } e.mesh.visible = c.root.visible; const B = c.B.spine || c.B.hips; if (!B) continue; c.root.updateMatrixWorld(true); B.getWorldPosition(kidWorldPos); const ry = c.root.rotation.y, r = .05 + .035 * e.tp, f = .03 + .04 * e.tp;
-      e.mesh.position.set(kidWorldPos.x + Math.sin(ry) * f, kidWorldPos.y - .05, kidWorldPos.z + Math.cos(ry) * f); e.mesh.scale.set(r * 1.05, r * 1.1, r * .85); e.mesh.rotation.y = ry;
+      e.mesh.position.set(kidWorldPos.x + Math.sin(ry) * f, kidWorldPos.y - .07, kidWorldPos.z + Math.cos(ry) * f); e.mesh.scale.set(r * 1.0, r * 1.3, r * .95); e.mesh.rotation.y = ry;
     }
     else if (e.kind === 'carry') { const c = e.c;
       const B = c.B.spine2 || c.B.spine; if (!B) continue; c.root.updateMatrixWorld(true); B.getWorldPosition(kidWorldPos); const ry = c.root.rotation.y;
