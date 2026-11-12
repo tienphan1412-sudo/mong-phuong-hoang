@@ -357,7 +357,7 @@ function thaiTick() {
 function thaiOne(p) {
   {
     if (!p.thai.known && now() - p.thai.since > 24 * 3600e3) revealThai(p, 'nghen');
-    else if (p.thai.known && now() >= p.thai.due && (p.thai.test || !Object.values(DB.state.cases).some(c => c.victim === p.id && c.status === 'open'))) { /* thai thử thì không chờ phá án */ if (DB.state.sinh?.id === p.id) return; if (online.has(p.id) && p.loc !== 'tamcung' && sinhStart(p)) return; if (now() - p.thai.due > 12 * 3600e3) birth(p); }
+    else if (p.thai.known && now() >= p.thai.due && (p.thai.test || !Object.values(DB.state.cases).some(c => c.victim === p.id && c.status === 'open'))) { /* thai thử thì không chờ phá án */ if (DB.state.sinh?.id === p.id) return; if (online.has(p.id) && p.loc !== 'tamcung' && sinhStart(p)) return; /* chỉ sinh khi người mẹ online để cả cung cùng chờ tin */ }
   }
 }
 
@@ -1082,12 +1082,12 @@ function kidScore(c) { return Math.round(c.van + c.vo + c.nghe + c.duc + c.ngoan
 function kidPub(p, others = false) {
   const o = {}; if (p.thai?.known && !(others && p.thai.test)) o.tp = Math.max(0, Math.min(1, 1 - (p.thai.due - now()) / (C.THAI_DAYS * 864e5)));
   const ks = p.children || [];
-  if (p.carry) { const c = ks.find(k => k.id === p.carry); if (c && kidStage(c) === 'so' && !c.ward && !(others && c.test)) o.carry = { cid: c.id, sex: c.sex, name: c.name }; else p.carry = null; }
-  if (p.follow) { const c = ks.find(k => k.id === p.follow); if (c && kidStage(c) !== 'so' && !c.ward && !(others && c.test)) o.follow = { cid: c.id, sex: c.sex, name: c.name, stage: kidStage(c), tt: kidTT(c) }; else p.follow = null; }
+  if (p.carry) { const c = ks.find(k => k.id === p.carry); if (c && kidStage(c) === 'so' && !c.ward) { if (!(others && c.test)) o.carry = { cid: c.id, sex: c.sex, name: c.name }; } else p.carry = null; }
+  if (p.follow) { const c = ks.find(k => k.id === p.follow); if (c && kidStage(c) !== 'so' && !c.ward) { if (!(others && c.test)) o.follow = { cid: c.id, sex: c.sex, name: c.name, stage: kidStage(c), tt: kidTT(c), ao: c.ao || 0 }; } else p.follow = null; }
   o.cry = ks.filter(c => c.cry && !(others && c.test)).map(c => c.id);
   return o;
 }
-function kidView(p) { return kidFix(p).map(c => ({ id: c.id, sex: c.sex, name: c.name, born: c.born, stage: kidStage(c), age: +kidAge(c).toFixed(2), hp: c.hp, ngoan: c.ngoan, van: c.van, vo: c.vo, nghe: c.nghe, duc: c.duc, ward: !!c.ward, sick: !!c.sick, cry: c.cry ? c.cry.need : null, hoc: c.hocD === dayKey() ? c.hoc || {} : {}, tham: c.thamD === dayKey(), khao: c.khaoD === dayKey(), test: !!c.test, taytam: !!c.taytam, traochu: !!c.traochu, talent: c.talent || null, thaitu: DB.state.thaitu?.cid === c.id, coluan: c.sex === 'gai' && kidScore(c) >= KID().THAITU_MIN })); }
+function kidView(p) { return kidFix(p).map(c => ({ id: c.id, sex: c.sex, name: c.name, born: c.born, stage: kidStage(c), age: +kidAge(c).toFixed(2), hp: c.hp, ngoan: c.ngoan, van: c.van, vo: c.vo, nghe: c.nghe, duc: c.duc, ward: !!c.ward, sick: !!c.sick, cry: c.cry ? c.cry.need : null, hoc: c.hocD === dayKey() ? c.hoc || {} : {}, tham: c.thamD === dayKey(), khao: c.khaoD === dayKey(), test: !!c.test, ao: c.ao || 0, tt: kidTT(c), taytam: !!c.taytam, traochu: !!c.traochu, talent: c.talent || null, thaitu: DB.state.thaitu?.cid === c.id, coluan: c.sex === 'gai' && kidScore(c) >= KID().THAITU_MIN })); }
 const kidTT = c => c.sex === 'trai' ? DB.state.thaitu?.cid === c.id : kidScore(c) >= KID().THAITU_MIN;
 function kidEmit(p) { const s = sockOf(p.id); const pub = kidPub(p), pubO = kidPub(p, true); for (const [id, so] of online) if (id !== p.id && P(id)?.loc === p.loc && (!stealth(p) || isAdm(id))) so.emit('pkid', { id: p.id, kid: isAdm(id) ? pub : pubO }); if (s) s.emit('pkid', { id: p.id, kid: pub }); }
 // trẻ nhỏ đòi chăm: khóc ngẫu nhiên khi mẹ online
@@ -1139,6 +1139,7 @@ function kidSock(sock, getMe) {
       if (a === 'ru' || a === 'choi') { if (now() - (c.playAt || 0) < 3600e3) return toast(me, `${c.name} vừa chơi xong, để bé nghỉ chút.`); c.playAt = now(); c.ngoan = Math.min(100, c.ngoan + 2); c.hp = Math.min(100, c.hp + 1); addPts(me, 2); return done(a === 'ru' ? `Bổn cung bế ${c.name} ru hát, bé cười tít mắt.` : `Bổn cung chơi đùa với ${c.name}, tiếng cười vang cả cung.`); }
       return toast(me, `${c.name} đang ngoan, không khóc.`);
     }
+    if (d.op === 'ao') { if (st === 'so' || !near()) return toast(me, `Phải ở bên ${c.name} mới thay đồ được.`); const o = +d.ao; if (![1, 2].includes(o)) return; c.ao = o; return done(`Bổn cung thay cho ${c.name} bộ đồ mới, bé xoay một vòng khoe mẫu thân.`); }
     if (d.op === 'gan') {
       const A = { hon: 'Bổn cung hôn lên trán con, bé cười toe.', nung: 'Bổn cung nựng đôi má phúng phính, bé khúc khích.', hat: 'Bổn cung bế con khẽ hát ru, bé lim dim ngủ.', om: `Bổn cung ôm ${c.name} vào lòng, con rúc đầu vào ngực mẹ.`, tron: `Hai mẹ con chơi trốn tìm, ${c.name} cười nắc nẻ.`, tapdi: `Bổn cung nắm tay ${c.name} tập đi từng bước.`, kechuyen: `Bổn cung kể chuyện cổ tích, ${c.name} nghe say sưa.`, chaitoc: `Bổn cung chải tóc cho ${c.name}, con ngồi im ngoan ngoãn.`, dayviet: `Bổn cung cầm tay ${c.name} viết từng nét chữ.` };
       const a = String(d.act || ''); if (!A[a]) return; if (!near()) return toast(me, `Phải ở bên ${c.name} mới gần gũi được.`);
@@ -1433,7 +1434,7 @@ function enter(p, loc, sock) {
   if (loc === 'yentiec') { const free = SEAT_IDS.yentiec.find(id => !(SEATS.yentiec || {})[id] || !online.has(SEATS.yentiec[id])); if (free) { takeSeat(p, free); seat = free; } }
   if (loc === 'phong' && p.lying) p.anim = 'lie:b0';
   const host = loc === 'phong' ? (P(p.visit) || p) : null;
-  sock.emit('scene', { fei: feiPresent(loc).map(feiView), loc, players: others, venue: DB.state.feast?.venue || 'out', seat, host: host ? { id: host.id, name: host.name, decor: host.decor || [], palace: host.rank >= C.PALACE_RANK, kids: kidView(host).filter(c => !c.ward && !c.test && c.id !== host.carry && c.id !== host.follow).map(c => ({ id: c.id, sex: c.sex, name: c.name, stage: c.stage, cry: c.cry, tt: c.thaitu || c.coluan })) } : null, sinh: loc === 'sansinh' ? sinhPub() : null, acaso: loc === 'acaso' ? Object.values(DB.players).flatMap(q => kidView(q).filter(c => c.ward && !c.test).map(c => ({ id: c.id, sex: c.sex, name: c.name, stage: c.stage, cry: c.cry, tt: c.thaitu || c.coluan, mother: q.name, mid: q.id }))) : null, lying: loc === 'phong' && !!p.lying });
+  sock.emit('scene', { fei: feiPresent(loc).map(feiView), loc, players: others, venue: DB.state.feast?.venue || 'out', seat, host: host ? { id: host.id, name: host.name, decor: host.decor || [], palace: host.rank >= C.PALACE_RANK, kids: kidView(host).filter(c => !c.ward && !c.test && c.id !== host.carry && c.id !== host.follow).map(c => ({ id: c.id, sex: c.sex, name: c.name, stage: c.stage, cry: c.cry, tt: c.thaitu || c.coluan, ao: c.ao })) } : null, sinh: loc === 'sansinh' ? sinhPub() : null, acaso: loc === 'acaso' ? Object.values(DB.players).flatMap(q => kidView(q).filter(c => c.ward && !c.test).map(c => ({ id: c.id, sex: c.sex, name: c.name, stage: c.stage, cry: c.cry, tt: c.thaitu || c.coluan, ao: c.ao, mother: q.name, mid: q.id }))) : null, lying: loc === 'phong' && !!p.lying });
   if (loc === 'yentiec' && DB.state.feast?.show && now() < DB.state.feast.show.at + 38e3) setTimeout(() => sock.emit('npcShow', DB.state.feast.show), 2000);
   if (loc === 'yentiec') { const t = DB.state.feast?.tl; setTimeout(() => sock.emit('tuulenh', t && !t.done ? { q: t.q, end: t.end } : null), 1500); }
   if (stealth(p)) { for (const [id, so] of online) { const q = P(id); if (q && q.admin && id !== p.id && roomOf(q) === room) so.emit('pjoin', publicView(p)); } } else sock.to(room).emit('pjoin', publicView(p));

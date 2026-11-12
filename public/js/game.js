@@ -2246,8 +2246,11 @@ function openDay() {
 // =====================================================================
 // THÁNH CHỈ CẬP NHẬT: hiện một lần cho mỗi bản mới
 // =====================================================================
-const UPDATE_VER = 'u2026-11-13b';
+const UPDATE_VER = 'u2026-11-13c';
 const UPDATE_NOTES = [
+  ['👘 Thay đồ cho con', 'Hoàng tử, công chúa có 2 bộ thường phục để mẹ chọn. Lễ phục (vàng cho Thái tử, đỏ phượng cho công chúa giỏi) tự mặc khi được sắc phong.'],
+  ['🤱 Bế con trên tay', 'Bé sơ sinh nằm gọn trên cánh tay mẹ, đầu gối lên khuỷu tay. Hôn trán: mẹ nâng bé lên cúi xuống hôn; ôm con: mẹ khom người dang tay ôm.'],
+  ['⏳ Sinh con', 'Chỉ chuyển dạ khi người mẹ đang online để cả cung chờ tin. Chờ tin còn 1 phút.'],
   ['💞 Gần gũi với con', 'Mẹ có thể hôn trán, nựng má, bế hát ru bé sơ sinh; ôm con, chơi trốn tìm, dắt tay tập đi khi bé chập chững; kể chuyện, chải tóc, dạy viết chữ khi con đi học. Bé thêm ngoan, thêm khỏe.'],
   ['✍️ Mẹ đặt tên con', 'Lúc sinh, Hoàng thượng đưa vài cái tên, người mẹ chọn tên cho con.'],
   ['🏯 Cổng cung mới', 'Sân cung lúc chuyển dạ có mặt tiền song gỗ, cửa lớn bốn cánh mở hai cánh giữa. Thời gian chờ sinh rút ngắn còn vài phút.'],
@@ -2589,7 +2592,7 @@ function animKid(k, t, moving, mode) {
 const KID_SC = { chap: .56, hoc: .68 };
 function kidBody(k, e) {
   const g = new THREE.Group(); let h = 0; for (const ch of String(k.id || k.cid)) h = (h * 31 + ch.charCodeAt(0)) >>> 0;
-  const model = k.sex === 'trai' ? (k.tt ? 'hoangtu3' : h % 2 ? 'hoangtu2' : 'hoangtu1') : (k.tt ? 'congchua3' : h % 2 ? 'congchua2' : 'congchua1'), w = world;
+  const ao = k.ao || (h % 2 ? 2 : 1); const model = k.sex === 'trai' ? (k.tt ? 'hoangtu3' : 'hoangtu' + ao) : (k.tt ? 'congchua3' : 'congchua' + ao), w = world;
   spawn(model).then(c => { if (world !== w || !g.parent) return c.dispose(); c.root.scale.setScalar(KID_SC[k.stage] || .68); g.add(c.root); c.play('dung_cho'); e.char = c; }).catch(() => { g.add(makeKid(k.sex, k.stage)); });
   g.userData = { modelKid: true }; return g;
 }
@@ -2617,9 +2620,9 @@ function syncKids() {
   for (const e of kidEnts.values()) e.seen = false;
   for (const O of kidOwners()) {
     const K = O.kid;
-    if (K.tp > .03 && K.tp < BAU_FROM) kidEnt('belly:' + O.id, () => ({ kind: 'belly', c: O.c, mesh: makeBelly(O.c) })).tp = K.tp;
-    if (K.carry) { const e = kidEnt('carry:' + O.id + ':' + K.carry.cid, () => { const m = makeBaby(K.carry.sex); world.group.add(m); const lb = kidLabel(K.carry.name); m.add(lb); lb.position.set(0, .15, 0); return { kind: 'carry', c: O.c, mesh: m, label: lb, cid: K.carry.cid }; }); }
-    if (K.follow) { kidEnt('follow:' + O.id + ':' + K.follow.cid + ':' + K.follow.stage + ':' + !!K.follow.tt, () => { const e = { kind: 'follow', c: O.c, cid: K.follow.cid, stage: K.follow.stage }; const m = e.mesh = kidBody({ ...K.follow, id: K.follow.cid }, e); const p = O.c.root.position; m.position.set(p.x + .5, 0, p.z + .5); world.group.add(m); const lb = e.label = kidLabel(K.follow.name); m.add(lb); lb.position.y = K.follow.stage === 'chap' ? .68 : .82; return e; }); }
+    if (K.tp > .03 && K.tp < BAU_FROM) kidEnt('belly:' + O.id, () => ({ kind: 'belly', oid: O.id, c: O.c, mesh: makeBelly(O.c) })).tp = K.tp;
+    if (K.carry) { const e = kidEnt('carry:' + O.id + ':' + K.carry.cid, () => { const m = makeBaby(K.carry.sex); world.group.add(m); const lb = kidLabel(K.carry.name); m.add(lb); lb.position.set(0, .15, 0); return { kind: 'carry', oid: O.id, c: O.c, mesh: m, label: lb, cid: K.carry.cid }; }); }
+    if (K.follow) { kidEnt('follow:' + O.id + ':' + K.follow.cid + ':' + K.follow.stage + ':' + !!K.follow.tt + ':' + (K.follow.ao || 0), () => { const e = { kind: 'follow', oid: O.id, c: O.c, cid: K.follow.cid, stage: K.follow.stage }; const m = e.mesh = kidBody({ ...K.follow, id: K.follow.cid }, e); const p = O.c.root.position; m.position.set(p.x + .5, 0, p.z + .5); world.group.add(m); const lb = e.label = kidLabel(K.follow.name); m.add(lb); lb.position.y = K.follow.stage === 'chap' ? .68 : .82; return e; }); }
   }
   // bé trong cung riêng
   if (world.loc === 'phong') {
@@ -2631,7 +2634,7 @@ function syncKids() {
   for (const [key, e] of kidEnts) if (!e.seen || e.w !== world) { kidDrop(e); kidEnts.delete(key); }
 }
 function kidStatic(k, o) {
-  kidEnt('st:' + k.id + ':' + k.stage + ':' + !!k.tt, () => {
+  kidEnt('st:' + k.id + ':' + k.stage + ':' + !!k.tt + ':' + (k.ao || 0), () => {
     const lb = kidLabel(k.name + (k.mother ? ` · con ${k.mother}` : ''));
     if (o.cradle) { const cr = o.existing || makeCradle(); if (!o.existing) { cr.position.set(o.cradle[0], 0, o.cradle[1]); world.group.add(cr); } const rock = cr.getObjectByName('rock'); const b = makeBaby(k.sex); b.position.set(0, .36, .04); rock.add(b); b.add(lb); lb.position.y = .3; return { kind: 'cradle', mesh: o.existing ? b : cr, extra: o.existing ? null : null, baby: b, rock, label: lb, cid: k.id }; }
     const e = { cid: k.id, label: lb }; const m = e.mesh = kidBody(k, e); m.add(lb); lb.position.y = k.stage === 'chap' ? .68 : .82; world.group.add(m);
@@ -2643,14 +2646,14 @@ let kidT = 0, kidLesson = null;
 function kidFrame(dt) {
   if (!world) return; kidT += dt;
   for (const [, e] of kidEnts) {
-    if (e.w !== world) continue; const cry = e.cid && kidCries(e.cid);
+    if (e.w !== world) continue; if (e.oid) { const oc = e.oid === me?.id ? selfC : others.get(e.oid)?.c; if (oc && oc !== e.c) { e.c = oc; e.mesh?.userData?.belly && null; } } const cry = e.cid && kidCries(e.cid);
     if (e.label && cry && kidT - (e.bub || 0) > 3.5) { e.bub = kidT; bubble(e.label, rpick(['Oe oe oe… 😭', 'Hu hu… 😢', 'Oaaa! 😭'])); }
     if (e.kind === 'belly') { const c = e.c; if (!c.root.parent) { e.mesh.visible = false; continue; } e.mesh.visible = c.root.visible; const B = c.B.spine || c.B.hips; if (!B) continue; c.root.updateMatrixWorld(true); B.getWorldPosition(kidWorldPos); const ry = c.root.rotation.y, r = .05 + .035 * e.tp, f = .03 + .04 * e.tp;
       e.mesh.position.set(kidWorldPos.x + Math.sin(ry) * f, kidWorldPos.y - .07, kidWorldPos.z + Math.cos(ry) * f); e.mesh.scale.set(r * 1.0, r * 1.3, r * .95); e.mesh.rotation.y = ry;
     }
     else if (e.kind === 'carry') { const c = e.c;
       const B = c.B.spine2 || c.B.spine; if (!B) continue; c.root.updateMatrixWorld(true); B.getWorldPosition(kidWorldPos); const ry = c.root.rotation.y;
-      const lift = e.c === selfC ? ganFx.lift || 0 : 0; e.mesh.position.set(kidWorldPos.x + Math.sin(ry) * (.2 - lift * .4), kidWorldPos.y - .2 + lift, kidWorldPos.z + Math.cos(ry) * .2); e.mesh.rotation.set(0, ry + Math.PI / 2, 0); e.mesh.rotateX(-.35); e.mesh.visible = c.root.visible;
+      const lift = e.c === selfC ? ganFx.lift || 0 : 0; e.mesh.scale.setScalar(.6); e.mesh.position.set(kidWorldPos.x + Math.sin(ry) * (.15 - lift * .3), kidWorldPos.y - .1 + lift, kidWorldPos.z + Math.cos(ry) * .2); e.mesh.rotation.set(0, ry + Math.PI / 2, 0); e.mesh.rotateX(.38 + lift * 2); e.mesh.rotateZ(.5); e.mesh.visible = c.root.visible;
       if (cry) e.mesh.userData.mouth.scale.set(1.4, 1.4, 1); else e.mesh.userData.mouth.scale.set(1, .4, 1); }
     else if (e.kind === 'follow') { const c = e.c, m = e.mesh, p = c.root.position, ry = c.root.rotation.y; let tx, tz;
       if (kidLesson?.cid === e.cid && (kidLesson.pos || world.kidDesks)) { const d = kidLesson.pos || world.kidDesks[kidLesson.desk]; tx = d.x; tz = d.z; } else { tx = p.x - Math.sin(ry) * .65 + Math.cos(ry) * .4; tz = p.z - Math.cos(ry) * .65 - Math.sin(ry) * .4; }
@@ -2667,9 +2670,9 @@ function kidFrame(dt) {
   }
   for (const O of kidOwners()) { const c = O.c; c._carry = !!O.kid.carry; c._preg = (O.kid.tp || 0) > .4;
     if (!c.post2) c.post2 = cc => { if (cc.pose || cc.post || cc.curName === 'ngoi') return;
-      if (cc._hug) { aim(cc.root, cc.B.rArm, cc.B.rFore, v3([-.35, -.55, .75])); aim(cc.root, cc.B.rFore, cc.B.rHand, v3([.7, -.2, .55])); aim(cc.root, cc.B.lArm, cc.B.lFore, v3([.35, -.55, .75])); aim(cc.root, cc.B.lFore, cc.B.lHand, v3([-.7, -.2, .55])); aim(cc.root, cc.B.neck, cc.B.head, v3([0, .8, .55])); return; }
+      if (cc._hug) { aim(cc.root, cc.B.spine1, cc.B.spine2, v3([0, .86, .5])); aim(cc.root, cc.B.rArm, cc.B.rFore, v3([-.3, -.75, .6])); aim(cc.root, cc.B.rFore, cc.B.rHand, v3([.75, -.35, .5])); aim(cc.root, cc.B.lArm, cc.B.lFore, v3([.3, -.75, .6])); aim(cc.root, cc.B.lFore, cc.B.lHand, v3([-.75, -.35, .5])); aim(cc.root, cc.B.neck, cc.B.head, v3([0, .8, .55])); return; }
       if (cc._brush) { aim(cc.root, cc.B.rArm, cc.B.rFore, v3([-.3, -.3, .9])); aim(cc.root, cc.B.rFore, cc.B.rHand, v3([.2, -.4 + Math.sin(cc.t * 6) * .35, .85])); aim(cc.root, cc.B.neck, cc.B.head, v3([0, .8, .55])); }
-      if (cc._carry) { aim(cc.root, cc.B.rArm, cc.B.rFore, v3([-.15, -.8, .5])); aim(cc.root, cc.B.rFore, cc.B.rHand, v3([.8, .15, .5])); aim(cc.root, cc.B.lArm, cc.B.lFore, v3([.15, -.8, .5])); aim(cc.root, cc.B.lFore, cc.B.lHand, v3([-.8, .15, .5])); }
+      if (cc._carry) { aim(cc.root, cc.B.rArm, cc.B.rFore, v3([-.15, -.8, .5])); aim(cc.root, cc.B.rFore, cc.B.rHand, v3([.8, .15, .5])); aim(cc.root, cc.B.lArm, cc.B.lFore, v3([.15, -.8, .5])); aim(cc.root, cc.B.lFore, cc.B.lHand, v3([-.8, .15, .5]));  if (cc === selfC && ganFx.kiss) { aim(cc.root, cc.B.spine1, cc.B.spine2, v3([0, .9, .3])); aim(cc.root, cc.B.neck, cc.B.head, v3([.15, .45, .9])); } }
       else if (cc._preg && cc.curName === 'dung_cho') { aim(cc.root, cc.B.lArm, cc.B.lFore, v3([.25, -.75, .5])); aim(cc.root, cc.B.lFore, cc.B.lHand, v3([-.75, -.15, .45])); } }; }
 
 }
@@ -2704,6 +2707,7 @@ function kidActs(add) {
     else if (inPhong || withMe) {
       if (k.stage === 'so') add(me.carry === k.id ? `👐 Đặt ${k.name} vào nôi` : `🤱 Bế ${k.name}`, me.carry === k.id ? '' : 'Bế con đi khắp cung, ra Dưỡng Tâm điện khoe Hoàng thượng', () => socket.emit('con', { op: 'be', cid: k.id }));
       else add(me.follow === k.id ? `🏠 Để ${k.name} ở lại cung` : `👣 Dắt ${k.name} đi theo`, me.follow === k.id ? '' : k.stage === 'hoc' ? 'Dắt con tới Thượng thư phòng học, ra mắt Hoàng thượng' : 'Bé lon ton chạy theo bổn cung', () => socket.emit('con', { op: 'theo', cid: k.id }));
+      if (k.stage !== 'so') { const AO = k.sex === 'trai' ? ['Áo gấm xanh lục', 'Áo gấm xanh đen'] : ['Áo xanh ngọc', 'Áo hồng đào']; add(`👘 Thay đồ cho ${k.name}`, k.tt ? (k.sex === 'trai' ? 'Đang mặc lễ phục vàng của Thái tử' : 'Đang mặc lễ phục phượng đỏ') : `Đang mặc ${AO[(k.ao || 1) - 1]}`, async () => { const i = await say(k.sex === 'trai' ? 'hoangtu1' : 'congchua1', esc(k.name), 'Mẫu thân, hôm nay con mặc bộ nào ạ?', [...AO.map((t, j) => [t, String(j + 1), (k.ao || 1) === j + 1 ? 'gold' : '']), ['Thôi', '0', '']]); dlgClose(); if (+i) socket.emit('con', { op: 'ao', cid: k.id, ao: +i }); }); }
       if (!k.cry) add(`💞 Gần gũi với ${k.name}`, k.stage === 'so' ? 'Hôn trán, nựng má, bế hát ru' : k.stage === 'chap' ? 'Ôm con, trốn tìm, tập đi' : 'Ôm con, kể chuyện, chải tóc, dạy viết', () => openGan(k));
     }
     if (near && (k.sick || k.hp < 70)) add(`🩺 Mời Thái y khám cho ${k.name}`, `20 bạc · sức khỏe ${k.hp}${k.sick ? ' · đang ốm' : ''}`, () => socket.emit('con', { op: 'thaiy', cid: k.id }));
@@ -2923,12 +2927,12 @@ function ganPlay(k, act) {
   const heartAt = (o, dy = .6) => { const p = new THREE.Vector3(); (o || r).getWorldPosition(p); hearts(p.x, p.y + dy, p.z); };
   selfC.target = null;
   if (k.stage === 'so') {
-    if (e?.kind === 'cradle') { const p = new THREE.Vector3(); e.rock.getWorldPosition(p); selfC.target = clampPos(p.x + .45, p.z); setTimeout(() => { emote('cui_chao'); heartAt(e.rock, .4); }, 1500); return end(4000); }
-    if (act === 'hon') { ganFx.lift = .14; setTimeout(() => heartAt(null, 1.0), 600); return end(2200); }
+    if (e?.kind === 'cradle') { const p = new THREE.Vector3(); e.rock.getWorldPosition(p); selfC.target = clampPos(p.x + .42, p.z); setTimeout(() => { selfC.target = null; selfC.root.rotation.y = Math.atan2(p.x - selfC.root.position.x, p.z - selfC.root.position.z); emote('cui_chao'); setTimeout(() => heartAt(e.rock, .35), 700); }, 1600); return end(4200); }
+    if (act === 'hon') { ganFx.lift = .16; ganFx.kiss = true; setTimeout(() => heartAt(null, 1.0), 600); return end(2200); }
     if (act === 'nung') { ganFx.lift = .06; for (let t = 0; t < 3; t++) setTimeout(() => heartAt(null, .8), t * 500); return end(2000); }
     ganFx.rock = true; let t = 0; FX.push(dt => { if (!ganFx.rock) return false; t += dt; ganFx.lift = .04 + Math.sin(t * 3) * .03; }); for (let i = 0; i < 4; i++) setTimeout(() => heartAt(null, .9), i * 800); return end(3600);
   }
-  if (act === 'om') { at(.32, true); setTimeout(() => { selfC._hug = true; heartAt(null, .9); setTimeout(() => heartAt(null, .9), 700); }, 1500); return end(4200); }
+  if (act === 'om') { at(.24, true); setTimeout(() => { selfC._hug = true; heartAt(null, .9); setTimeout(() => heartAt(null, .9), 900); }, 1700); return end(5500); }
   if (act === 'tron') { const a = Math.random() * 6.28; kidLesson = { cid: k.id, stand: true, pos: { ...clampPos(r.position.x + Math.cos(a) * 2.2, r.position.z + Math.sin(a) * 2.2), ry: a } }; emote('che_mieng'); setTimeout(() => { at(.35, true); toast('“Bắt được con rồi nhé!”'); }, 3500); setTimeout(() => heartAt(null, .9), 5200); return end(6000); }
   if (act === 'tapdi') { selfC.target = clampPos(r.position.x + fx * 1.6, r.position.z + fz * 1.6); setTimeout(() => heartAt(null, .9), 2500); return end(3500); }
   if (act === 'chaitoc') { at(.3, true, r.rotation.y); setTimeout(() => { selfC._brush = true; }, 1500); setTimeout(() => heartAt(null, .9), 3000); return end(4800); }
@@ -2945,3 +2949,8 @@ renderActs = function () { _renderActs(); const a = $('acts'); if (!a) return; c
   const urgent = b => /😭|🏮|🐉|🌸|🙏|🌿|chuyển dạ|trình bài|Nghênh giá/.test(b.textContent); bs.filter(urgent).reverse().forEach(b => a.insertBefore(b, a.querySelector(':scope > button')));
   const all = [...a.querySelectorAll(':scope > button')]; if (!actsOpen) all.slice(SHOW).forEach(b => b.style.display = 'none');
   const t = document.createElement('button'); t.className = 'more'; t.innerHTML = actsOpen ? '▴ Thu gọn' : `▾ Xem thêm ${all.length - SHOW} việc`; t.onclick = () => { actsOpen = !actsOpen; try { localStorage.setItem('mph_acts', actsOpen ? '1' : '0'); } catch {} renderActs(); }; a.appendChild(t); };
+window.__mph.me = () => ({ carry: me.carry, follow: me.follow, kidPub: me.kidPub, kids: (me.children||[]).map(k => [k.name, k.stage, k.ward]) });
+window.__mph.kidIds = () => (me.children||[]).map(k => [k.id, k.name, k.stage]);
+window.__mph.spec = (p, l) => { specCam = p ? { loc: world.loc, keep: true, pos: new THREE.Vector3(...p), look: new THREE.Vector3(...l), until: Date.now() + 36e5 } : null; };
+window.__mph.gan = (cid, act) => { const k = (me.children || []).find(x => x.id === cid); if (k) ganPlay(k, act); };
+window.__mph.kl = () => JSON.stringify({kl: kidLesson, hug: selfC?._hug, gf: ganFx, pose: selfC?.pose, post: !!selfC?.post, cur: selfC?.curName, p2: String(selfC?.post2).slice(0, 120)});
