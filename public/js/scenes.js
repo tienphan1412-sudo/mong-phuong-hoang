@@ -103,15 +103,28 @@ const shade = o => { o.traverse(m => { if (m.isMesh) { m.castShadow = true; m.re
 function box(g, w, h, d, m, x, y, z) { const o = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), m); o.position.set(x, y, z); g.add(o); return o; }
 function cyl(g, rt, rb, h, m, x, y, z, seg = 24) { const o = new THREE.Mesh(new THREE.CylinderGeometry(rt, rb, h, seg), m); o.position.set(x, y, z); g.add(o); return o; }
 
+function bedOld() { const m = mats(), g = new THREE.Group(); box(g, 1.1, .3, .75, m.wood, 0, .15, 0); box(g, 1.04, .08, .7, m.cloth, 0, .34, 0); box(g, .3, .08, .2, m.red, -.38, .41, 0); for (const [x, z] of [[-.52, -.34], [.52, -.34], [-.52, .34], [.52, .34]]) box(g, .05, 1.3, .05, m.wood, x, .65, z); box(g, 1.1, .06, .75, m.red, 0, 1.3, 0); const cur = new THREE.Mesh(new THREE.PlaneGeometry(1.06, 1.0), m.silk); cur.position.set(0, .8, .36); g.add(cur); const back = new THREE.Mesh(new THREE.PlaneGeometry(1.06, 1.0), m.silk); back.position.set(0, .8, -.36); g.add(back); return shade(g); }
+
 // ---------- đồ vật dùng chung (cũng là nội thất trang trí) ----------
 export const DECOR = {
   binhphong: { name: 'Bình phong sơn thủy', make: () => { const m = mats(), g = new THREE.Group(); for (const [i, a] of [[-1, .35], [0, 0], [1, -.35]]) { const p = new THREE.Group(); p.add(new THREE.Mesh(new THREE.BoxGeometry(.55, 1.0, .04), [m.red, m.red, m.red, m.red, m.screen, m.red])); p.position.set(i * .52, .5, Math.abs(i) * .09); p.rotation.y = a; g.add(p); } return shade(g); } },
   banTra: { name: 'Bàn trà gỗ', make: () => { const m = mats(), g = new THREE.Group(); box(g, .7, .04, .45, m.wood, 0, .32, 0); for (const [x, z] of [[-.3, -.18], [.3, -.18], [-.3, .18], [.3, .18]]) box(g, .04, .3, .04, m.wood, x, .15, z); cyl(g, .05, .04, .07, m.porcelain, -.12, .37, 0, 14); cyl(g, .035, .03, .05, m.porcelain, .08, .36, .05, 12); cyl(g, .035, .03, .05, m.porcelain, .16, .36, -.05, 12); return shade(g); } },
-  ghedon: { name: 'Đôn sứ', make: () => { const m = mats(), g = new THREE.Group(); cyl(g, .13, .13, .4, m.porcelain, 0, .2, 0, 32); cyl(g, .133, .133, .035, m.blue, 0, .33, 0, 32); cyl(g, .133, .133, .035, m.blue, 0, .07, 0, 32); return shade(g); } },
+  ghedon: { name: 'Đôn sứ', make: () => { const m = mats(), g = new THREE.Group(); const pts = [[0, 0], [.1, 0], [.12, .03], [.135, .11], [.12, .2], [.125, .22], [0, .22]].map(([x, y]) => new THREE.Vector2(x, y)); g.add(new THREE.Mesh(new THREE.LatheGeometry(pts, 32), m.porcelain)); cyl(g, .137, .137, .025, m.blue, 0, .11, 0, 32); cyl(g, .127, .127, .018, m.blue, 0, .2, 0, 32); g.userData.seatTop = .22; return shade(g); } },
   chaucay: { name: 'Chậu tùng cảnh', make: () => { const m = mats(), g = new THREE.Group(); cyl(g, .16, .12, .2, m.blue, 0, .1, 0, 20); const tr = cyl(g, .025, .04, .45, m.trunk, 0, .4, 0, 8); tr.rotation.z = .25; for (const [x, y, z] of [[-.12, .6, 0], [.08, .7, .05], [-.02, .55, -.08]]) { const f = new THREE.Mesh(new THREE.SphereGeometry(.13, 10, 8), m.leaf); f.scale.y = .45; f.position.set(x, y, z); g.add(f); } return shade(g); } },
   denlong: { name: 'Đèn đứng cung đình', make: () => { const m = mats(), g = new THREE.Group(); cyl(g, .03, .05, 1.3, m.red, 0, .65, 0, 10); cyl(g, .14, .17, .06, m.gold, 0, .03, 0, 6); cyl(g, .15, .18, .32, m.lantern, 0, 1.42, 0, 6); const L = new THREE.PointLight(0xffc088, 2.5, 4, 1.5); L.position.y = 1.42; g.add(L); return shade(g); } },
   binhsu: { name: 'Bình sứ hoa lam', make: () => { const m = mats(), g = new THREE.Group(); const pts = [[0, 0], [.09, .02], [.13, .15], [.12, .3], [.06, .42], [.05, .5], [.07, .53]].map(([x, y]) => new THREE.Vector2(x, y)); const v = new THREE.Mesh(new THREE.LatheGeometry(pts, 24), m.porcelain); g.add(v); cyl(g, .132, .132, .04, m.blue, 0, .18, 0, 24); return shade(g); } },
-  giuong: { name: 'Giường có màn', make: () => { const m = mats(), g = new THREE.Group(); box(g, 1.1, .3, .75, m.wood, 0, .15, 0); box(g, 1.04, .08, .7, m.cloth, 0, .34, 0); box(g, .3, .08, .2, m.red, -.38, .41, 0); for (const [x, z] of [[-.52, -.34], [.52, -.34], [-.52, .34], [.52, .34]]) box(g, .05, 1.3, .05, m.wood, x, .65, z); box(g, 1.1, .06, .75, m.red, 0, 1.3, 0); const cur = new THREE.Mesh(new THREE.PlaneGeometry(1.06, 1.0), m.silk); cur.position.set(0, .8, .36); g.add(cur); const back = new THREE.Mesh(new THREE.PlaneGeometry(1.06, 1.0), m.silk); back.position.set(0, .8, -.36); g.add(back); return shade(g); } },
+  giuong: { name: 'Giường có màn', make: () => { const m = mats(), g = new THREE.Group(), L = 1.5, Wd = .85;
+    box(g, L, .2, Wd, m.wood, 0, .1, 0); box(g, L + .04, .04, Wd + .04, m.darkRed || m.red, 0, .21, 0); // khung giường
+    box(g, L - .06, .09, Wd - .06, m.cloth, 0, .275, 0); // nệm, mặt nệm cao .32
+    const pil = box(g, .18, .07, .42, m.red, -L / 2 + .16, .355, 0); pil.scale.y = 1;
+    box(g, .5, .05, Wd - .1, m.silk, .3, .345, 0); // chăn gấp
+    box(g, .05, .55, Wd + .04, m.wood, -L / 2 - .02, .45, 0); box(g, .05, .4, Wd + .04, m.wood, L / 2 + .02, .38, 0); // đầu giường, cuối giường
+    box(g, L + .04, .5, .04, m.wood, 0, .5, -Wd / 2 - .02); // vách sau
+    for (const [x, z] of [[-L / 2, -Wd / 2], [L / 2, -Wd / 2], [-L / 2, Wd / 2], [L / 2, Wd / 2]]) box(g, .05, 1.55, .05, m.wood, x, .78, z);
+    box(g, L + .1, .07, Wd + .1, m.red, 0, 1.56, 0); box(g, L + .1, .14, .03, m.gold, 0, 1.47, Wd / 2 + .05);
+    const back = new THREE.Mesh(new THREE.PlaneGeometry(L, 1.0), m.silk); back.position.set(0, 1.0, -Wd / 2 + .01); g.add(back);
+    for (const s of [-1, 1]) { const c = new THREE.Mesh(new THREE.PlaneGeometry(.22, 1.2), m.silk); c.position.set(s * (L / 2 - .1), .92, Wd / 2); g.add(c); const t = cyl(g, .025, .025, .05, m.gold, s * (L / 2 - .1), .8, Wd / 2 + .01, 8); t.rotation.x = Math.PI / 2; }
+    g.userData.bed = { L, top: .32 }; return shade(g); } },
   tham: { name: 'Thảm đỏ hoa văn', make: () => { const m = mats(), g = new THREE.Group(); const c = new THREE.Mesh(new THREE.PlaneGeometry(1.2, 1.8), m.carpet); c.rotation.x = -Math.PI / 2; c.position.y = .006; c.receiveShadow = true; g.add(c); return g; } },
   luhuong: { name: 'Lư hương đồng', make: () => { const m = mats(), g = new THREE.Group(); cyl(g, .12, .15, .06, m.bronze, 0, .03, 0); cyl(g, .04, .06, .22, m.bronze, 0, .17, 0); const b = new THREE.Mesh(new THREE.SphereGeometry(.15, 20, 12, 0, 7, 0, 1.9), m.bronze); b.rotation.x = Math.PI; b.position.y = .4; g.add(b); const l = new THREE.Mesh(new THREE.ConeGeometry(.12, .16, 20), m.bronze); l.position.y = .48; g.add(l); return shade(g); } },
 };
@@ -236,7 +249,7 @@ function bedroom(o) {
   const fl = new THREE.Mesh(new THREE.PlaneGeometry(W, D), m.floor); fl.rotation.x = -Math.PI / 2; fl.receiveShadow = true; fl.name = 'ground'; g.add(fl);
   for (const s of [-1, 1]) box(g, .08, H, D, m.wall, s * (W / 2 + .04), H / 2, 0);
   box(g, W, H, .1, m.wall, 0, H / 2, -D / 2 - .05); box(g, W, H, .1, m.wall, 0, H / 2, D / 2 + .05);
-  const bed = DECOR.giuong.make(); bed.scale.setScalar(1.8); bed.position.set(0, 0, -D / 2 + .9); g.add(bed); o.bed = bed; bed.children.filter(m => m.isMesh && m.geometry.type === 'PlaneGeometry' && m.position.z > .3).forEach(m => m.visible = false); // vén rèm trước o.bedFront = -D / 2 + .9 + .75 * 1.8 / 2;
+  const bed = bedOld(); bed.scale.setScalar(1.8); bed.position.set(0, 0, -D / 2 + .9); g.add(bed); o.bed = bed; bed.children.filter(m => m.isMesh && m.geometry.type === 'PlaneGeometry' && m.position.z > .3).forEach(m => m.visible = false); // vén rèm trước o.bedFront = -D / 2 + .9 + .75 * 1.8 / 2;
   const tham = DECOR.tham.make(); tham.position.set(0, 0, .5); g.add(tham);
   const candles = [];
   for (const [x, z] of [[-1.6, -1.6], [1.6, -1.6], [-2.2, .8], [2.2, .8], [-.9, 1.6], [.9, 1.6]]) {

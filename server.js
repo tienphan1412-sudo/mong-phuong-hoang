@@ -146,6 +146,7 @@ function selfView(p) {
     thai: p.thai?.known ? { due: p.thai.due, care: p.thai.care || 0, antai: p.thai.antai === dayKey() } : null, children: p.children || [],
     isHH: isHH(p), hhDay: p.hhDay || {}, hhVote: hhVoteView(p), hhName: DB.state.hh ? P(DB.state.hh.id)?.name || null : null,
     event: { ...curEvent(), done: p.evDay === dayKey() }, streak: p.streak || 0, ach: achView(p), titleSel: p.titleSel || '',
+    lying: !!p.lying, visit: p.visit || null, selfSick: !!(p.sick && p.sickUntil > now()), selfSickDay: p.selfSickDay === dayKey(),
     big: bigView(p), fest: festView(p), night: nightView(p), diary: (p.diary || []).slice(0, 30), tinvat: p.tinvat || {}, keoDay: p.keoDay === dayKey(),
     dish: p.dish ? { name: p.dish.name, q: p.dish.q, t: p.dish.t, dish: p.dish.dish } : null, cookN: p.cookDay?.d === dayKey() ? p.cookDay.n : 0,
     quest: questView(p), jewels: p.jewels || [], mcDay: p.mcDay === dayKey(),
@@ -773,7 +774,7 @@ function checkDeadlines() {
 
 // ---------------- lật thẻ ----------------
 function latThe(when = 'Đêm nay') {
-  const pool = Object.values(DB.players).filter(p => !p.lanh && !p.thai?.known && !((p.camTucUntil || 0) > now()) && p.rank >= 1 && (online.has(p.id) || now() - (p.lastSeen || p.created || 0) < 3 * 864e5));
+  const pool = Object.values(DB.players).filter(p => !p.lanh && !p.thai?.known && !(p.sick && p.sickUntil > now()) && !((p.camTucUntil || 0) > now()) && p.rank >= 1 && (online.has(p.id) || now() - (p.lastSeen || p.created || 0) < 3 * 864e5));
   if (!pool.length) return null;
   const weight = p => {
     let m = 1;
@@ -991,8 +992,8 @@ const LOCS = ['tuninh', 'hoavien', 'duongtam', 'phong', 'tamcung', 'lanhcung', '
 // ghế ngồi: loc -> { seatId: playerId }
 const SEATS = {}; const SEAT_IDS = { hoavien: ['hv0', 'hv1', 'hv2'], yentiec: ['f0', 'f1', 'f2', 'f3', 'f4', 'f5', 'f6', 'f7'] };
 function freeSeat(p) { for (const loc in SEATS) for (const k in SEATS[loc]) if (SEATS[loc][k] === p.id) delete SEATS[loc][k]; p.seat = null; }
-function takeSeat(p, id) { const L = (SEATS[p.loc] = SEATS[p.loc] || {}); if (!(SEAT_IDS[p.loc] || []).includes(id)) return false; if (L[id] && L[id] !== p.id && online.has(L[id])) return false; freeSeat(p); L[id] = p.id; p.seat = id; p.anim = 'sit:' + id; return true; }
-function roomOf(p) { return p.loc === 'phong' || p.loc === 'tamcung' ? p.loc + ':' + p.id : p.loc; }
+function takeSeat(p, id) { const rk = roomOf(p), L = (SEATS[rk] = SEATS[rk] || {}); if (p.loc === 'phong' ? !/^(d\d{1,2}|b0)$/.test(id) : !(SEAT_IDS[p.loc] || []).includes(id)) return false; if (L[id] && L[id] !== p.id && online.has(L[id])) return false; freeSeat(p); L[id] = p.id; p.seat = id; p.anim = 'sit:' + id; return true; }
+function roomOf(p) { return p.loc === 'phong' ? 'phong:' + (p.visit || p.id) : p.loc === 'tamcung' ? 'tamcung:' + p.id : p.loc; }
 function enter(p, loc, sock) {
   const old = roomOf(p); freeSeat(p);
   sock.leave(old); sock.to(old).emit('pleave', p.id);
@@ -1002,7 +1003,9 @@ function enter(p, loc, sock) {
   const others = [...online.keys()].map(P).filter(q => q && q.id !== p.id && roomOf(q) === room).map(publicView);
   let seat = null;
   if (loc === 'yentiec') { const free = SEAT_IDS.yentiec.find(id => !(SEATS.yentiec || {})[id] || !online.has(SEATS.yentiec[id])); if (free) { takeSeat(p, free); seat = free; } }
-  sock.emit('scene', { loc, players: others, venue: DB.state.feast?.venue || 'out', seat });
+  if (loc === 'phong' && p.lying) p.anim = 'lie:b0';
+  const host = loc === 'phong' ? (P(p.visit) || p) : null;
+  sock.emit('scene', { loc, players: others, venue: DB.state.feast?.venue || 'out', seat, host: host ? { id: host.id, name: host.name, decor: host.decor || [], palace: host.rank >= C.PALACE_RANK } : null, lying: loc === 'phong' && !!p.lying });
   if (loc === 'yentiec' && DB.state.feast?.show && now() < DB.state.feast.show.at + 38e3) setTimeout(() => sock.emit('npcShow', DB.state.feast.show), 2000);
   if (loc === 'yentiec') { const t = DB.state.feast?.tl; setTimeout(() => sock.emit('tuulenh', t && !t.done ? { q: t.q, end: t.end } : null), 1500); }
   sock.to(room).emit('pjoin', publicView(p));
@@ -1014,7 +1017,7 @@ io.on('connection', sock => {
   const ok = p => {
     setTimeout(() => { for (const c of Object.values(DB.state.cases)) if (c.witnessReq?.who === p.id) askWitness(c); }, 3000);
     if (online.has(p.id)) { try { online.get(p.id).emit('kicked'); online.get(p.id).disconnect(); } catch (e) {} }
-    me = p; online.set(p.id, sock); p.lastSeen = now(); freshDay(p); track(p, 's');
+    me = p; online.set(p.id, sock); p.lastSeen = now(); freshDay(p); track(p, 's'); p.visit = null; if (p.sickUntil && now() > p.sickUntil) { p.sick = false; p.sickUntil = 0; p.lying = false; }
     if (!p.token) p.token = crypto.randomBytes(16).toString('hex');
     sock.emit('auth', { token: p.token });
     sock.emit('newsAll', DB.state.news.slice(0, 30));
@@ -1071,6 +1074,8 @@ io.on('connection', sock => {
     if ((me.camTucUntil || 0) > now() && loc !== 'phong') return toast(me, 'Đang bị cấm túc, chưa được ra khỏi phòng.', 'bad');
     if (loc === 'yentiec' && !(DB.state.feast && !DB.state.feast.done)) return toast(me, 'Hiện không có yến tiệc.');
     if (loc === 'ngutien' && me.rank < C.FIGHT_RANK) return toast(me, `Từ ${C.RANKS[C.FIGHT_RANK].name} mới được vào Ngự thiện phòng.`);
+    if (me.lying && !(loc === 'phong' && !me.visit)) { me.lying = false; }
+    me.visit = null;
     if (loc === 'tamcung') me.outfit = 'aongu';
     else if (me.outfit === 'aongu' && loc !== 'phong') me.outfit = me.lanh ? 'tunu' : C.RANKS[me.rank].outfit;
     enter(me, loc, sock); push(me);
@@ -1081,7 +1086,7 @@ io.on('connection', sock => {
     sock.to(roomOf(me)).emit('pmove', { id: me.id, x: me.x, z: me.z, ry: me.ry, anim: me.anim });
   });
   sock.on('sit', d => { if (!me) return; if (!takeSeat(me, String(d?.seat || ''))) return toast(me, 'Ghế này đã có người ngồi.'); sock.emit('sitOk', { seat: me.seat }); sock.to(roomOf(me)).emit('pmove', { id: me.id, x: me.x, z: me.z, ry: me.ry, anim: me.anim }); });
-  sock.on('stand', () => { if (!me || !me.seat) return; freeSeat(me); me.anim = 'dung_cho'; sock.to(roomOf(me)).emit('pmove', { id: me.id, x: me.x, z: me.z, ry: me.ry, anim: 'dung_cho' }); });
+  sock.on('stand', () => { if (!me) return; if (me.lying) { me.lying = false; push(me); } if (!me.seat) return; freeSeat(me); me.anim = 'dung_cho'; sock.to(roomOf(me)).emit('pmove', { id: me.id, x: me.x, z: me.z, ry: me.ry, anim: 'dung_cho' }); });
   sock.on('emote', a => { if (me) { me.anim = String(a).slice(0, 20); sock.to(roomOf(me)).emit('pmove', { id: me.id, x: me.x, z: me.z, ry: me.ry, anim: me.anim, once: true }); } });
   sock.on('chat', t => {
     if (!me) return;
@@ -1171,6 +1176,7 @@ io.on('connection', sock => {
       const t = P(d.target);
       if (!t || t.id === me.id || t.lanh || t.rank < C.FIGHT_RANK) return toast(me, `Chỉ nhắm được người từ ${C.RANKS[C.FIGHT_RANK].name} trở lên.`, 'bad');
       if (sisters(me, t)) return toast(me, 'Đã kết nghĩa tỷ muội, sao nỡ ra tay.', 'bad');
+      if (t.sick && t.sickUntil > now()) return toast(me, 'Người này đang cáo bệnh đóng cửa cung.', 'bad');
       if ((me.attacks || 0) >= C.ATTACK_PER_DAY) return toast(me, 'Hôm nay đã ra tay đủ số lần.', 'bad');
       if ((t.targeted || 0) >= C.TARGETED_PER_DAY || (t.protectUntil || 0) > now()) return toast(me, 'Người này đang được bảo hộ, chưa thể ra tay.', 'bad');
       if (Object.values(DB.state.cases).some(c => c.victim === t.id && c.status === 'open' && !c.det)) return toast(me, 'Người này đang dính một vụ án khác.', 'bad');
@@ -1491,6 +1497,43 @@ io.on('connection', sock => {
     if (t && e && t.id !== me.id) { e.bonus = Math.max(-15, Math.min(15, (e.bonus || 0) + (r === 'khen' || r === 'hoa' ? 3 : -2)));
       toast(t, { khen: `👏 ${me.name} vỗ tay khen tiết mục của bổn cung!`, hoa: `🌸 ${me.name} tung hoa khen bổn cung!`, che: `😒 ${me.name} chề môi chê tiết mục…`, quay: `🙄 ${me.name} quay mặt đi, không thèm xem…` }[r], r === 'khen' || r === 'hoa' ? 'good' : 'bad'); }
     if (r === 'khen' || r === 'hoa') addPts(me, 1);
+  });
+  sock.on('nam', d => {
+    if (!me) return; const on = !!d?.on;
+    if (on) { if (me.loc !== 'phong' || me.visit) return; freeSeat(me); me.lying = true; me.anim = 'lie:b0'; }
+    else { me.lying = false; me.anim = 'dung_cho'; }
+    if (d?.sick !== undefined) {
+      if (d.sick && on) { if (me.selfSickDay === dayKey()) return toast(me, 'Hôm nay đã cáo bệnh một lần rồi.'); me.selfSickDay = dayKey(); me.sick = true; me.sickUntil = now() + 2 * 3600e3; news(`🤒 ${me.name} cáo bệnh, đóng cửa cung nghỉ ngơi.`); toast(me, 'Đã cáo bệnh: 2 giờ tới không ai ra tay được, nhưng Hoàng thượng cũng không lật thẻ bổn cung. Đứng dậy là khỏi bệnh.', 'good'); }
+      if (!on && me.sick && me.sickUntil) { me.sick = false; me.sickUntil = 0; news(`${me.name} đã khỏe lại.`); }
+    }
+    sock.to(roomOf(me)).emit('pmove', { id: me.id, x: me.x, z: me.z, ry: me.ry, anim: me.anim }); push(me); save();
+  });
+  sock.on('tra', d => {
+    if (!me || !d) return;
+    if (d.op === 'invite') {
+      if (me.loc !== 'phong' || me.visit) return toast(me, 'Về cung riêng mới mời khách được.');
+      const t = P(d.who); if (!t || t.id === me.id) return; const sk = sockOf(t.id);
+      if (!sk) { addMail(t, { kind: 'thu', from: me.id, fromName: title(me), text: 'Mời tỷ muội ghé cung bổn cung thưởng trà. Lúc nào rảnh cứ sang nhé!' }); return toast(me, `${t.name} đang offline, đã gửi thư mời.`, 'good'); }
+      if (t.lanh) return toast(me, 'Người này đang ở lãnh cung.'); if ((t.camTucUntil || 0) > now()) return toast(me, 'Người này đang bị cấm túc.');
+      sk.emit('traInvite', { host: me.id, name: title(me) }); toast(me, `Đã sai cung nữ sang mời ${t.name} qua thưởng trà.`, 'good');
+    } else if (d.op === 'accept') {
+      const h = P(d.host); if (!h || !online.has(h.id) || h.loc !== 'phong' || h.visit) return toast(me, 'Chủ nhân đã rời cung.');
+      if (me.lanh || (me.camTucUntil || 0) > now()) return;
+      if (me.outfit === 'aongu') me.outfit = C.RANKS[me.rank].outfit; me.lying = false;
+      me.visit = h.id; enter(me, 'phong', sock); push(me);
+      io.to(roomOf(me)).emit('chat', { id: null, name: '🍵 ' + h.name + ' cung', text: `${me.name} sang chơi, mời ngồi thưởng trà.` });
+    } else if (d.op === 'serve') {
+      if (me.loc !== 'phong' || me.visit) return toast(me, 'Chỉ chủ nhân mới pha trà.');
+      const guests = [...online.keys()].map(P).filter(q => q && q.id !== me.id && q.loc === 'phong' && q.visit === me.id);
+      if (!guests.length) return toast(me, 'Chưa có khách. Mời bạn bè sang từ Danh sách hậu cung.');
+      me.traDay = me.traDay?.d === dayKey() ? me.traDay : { d: dayKey(), g: [] }; let n = 0;
+      for (const g of guests) { if (me.traDay.g.includes(g.id)) continue; me.traDay.g.push(g.id); n++; addPts(g, 5); g.sung += 2; addPts(me, 5); cnt(me, 'tra'); cnt(g, 'tra'); me.rel = me.rel || {}; me.rel[g.id] = (me.rel[g.id] || 0) + 2; push(g); }
+      const tea = pick(['Long Tỉnh Tây Hồ', 'Bích La Xuân', 'Thiết Quan Âm', 'trà hoa nhài', 'Phổ Nhĩ lâu năm', 'trà sen Tây Hồ']);
+      io.to(roomOf(me)).emit('chat', { id: null, name: '🍵 Thưởng trà', text: `${me.name} tự tay pha ấm ${tea} mời ${guests.map(g => g.name).join(', ')}.${n ? ' Mọi người được +5 công trạng.' : ''}` });
+      io.to(roomOf(me)).emit('traCheers', { ids: [me.id, ...guests.map(g => g.id)] });
+      if (!n) toast(me, 'Hôm nay đã mời những vị khách này rồi, trà vẫn thơm nhưng không có thưởng thêm.');
+    }
+    save(); push(me);
   });
   sock.on('pushKey', () => sock.emit('pushKey', vapid()));
   sock.on('pushSub', sub => { if (!me || !sub?.endpoint) return; me.pushSubs = (me.pushSubs || []).filter(x => x.endpoint !== sub.endpoint).concat([{ endpoint: String(sub.endpoint), keys: sub.keys }]).slice(-3); save(); push(me); sendPush(me, 'Đã bật thông báo', 'Khi bổn cung offline mà có chuyện trong cung, thông báo sẽ hiện ở đây.'); });

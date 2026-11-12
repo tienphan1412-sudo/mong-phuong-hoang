@@ -74,7 +74,9 @@ async function enterScene(loc, players, venue, seatId) {
   closeDecor(); seated = null;
   music.setMode(loc);
   // dựng cảnh mới ở hậu trường, cảnh cũ vẫn hiện cho tới khi xong
-  const o = buildLocation(loc, { palace: me?.hasPalace, palaceName: me ? (me.name.split(' ').pop() + ' cung') : '', venue });
+  const H = loc === 'phong' && sceneHost ? sceneHost : null, hName = H ? H.name : me?.name || '';
+  const o = buildLocation(loc, { palace: H ? H.palace : me?.hasPalace, palaceName: hName.split(' ').pop() + ' cung', venue });
+  if (H && H.id !== me.id) o.decorable = false;
   o.loc = loc; chairSeat = null;
   await ready();
   await Promise.all([...o.npcs.map(n => loadModel(n.model)), loadModel(me.outfit), ...(players || []).map(p => loadModel(p.outfit))]).catch(() => {});
@@ -102,12 +104,14 @@ async function enterScene(loc, players, venue, seatId) {
   world = o; scene.add(o.group); applyLights(o.lights);
   if (o.steamAt) startSteam(o);
   camDist = o.cam.dist; camH = o.cam.height; camYaw = 0;
-  if (o.decorable) renderDecor(me.decor);
+  if (selfC) selfC.root.rotation.x = 0; lying = false;
+  if (loc === 'phong') { renderDecor(H ? H.decor : me.decor); roomSeats(o); }
   // bản thân
   const sp = clampPos(o.spawn.x + (Math.random() - .5) * 1.4, o.spawn.z + (Math.random() - .5) * .6);
   await respawnSelf(sp.x, sp.z, Math.PI);
   if (tok !== loadToken) return;
   if (seatId) sitSelfAt(seatId); else sendMove('dung_cho');
+  if (sceneLying && o.myBed) { lying = true; lieOn(selfC); }
   snapCam = true; refreshClueMarkers(); if (nb) renderNotebook(); syncFeastHT(); hideLoading();
   if (loc === 'tamcung' && !me.htTalked) setTimeout(() => { if (world?.loc === 'tamcung') startHtTalk(); }, 2500);
   for (const p of players || []) addOther(p);
@@ -149,6 +153,8 @@ function clickWorld(e) {
   if (world.brazier && ray.intersectObject(world.brazier, true).length) return clueTro();
   if (cookTarget && ray.intersectObject(cookTarget.g, true).length) return cookTarget.fn();
   if (taiOn) return;
+  if (world.myBed && !lying && ray.intersectObject(world.myBed.obj, true).length) return openMyBed();
+  if (lying) return getUp();
   if (world.seats && world.loc !== 'yentiec') { const hs = world.seats.find(st => ray.intersectObject(st.obj, true).length); if (hs) return socket.emit('sit', { seat: hs.id }); }
   if (chairSeat) { if (world.loc === 'yentiec') return; standChair(); }
   if (seated) standUp();
@@ -165,7 +171,7 @@ let lastSend = 0, wasMoving = false;
 function stepSelf(dt) {
   if (!selfC) return;
   const r = selfC.root;
-  if (chairSeat || taiOn) return;
+  if (chairSeat || taiOn || lying) return;
   if (selfC.target) {
     const dx = selfC.target.x - r.position.x, dz = selfC.target.z - r.position.z, d = Math.hypot(dx, dz);
     if (d < 0.05) { selfC.target = null; }
@@ -265,7 +271,8 @@ socket.on('me', async m => {
   if (!caseOpenId && me.cases?.length && !me.lanh) { caseOpenId = me.cases[0].id; nbMin = true; }
   if (caseOpenId) socket.emit('caseDetail', caseOpenId);
 });
-socket.on('scene', async d => { pendingScene = d; if (!stage) { await enterScene(d.loc, d.players, d.venue, d.seat); pendingScene = null; setTimeout(() => startTour(), 1200); } });
+let sceneHost = null, sceneLying = false;
+socket.on('scene', async d => { pendingScene = d; sceneHost = d.host || null; sceneLying = !!d.lying; if (!stage) { await enterScene(d.loc, d.players, d.venue, d.seat); pendingScene = null; setTimeout(() => startTour(), 1200); } });
 let pendingScene = null;
 socket.on('pjoin', p => addOther(p));
 socket.on('pleave', id => removeOther(id));
@@ -330,6 +337,8 @@ function renderActs() {
   if (L === 'yentiec') { if (!feast?.mine) add('🎎 Dâng tiết mục', 'Đàn, múa quạt, múa lụa, kiếm vũ, ngâm thơ, hát', performFeast); add('🍶 Kính rượu', 'Kính Hoàng thượng hoặc các tỷ muội trong tiệc', openRuou); add('💃 Ra múa cùng mọi người', 'Đủ người cùng múa thì Hoàng thượng thưởng', danceTogether); add('🍶 Tửu lệnh', 'Mỗi 4 phút một câu: gõ vế sau thành ngữ vào chat, ai nhanh nhất thắng', () => toast('Chờ Tửu lệnh hiện ở trên màn hình rồi gõ đáp án vào ô chat.')); add('🚪 Rời yến tiệc', '', () => socket.emit('goto', 'hoavien')); }
   if (L === 'hoavien') { if (feast) add('🎎 Dự yến tiệc', 'Đang có yến tiệc, vào ngồi cùng mọi người', () => socket.emit('goto', 'yentiec')); add('🎣 Câu cá ở hồ', `Miễn phí · cá bán lấy bạc${me.fishN >= 15 ? ' (hôm nay đã bán đủ)' : ''}, hiếm khi gặp cá chép vàng`, gameFish); add('👂 Dò tin', '1 lượt · nghe sở thích Hoàng thượng, chuyện trong cung', () => act('dotin')); add('🎐 Luyện tài nghệ', '1 lượt · chơi càng hay càng nhiều điểm', () => chooseTai(t => gameRhythm(t, q => act('luyen', { tai: t, q })))); }
   if (L === 'phong') { add('🎐 Luyện tài nghệ', '1 lượt · chơi càng hay càng nhiều điểm', () => chooseTai(t => gameRhythm(t, q => act('luyen', { tai: t, q })))); add('🎁 Ban thưởng cung nữ', `20 bạc · trung thành ${me.loyal ?? 50}/100 · mỗi ngày 1 lần`, () => act('thuongcn')); add('👘 Thay trang phục', '', openWardrobe); add('🏮 Bài trí ' + (me.hasPalace ? 'cung' : 'phòng'), 'Đặt, xoay đồ nội thất', openDecor); }
+  if (L === 'phong') { if (!me.visit) { add('🍵 Mời bạn bè thưởng trà', 'Mời sang cung riêng, ngồi đôn uống trà', inviteTra); add('🫖 Pha trà mời khách', 'Khách mới đến được +5 công trạng (mỗi người 1 lần/ngày)', () => socket.emit('tra', { op: 'serve' })); } else add('🚪 Cáo từ về cung', '', () => socket.emit('goto', 'phong'));
+    if (world?.myBed && !me.visit) add(lying ? '🧍 Ngồi dậy' : '🛏 Lên giường', lying ? (me.selfSick ? 'Ngồi dậy là khỏi bệnh' : '') : 'Ngồi mép giường · nằm nghỉ · cáo bệnh', lying ? getUp : openMyBed); }
   if (L === 'tamcung') { const N = me.night || {};
     if (!me.htTalked) add('💬 Hầu chuyện Hoàng thượng', 'Nghe tâm sự, chọn lời an ủi', startHtTalk);
     add('🛏 Lên giường', 'Ngồi cùng Hoàng thượng', openBed);
@@ -453,11 +462,11 @@ function openDecor() {
   bar.querySelectorAll('[data-d]').forEach(b => b.onclick = () => { decor.placing = b.dataset.d; bar.querySelectorAll('[data-d]').forEach(x => x.classList.toggle('on', x === b)); toast('Bấm xuống sàn để đặt ' + DECOR[b.dataset.d].name); });
   $('dRot').onclick = () => { const d = decor.list[decor.sel]; if (d) { d.ry += Math.PI / 4; d.obj.rotation.y = d.ry; } };
   $('dDel').onclick = () => { const d = decor.list[decor.sel]; if (d) { decor.group.remove(d.obj); decor.list.splice(decor.sel, 1); decor.list.forEach((x, i) => x.obj.userData.idx = i); decor.sel = -1; } };
-  $('dSave').onclick = () => socket.emit('decor', decor.list.map(({ item, x, z, ry }) => ({ item, x, z, ry })));
+  $('dSave').onclick = () => { socket.emit('decor', decor.list.map(({ item, x, z, ry }) => ({ item, x, z, ry }))); roomSeats(world); };
   $('dExit').onclick = closeDecor;
   toast('Chọn món đồ rồi bấm xuống sàn. Bấm vào món đã đặt để chọn, xoay hoặc bỏ.');
 }
-function closeDecor() { decor.on = false; $('decorbar').classList.add('hidden'); }
+function closeDecor() { decor.on = false; $('decorbar').classList.add('hidden'); if (world?.loc === 'phong') roomSeats(world); }
 function decorClick() {
   const hitD = ray.intersectObjects(decor.group?.children || [], true)[0];
   if (hitD && !decor.placing) { let o = hitD.object; while (o && o.userData.idx === undefined) o = o.parent; decor.sel = o?.userData.idx ?? -1; toast('Đã chọn ' + DECOR[decor.list[decor.sel]?.item]?.name); return; }
@@ -1214,6 +1223,8 @@ function applyAnim(o, anim, once) {
   const c = o.c; if (!c) return;
   if (o.taiK && !String(anim).startsWith('tai:')) { taiEnd(c); o.taiK = null; c.root.position.set(o.tx, world?.floorAt ? world.floorAt(o.tx, o.tz) : 0, o.tz); }
   if (anim === 'tai:rượu') { cheers(c); return; }
+  if (String(anim).startsWith('lie:')) { if (world?.myBed) { o.seated = { lie: 1 }; lieOn(c); } return; }
+  if (c.root.rotation.x) c.root.rotation.x = 0;
   if (String(anim).startsWith('sit:')) { const st = world?.seats?.find(x => x.id === anim.slice(4)); if (st) { o.seated = st; seatPose(c, st); return; } }
   if (o.seated) { o.seated = null; c.pose = null; c.root.position.set(o.tx, world?.floorAt ? world.floorAt(o.tx, o.tz) : 0, o.tz); c.root.rotation.y = o.try; }
   if (String(anim).startsWith('tai:')) { o.taiK = anim.slice(4); c.root.position.set(o.tx, 0, o.tz); c.root.rotation.y = o.try; taiStart(c, o.taiK);
@@ -2039,3 +2050,58 @@ socket.on('keoHT', d => {
   const iv = setInterval(() => { const l = Math.ceil((d.until - Date.now()) / 1000); const e = $('kpS'); if (e) e.textContent = Math.max(0, l); if (l <= 0) fin(); }, 300);
 });
 socket.on('keoKet', () => showScroll('Đêm dài', 'Hoàng thượng đã bỏ đi giữa đêm… Trong cung, ai cũng biết chuyện này. Lần sau nhớ giữ chân người cho chặt.', [['Lau nước mắt', () => { hideCut(); emote('khoc'); }]]));
+
+// =====================================================================
+// CUNG RIÊNG: ngồi đôn, giường (ngồi, nằm, cáo bệnh), mời bạn thưởng trà
+// =====================================================================
+let lying = false;
+function roomSeats(o) {
+  if (!o || o.loc !== 'phong') return;
+  const L = decor.list || [], tables = L.filter(d => d.item === 'banTra'); o.seats = []; o.myBed = null;
+  L.forEach((d, i) => {
+    if (d.item === 'ghedon') { const t = tables.sort((a, b) => Math.hypot(a.x - d.x, a.z - d.z) - Math.hypot(b.x - d.x, b.z - d.z))[0]; const ry = t && Math.hypot(t.x - d.x, t.z - d.z) < 1.4 ? Math.atan2(t.x - d.x, t.z - d.z) : d.ry; o.seats.push({ id: 'd' + i, x: d.x, z: d.z, ry, top: .22, kind: 'chair', obj: d.obj }); }
+    if (d.item === 'giuong' && !o.myBed) { const c = Math.cos(d.ry), sn = Math.sin(d.ry); o.myBed = { obj: d.obj, x: d.x, z: d.z, ry: d.ry, c, s: sn }; o.seats.push({ id: 'b0', x: d.x + sn * .22, z: d.z + c * .22, ry: d.ry, top: .32, kind: 'chair', obj: new THREE.Object3D() }); }
+  });
+  o.blocks = [...(o.blocks || []).filter(b => !b.decor), ...L.filter(d => d.item !== 'tham').map(d => ({ x: d.x, z: d.z, r: d.item === 'giuong' ? .6 : d.item === 'ghedon' ? .12 : .28, decor: 1 }))];
+}
+function lieOn(c) {
+  const B = world?.myBed; if (!B || !c) return;
+  c.pose = null; c.play('dung_cho'); const r = c.root; r.rotation.order = 'YXZ';
+  r.rotation.set(-Math.PI / 2, B.ry + Math.PI / 2, 0);
+  r.position.set(B.x + B.c * .5, .4, B.z - B.s * .5);
+}
+function openMyBed() {
+  const B = world?.myBed; if (!B || me.visit) return;
+  modal(`<button class="close" onclick="window._close()">✕</button><h3>🛏 Giường</h3>
+  <div class="btns" style="flex-direction:column;align-items:stretch">
+    <button data-b="sit">🪑 Ngồi mép giường</button>
+    <button data-b="lie">😴 Nằm nghỉ</button>
+    <button data-b="sick" ${me.selfSickDay ? 'disabled' : ''}>🤒 Cáo bệnh nằm nghỉ<small style="display:block;color:var(--muted)">${me.selfSickDay ? 'Hôm nay đã cáo bệnh rồi' : '2 giờ không ai ra tay được, nhưng Hoàng thượng cũng không lật thẻ · mỗi ngày 1 lần'}</small></button>
+  </div>`);
+  $('mcard').querySelectorAll('[data-b]').forEach(b => b.onclick = () => { closeModal(); const k = b.dataset.b;
+    if (k === 'sit') return socket.emit('sit', { seat: 'b0' });
+    if (chairSeat) { chairSeat = null; socket.emit('stand'); }
+    lying = true; lieOn(selfC); socket.emit('nam', { on: true, sick: k === 'sick' ? true : undefined }); renderActs();
+  });
+}
+function getUp() {
+  if (!lying || !selfC) return; lying = false; const B = world.myBed, r = selfC.root;
+  r.rotation.x = 0; r.rotation.y = B ? B.ry : r.rotation.y; if (B) r.position.set(B.x + B.s * .65, 0, B.z + B.c * .65); else r.position.y = 0;
+  selfC.play('dung_cho'); socket.emit('nam', { on: false, sick: false }); sendMove('dung_cho'); renderActs();
+}
+socket.on('me', m => { if (lying && !m.lying && world?.loc === 'phong') { lying = false; if (selfC) selfC.root.rotation.x = 0; } });
+function inviteTra() {
+  rosterSilent = true; socket.emit('roster'); socket.once('roster', r => { rosterSilent = false;
+    const list = r.list.filter(p => p.id !== me.id && !p.lanh);
+    modal(`<button class="close" onclick="window._close()">✕</button><h3>🍵 Mời ai sang thưởng trà?</h3><div style="color:var(--muted);font-size:12.5px">Người đang online sẽ nhận lời mời, người offline nhận thư.</div>
+    <table>${list.map(p => `<tr><td>${p.online ? '🟢' : '⚪'} ${esc(p.name)}</td><td>${esc(p.rankName)}</td><td><button data-w="${p.id}">Mời</button></td></tr>`).join('')}</table>`);
+    $('mcard').querySelectorAll('[data-w]').forEach(b => b.onclick = () => { socket.emit('tra', { op: 'invite', who: b.dataset.w }); b.disabled = true; b.textContent = 'Đã mời'; });
+  });
+}
+socket.on('traInvite', d => {
+  modal(`<h3>🍵 Lời mời thưởng trà</h3><div style="font-size:14px">Cung nữ của <b>${esc(d.name)}</b> sang thưa: "Chủ tử nhà nô tỳ mời chủ tử qua cung thưởng trà ạ."</div>
+  <div class="btns"><button class="gold" id="trOk">Sang ngay</button><button id="trNo">Để lần khác</button></div>`);
+  $('trOk').onclick = () => { closeModal(); socket.emit('tra', { op: 'accept', host: d.host }); };
+  $('trNo').onclick = closeModal;
+});
+socket.on('traCheers', d => { for (const id of d.ids) { const c = id === me?.id ? selfC : others.get(id)?.c; if (c) cheers(c); } });
