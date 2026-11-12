@@ -155,12 +155,12 @@ module.exports = {
   ],
   // ---------- phi tần NPC: đối thủ giữ ghế, cạnh tranh lật thẻ ----------
   NPC_FEI: [
-    { id: 'npc1', name: 'Tuệ Quý phi', short: 'Cao Tuệ Nhàn', rank: 7, pts: 1450, sung: 90, model: 'quyphi' },
-    { id: 'npc2', name: 'Mẫn Phi', short: 'Chương Giai Mẫn', rank: 6, pts: 700, sung: 70, model: 'phi' },
-    { id: 'npc3', name: 'Uyển Tần', short: 'Đổng Uyển Nghi', rank: 5, pts: 470, sung: 55, model: 'tan' },
-    { id: 'npc4', name: 'Lệ Tần', short: 'Kim Lệ Hoa', rank: 5, pts: 430, sung: 50, model: 'tan_tim' },
-    { id: 'npc5', name: 'Hân Quý nhân', short: 'Lục Hân Nhiên', rank: 4, pts: 300, sung: 40, model: 'quynhan' },
-    { id: 'npc6', name: 'Mai Thường tại', short: 'Diệp Mai Chi', rank: 3, pts: 170, sung: 30, model: 'thuongtai_hong' },
+    { id: 'npc1', tinh: 'kieu', name: 'Tuệ Quý phi', short: 'Cao Tuệ Nhàn', rank: 7, pts: 1450, sung: 90, model: 'quyphi' },
+    { id: 'npc2', tinh: 'xao', name: 'Mẫn Phi', short: 'Chương Giai Mẫn', rank: 6, pts: 700, sung: 70, model: 'phi' },
+    { id: 'npc3', tinh: 'hien', name: 'Uyển Tần', short: 'Đổng Uyển Nghi', rank: 5, pts: 470, sung: 55, model: 'tan' },
+    { id: 'npc4', tinh: 'danh', name: 'Lệ Tần', short: 'Kim Lệ Hoa', rank: 5, pts: 430, sung: 50, model: 'tan_tim' },
+    { id: 'npc5', tinh: 'ninh', name: 'Hân Quý nhân', short: 'Lục Hân Nhiên', rank: 4, pts: 300, sung: 40, model: 'quynhan' },
+    { id: 'npc6', tinh: 'nhut', name: 'Mai Thường tại', short: 'Diệp Mai Chi', rank: 3, pts: 170, sung: 30, model: 'thuongtai_hong' },
   ],
   NPC_LATTHE: 0.2,             // tỉ lệ Hoàng thượng lật thẻ phi tần NPC thay vì người chơi
   HIGH_RANK_SLOW: 0.7,         // từ Phi trở lên: công trạng nhận được x0.7

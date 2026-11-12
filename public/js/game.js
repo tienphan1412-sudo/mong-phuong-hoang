@@ -78,6 +78,10 @@ async function enterScene(loc, players, venue, seatId) {
   const H = loc === 'phong' && sceneHost ? sceneHost : null, hName = H ? H.name : me?.name || '';
   const o = buildLocation(loc, { palace: H ? H.palace : me?.hasPalace, palaceName: hName.split(' ').pop() + ' cung', venue });
   if (H && H.id !== me.id) o.decorable = false;
+  // phi tần NPC có mặt
+  const FS = { hoavien: [[1.6, 1.4, 2.6], [2.6, -.4, -2], [-.8, 2.6, 3], [.6, -2.2, .4], [3.2, 2.2, -2.4], [-1.6, 4, 2.2]], tuninh: [[-1.6, 2.4, 2.4], [1.6, 2.4, -2.4], [-2.4, 1.6, 1.6], [2.4, 1.4, -1.6], [-1, 3.2, 3], [1, 3.2, -3]] };
+  if (FS[loc]) sceneFei.forEach((f, i) => { const sp = FS[loc][i % FS[loc].length]; o.npcs.push({ model: f.model, x: sp[0], z: sp[1], ry: sp[2], name: '🎭 ' + f.name, talk: 'fei:' + f.id }); });
+  if (loc === 'yentiec') { let k = 0; for (const n of o.npcs) { if (n.model === 'hoangthuong' || n.sit) continue; const f = sceneFei[k++]; if (!f) break; n.name = '🎭 ' + f.name; n.model = f.model; n.talk = 'fei:' + f.id; } }
   o.loc = loc; chairSeat = null;
   await ready();
   await Promise.all([...o.npcs.map(n => loadModel(n.model)), loadModel(me.outfit), ...(players || []).map(p => loadModel(p.outfit))]).catch(() => {});
@@ -273,8 +277,8 @@ socket.on('me', async m => {
   if (!caseOpenId && me.cases?.length && !me.lanh) { caseOpenId = me.cases[0].id; nbMin = true; }
   if (caseOpenId) socket.emit('caseDetail', caseOpenId);
 });
-let sceneHost = null, sceneLying = false;
-socket.on('scene', async d => { pendingScene = d; sceneHost = d.host || null; sceneLying = !!d.lying; if (!stage) { await enterScene(d.loc, d.players, d.venue, d.seat); pendingScene = null; setTimeout(() => startTour(), 1200); } });
+let sceneHost = null, sceneLying = false, sceneFei = [];
+socket.on('scene', async d => { pendingScene = d; sceneHost = d.host || null; sceneLying = !!d.lying; sceneFei = d.fei || []; if (!stage) { await enterScene(d.loc, d.players, d.venue, d.seat); pendingScene = null; setTimeout(() => startTour(), 1200); } });
 let pendingScene = null;
 socket.on('pjoin', p => addOther(p));
 socket.on('pleave', id => removeOther(id));
@@ -339,6 +343,10 @@ function renderActs() {
   if (L === 'yentiec') { if (!feast?.mine) add('🎎 Dâng tiết mục', 'Đàn, múa quạt, múa lụa, kiếm vũ, ngâm thơ, hát', performFeast); add('🍶 Kính rượu', 'Kính Hoàng thượng hoặc các tỷ muội trong tiệc', openRuou); add('💃 Ra múa cùng mọi người', 'Đủ người cùng múa thì Hoàng thượng thưởng', danceTogether); add('🍶 Tửu lệnh', 'Mỗi 4 phút một câu: gõ vế sau thành ngữ vào chat, ai nhanh nhất thắng', () => toast('Chờ Tửu lệnh hiện ở trên màn hình rồi gõ đáp án vào ô chat.')); add('🚪 Rời yến tiệc', '', () => socket.emit('goto', 'hoavien')); }
   if (L === 'hoavien') { if (feast) add('🎎 Dự yến tiệc', 'Đang có yến tiệc, vào ngồi cùng mọi người', () => socket.emit('goto', 'yentiec')); add('🎣 Câu cá ở hồ', `Miễn phí · cá bán lấy bạc${me.fishN >= 15 ? ' (hôm nay đã bán đủ)' : ''}, hiếm khi gặp cá chép vàng`, gameFish); add('👂 Dò tin', '1 lượt · nghe sở thích Hoàng thượng, chuyện trong cung', () => act('dotin')); add('🎐 Luyện tài nghệ', '1 lượt · chơi càng hay càng nhiều điểm', () => chooseTai(t => gameRhythm(t, q => act('luyen', { tai: t, q })))); }
   if (L === 'phong') { add('🎐 Luyện tài nghệ', '1 lượt · chơi càng hay càng nhiều điểm', () => chooseTai(t => gameRhythm(t, q => act('luyen', { tai: t, q })))); add('🎁 Ban thưởng cung nữ', `20 bạc · trung thành ${me.loyal ?? 50}/100 · mỗi ngày 1 lần`, () => act('thuongcn')); add('👘 Thay trang phục', '', openWardrobe); add('🏮 Bài trí ' + (me.hasPalace ? 'cung' : 'phòng'), 'Đặt, xoay đồ nội thất', openDecor); }
+  if (L === 'phong' && !me.visit && me.rank >= 6 && !me.lanh) { const cc = me.ccDay || {};
+    add('📒 Hiệp lý lục cung', cc.so ? 'Hôm nay đã duyệt sổ' : 'Duyệt sổ chi tiêu, tìm khoản khai khống · mỗi ngày 1 lần', () => socket.emit('caocap', { op: 'so' }), cc.so);
+    add('📚 Dạy dỗ người mới', cc.day ? 'Hôm nay đã dạy' : 'Chỉ bảo một người từ Thường tại trở xuống (họ +15 công trạng)', openDay, cc.day);
+    add('🎎 Thiết yến', me.ccFeastOk ? '150 bạc · 15 phút · mỗi tiết mục +4 công trạng cho chủ tiệc' : 'Mỗi 2 ngày một lần', () => socket.emit('caocap', { op: 'yentiec' }), !me.ccFeastOk); }
   if (L === 'phong') { if (!me.visit) { add('🍵 Mời bạn bè thưởng trà', 'Mời sang cung riêng, ngồi đôn uống trà', inviteTra); add('🫖 Pha trà mời khách', 'Khách mới đến được +5 công trạng (mỗi người 1 lần/ngày)', () => socket.emit('tra', { op: 'serve' })); } else add('🚪 Cáo từ về cung', '', () => socket.emit('goto', 'phong'));
     if (world?.myBed && !me.visit) add(lying ? '🧍 Ngồi dậy' : '🛏 Lên giường', lying ? (me.selfSick ? 'Ngồi dậy là khỏi bệnh' : '') : 'Ngồi mép giường · nằm nghỉ · cáo bệnh', lying ? getUp : openMyBed); }
   if (L === 'tamcung') { const N = me.night || {};
@@ -383,6 +391,7 @@ function openEmotes() {
 function talk(n) {
   const c = me.cases[0];
   if (NPC_OF[n.talk]) return npcMenu(n);
+  if (String(n.talk).startsWith('fei:')) return socket.emit('fei', { op: 'talk', id: n.talk.slice(4) });
   if (n.talk === 'ngutru') { bubble(n.label, me.dish ? `${me.dish.name} xong rồi, chủ tử mau mang lên Dưỡng Tâm điện kẻo nguội!` : 'Chủ tử muốn tự tay nấu món dâng Hoàng thượng? Nô tài chuẩn bị bếp ngay!'); if (!me.dish && !cooking) setTimeout(() => openBiKip(), 900); return; }
   if (n.talk === 'thinhan') { if (world.loc === 'tuninh') thinhAn(); }
   else if (n.talk === 'dangcanh') gameCanh();
@@ -2185,3 +2194,29 @@ socket.on('coMove', d => {
   goStones(V.K, V.g); if (V === GOV) goDraw(d.i === -1 ? `${V.names[d.col - 1]} bỏ lượt` : '');
 });
 socket.on('coEnd', d => { const V = GOV?.id === d.id ? GOV : null; if (V) { V.g.over = true; goDraw(d.text); if (d.winner === me.id) fireworksSmall(); } if (window._watch) delete window._watch[d.id]; });
+
+// ---------------- phi tần NPC: trò chuyện ----------------
+socket.on('feiTalk', async d => {
+  const model = (sceneFei.find(f => f.id === d.id) || {}).model || 'phi';
+  const relTxt = d.rel <= -40 ? '😠 Thù địch' : d.rel <= -10 ? '😒 Không ưa' : d.rel >= 40 ? '💞 Thân thiết' : d.rel >= 10 ? '🙂 Có thiện cảm' : '😐 Bình thường';
+  const text = `${esc(d.line)}${d.tip ? `<br><i style="color:var(--gold2)">${esc(d.tip)}</i>` : ''}<br><small>Quan hệ: ${relTxt} (${d.rel})${d.done ? ' · hôm nay đã trò chuyện' : ''}</small>`;
+  const opts = d.opts.length ? d.opts.map(([k, t]) => [esc(t), k, '']) : [['Lui', null, '']];
+  const i = await say(model, d.name, text, opts); dlgClose();
+  if (d.opts[i]) socket.emit('fei', { op: 'ans', id: d.id, a: d.opts[i][0] });
+});
+// ---------------- việc riêng bậc cao ----------------
+socket.on('ccSo', items => {
+  modal(`<button class="close" onclick="window._close()">✕</button><h3>📒 Sổ chi tiêu lục cung</h3><div style="color:var(--muted);font-size:12.5px">Tổng quản trình sổ tháng này. Có một khoản bị khai khống gấp ba, chủ tử chỉ ra khoản nào?</div>
+  <table>${items.map((x, i) => `<tr><td>${esc(x.t)}</td><td style="text-align:right">${x.v} lượng</td><td><button data-i="${i}">Khoản này sai</button></td></tr>`).join('')}</table>`);
+  $('mcard').querySelectorAll('[data-i]').forEach(b => b.onclick = () => { socket.emit('caocap', { op: 'so', ok: +b.dataset.i }); closeModal(); });
+});
+function openDay() {
+  rosterSilent = true; socket.emit('roster'); socket.once('roster', r => { rosterSilent = false;
+    const lows = r.list.filter(p => p.id !== me.id && !p.lanh && ['Tú nữ', 'Quan nữ tử', 'Đáp ứng', 'Thường tại'].includes(p.rankName));
+    modal(`<button class="close" onclick="window._close()">✕</button><h3>📚 Dạy dỗ người mới</h3><div style="color:var(--muted);font-size:12.5px">Chỉ bảo lễ nghi cho người cấp thấp: họ +15 công trạng, bổn cung +10 và Thái hậu thêm quý mến.</div>
+    <table>${lows.map(p => `<tr><td>${p.online ? '🟢' : '⚪'} ${esc(p.name)}</td><td>${esc(p.rankName)}</td><td><button data-w="${p.id}">Dạy dỗ</button></td></tr>`).join('')}</table>
+    <div class="btns"><button id="dTn">Dạy các tú nữ mới tuyển (+8 công trạng)</button></div>`);
+    $('mcard').querySelectorAll('[data-w]').forEach(b => b.onclick = () => { socket.emit('caocap', { op: 'day', who: b.dataset.w }); closeModal(); });
+    $('dTn').onclick = () => { socket.emit('caocap', { op: 'day' }); closeModal(); };
+  });
+}
