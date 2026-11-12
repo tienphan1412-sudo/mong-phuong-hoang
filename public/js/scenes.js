@@ -59,6 +59,11 @@ function textures() {
   T.ready = true;
   return T;
 }
+function latticeTex() { // song cửa gỗ kiểu cung Thanh: khung đỏ nâu, ô vuông lồng, giấy dán màu ngà
+  return latticeTex.t || (latticeTex.t = tex(256, 256, (g, w, h) => { g.fillStyle = '#e9d9b4'; g.fillRect(0, 0, w, h); g.strokeStyle = '#6a2416'; g.lineWidth = 9;
+    for (let i = 0; i <= 8; i++) { g.beginPath(); g.moveTo(i * w / 8, 0); g.lineTo(i * w / 8, h); g.stroke(); g.beginPath(); g.moveTo(0, i * h / 8); g.lineTo(w, i * h / 8); g.stroke(); }
+    g.lineWidth = 6; for (let i = 0; i < 8; i++) for (let j = 0; j < 8; j++) if ((i + j) % 2 === 0) g.strokeRect(i * w / 8 + 9, j * h / 8 + 9, w / 8 - 18, h / 8 - 18); }, [1, 1]));
+}
 function plaqueTex(text, bg = '#122a4a') {
   return tex(1024, 360, (g, w, h) => {
     g.fillStyle = bg; g.fillRect(0, 0, w, h); g.strokeStyle = '#e2bf6b'; g.lineWidth = 26; g.strokeRect(0, 0, w, h); g.lineWidth = 6; g.strokeRect(36, 36, w - 72, h - 72);
@@ -275,20 +280,41 @@ function sansinh(o, name) {
   // tường bao và mặt tiền cung (người cao ~1 đơn vị)
   const wallM = m.wall, red = m.red, tile = m.roofTile;
   for (const [x, z, w, ry] of [[0, -5, 16, 0], [-8, 0, 10, Math.PI / 2], [8, 0, 10, Math.PI / 2], [0, 5, 16, 0]]) { const wl = new THREE.Group(); wl.position.set(x, 0, z); wl.rotation.y = ry; g.add(wl); box(wl, w, 1.5, .25, wallM, 0, .75, 0); box(wl, w + .2, .1, .55, tile, 0, 1.55, 0); }
+  // mặt tiền cung: hàng cột son, cửa sổ song gỗ, chính giữa cửa lớn 4 cánh (mở 2 cánh giữa)
   const fa = new THREE.Group(); fa.position.set(0, 0, -4.7); g.add(fa);
-  box(fa, 6, .18, 1.2, m.stone, 0, .09, .2); // bậc thềm
-  for (let k = 0; k < 2; k++) box(fa, 1.6, .06, .25, m.stone, 0, .03 + k * .06, .95 - k * .2);
-  box(fa, 6, 1.7, .3, wallM, 0, 1.03, -.2);
-  for (const x of [-2.6, -1.2, 1.2, 2.6]) cyl(fa, .08, .08, 1.7, red, x, 1.03, .3, 12);
-  const roof = new THREE.Mesh(new THREE.CylinderGeometry(.01, 1, 6.8, 4, 1, false, Math.PI / 4), tile); roof.rotation.z = Math.PI / 2; roof.scale.set(.75, 1, 1.2); roof.position.set(0, 2.25, 0); fa.add(roof);
-  box(fa, 6.6, .12, 1.5, red, 0, 1.92, 0);
-  // cửa cung hai cánh son đỏ đinh vàng
-  for (const sx of [-1, 1]) { const dr = box(fa, .5, 1.25, .06, red, sx * .26, .8, -.03); for (let r = 0; r < 4; r++) for (let c = 0; c < 3; c++) { const nail = new THREE.Mesh(new THREE.SphereGeometry(.018, 6, 4), m.gold); nail.position.set(sx * .26 + (c - 1) * .13, .35 + r * .27, 0); fa.add(nail); } }
-  box(fa, 1.15, .08, .1, m.gold, 0, 1.45, -.02);
-  const pl = new THREE.Mesh(new THREE.PlaneGeometry(1.3, .42), new THREE.MeshStandardMaterial({ map: plaqueTex(name || 'Cung'), roughness: .5 })); pl.position.set(0, 1.68, -.03); fa.add(pl);
+  const H = 1.62, W = 6.6, base = .2;
+  box(fa, W + .6, base, 1.3, m.stone, 0, base / 2, .25); // nền đá
+  for (let k = 0; k < 3; k++) box(fa, 1.9 - k * .1, .065, .22, m.stone, 0, base - .065 * (k + 1) + .032, .98 + k * .2); // bậc thềm
+  const woodD = new THREE.MeshStandardMaterial({ color: 0x5a1e12, roughness: .55 }), woodL = new THREE.MeshStandardMaterial({ color: 0x7a2a18, roughness: .5 });
+  const latM = new THREE.MeshStandardMaterial({ map: latticeTex(), roughness: .8, emissive: 0x3a2410, emissiveIntensity: .25 });
+  box(fa, W, H, .06, new THREE.MeshStandardMaterial({ color: 0x1a0d08 }), 0, base + H / 2, -.7); box(fa, 1.9, .02, .7, new THREE.MeshStandardMaterial({ color: 0x3a2418 }), 0, base + .01, -.35); for (const sx of [-1, 1]) box(fa, .04, H, .7, new THREE.MeshStandardMaterial({ color: 0x2a1610 }), sx * .97, base + H / 2, -.35); // trong nhà tối
+  const cols = [-3.2, -1.95, -.95, .95, 1.95, 3.2];
+  for (const x of cols) { cyl(fa, .075, .085, H, red, x, base + H / 2, .05, 14); cyl(fa, .12, .12, .06, m.stone, x, base + .03, .05, 14); }
+  // ô cửa sổ song gỗ hai bên (trên song, dưới bản gỗ)
+  const bay = (x0, x1, door) => { const w = x1 - x0 - .17, cx = (x0 + x1) / 2;
+    box(fa, w + .04, .05, .08, woodD, cx, base + H - .04, 0); box(fa, w + .04, .05, .08, woodD, cx, base + .42, 0); box(fa, w + .04, .05, .08, woodD, cx, base + .03, 0);
+    if (!door) { const p = new THREE.Mesh(new THREE.PlaneGeometry(w, H - .5), latM); p.position.set(cx, base + .44 + (H - .5) / 2, .01); fa.add(p); box(fa, w, .38, .04, woodL, cx, base + .23, 0); for (const k of [-.25, .25]) box(fa, .025, H - .5, .06, woodD, cx + k * w, base + .44 + (H - .5) / 2, .02); } };
+  bay(-3.2, -1.95); bay(-1.95, -.95); bay(.95, 1.95); bay(1.95, 3.2);
+  // cửa chính 4 cánh: 2 cánh ngoài đóng, 2 cánh giữa mở vào trong
+  const DW = 1.9 / 4, DH = H - .08;
+  const leaf = () => { const L = new THREE.Group(); box(L, DW - .02, DH, .05, woodL, DW / 2, DH / 2, 0);
+    const p = new THREE.Mesh(new THREE.PlaneGeometry(DW - .1, DH * .55), latM); p.position.set(DW / 2, DH * .64, .03); L.add(p); const p2 = p.clone(); p2.rotation.y = Math.PI; p2.position.z = -.03; L.add(p2);
+    for (const y of [DH * .36, DH * .92]) box(L, DW - .02, .035, .07, woodD, DW / 2, y, 0); box(L, DW - .14, DH * .22, .065, woodD, DW / 2, DH * .2, 0);
+    const ring = new THREE.Mesh(new THREE.TorusGeometry(.028, .006, 6, 14), m.gold); ring.position.set(DW - .06, DH * .45, .045); L.add(ring); return L; };
+  for (const [px, lx, ry] of [[-2 * DW, 0, 0], [-DW, 0, 1.25], [DW, -DW, -1.25], [DW, 0, 0]]) { const piv = new THREE.Group(); piv.position.set(px, base + .02, 0); piv.rotation.y = ry; fa.add(piv); const L = leaf(); L.position.x = lx; piv.add(L); }
+  box(fa, 1.98, .06, .1, woodD, 0, base + H - .02, .02); box(fa, 1.98, .05, .2, m.stone, 0, base + .02, .02); // ngạch cửa
+  // xà ngang sơn xanh đỏ, đấu củng, mái ngói cong
+  box(fa, W + .4, .14, .3, new THREE.MeshStandardMaterial({ color: 0x2a5a4c, roughness: .6 }), 0, base + H + .07, .05);
+  box(fa, W + .4, .025, .32, m.gold, 0, base + H + .015, .05);
+  for (let x = -3.2; x <= 3.21; x += .4) box(fa, .14, .1, .22, new THREE.MeshStandardMaterial({ color: 0x2b4a7a }), x, base + H + .19, .14);
+  box(fa, W + 1.1, .06, 1.5, red, 0, base + H + .27, .15);
+  const roof = new THREE.Mesh(new THREE.CylinderGeometry(.01, 1, W + 1.3, 4, 1, false, Math.PI / 4), tile); roof.rotation.z = Math.PI / 2; roof.scale.set(.55, 1, 1.15); roof.position.set(0, base + H + .6, .05); fa.add(roof);
+  box(fa, W + .6, .1, .12, tile, 0, base + H + .98, .05);
+  for (const sx of [-1, 1]) { const tip = new THREE.Mesh(new THREE.ConeGeometry(.07, .3, 6), tile); tip.position.set(sx * (W / 2 + .45), base + H + 1.05, .05); tip.rotation.z = -sx * .5; fa.add(tip); }
+  const pl = new THREE.Mesh(new THREE.PlaneGeometry(1.1, .34), new THREE.MeshStandardMaterial({ map: plaqueTex(name || 'Cung'), roughness: .5 })); pl.position.set(0, base + H + .07, .21); fa.add(pl);
   o.gate = { x: 0, z: -4.1 };
   // đèn lồng đỏ treo cổng (cung có hỷ)
-  for (const x of [-.95, .95]) { const ln = new THREE.Mesh(new THREE.SphereGeometry(.14, 14, 10), new THREE.MeshStandardMaterial({ color: 0xd62a2a, emissive: 0xc81e1e, emissiveIntensity: .7 })); ln.scale.y = 1.15; ln.position.set(x, 1.32, .35); fa.add(ln); const lt = new THREE.PointLight(0xff6a3c, .8, 3); lt.position.set(x, 1.3, .55); fa.add(lt); cyl(fa, .004, .004, .2, m.gold, x, 1.55, .35, 4); }
+  for (const x of [-.95, .95]) { const ln = new THREE.Mesh(new THREE.SphereGeometry(.11, 14, 10), new THREE.MeshStandardMaterial({ color: 0xd62a2a, emissive: 0xc81e1e, emissiveIntensity: .7 })); ln.scale.y = 1.2; ln.position.set(x, base + H - .2, .3); fa.add(ln); const lt = new THREE.PointLight(0xff6a3c, .8, 3); lt.position.set(x, base + H - .2, .5); fa.add(lt); cyl(fa, .004, .004, .15, m.gold, x, base + H - .03, .3, 4); for (const y of [.13, -.13]) cyl(fa, .05, .05, .025, m.gold, x, base + H - .2 + y, .3, 10); }
   // nhà chờ (đình lục giác thấp) bên phải sân
   const pv = new THREE.Group(); pv.position.set(2.7, 0, .3); g.add(pv);
   cyl(pv, 1.9, 2, .14, m.stone, 0, .07, 0, 6);

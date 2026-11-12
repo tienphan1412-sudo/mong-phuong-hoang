@@ -335,7 +335,7 @@ function sayThai(p, why) {
 }
 function birth(p, opt = {}) {
   if (!p.thai) return {}; const care = p.thai.care || 0, isTest = !!p.thai.test; p.thai = null; p.bornAt = now();
-  const sex = Math.random() < .5 ? 'trai' : 'gai', name = pick(C.CHILD_NAMES[sex]);
+  const sex = opt.sex || (Math.random() < .5 ? 'trai' : 'gai'), name = opt.name || pick(C.CHILD_NAMES[sex]);
   p.children = p.children || []; const firstSon = sex === 'trai' && !p.children.some(c => c.sex === 'trai' && !c.test); const ward = p.rank < C.CHILD.WARD_RANK; p.children.push({ sex, name, born: now(), ward, ...(isTest ? { test: true } : {}) }); kidFix(p);
   if (ward) setTimeout(() => news(`🏯 Theo tổ chế, phi tần dưới bậc ${C.RANKS[C.CHILD.WARD_RANK].name} không được tự nuôi con: ${sex === 'trai' ? 'hoàng tử' : 'công chúa'} ${name} được đưa tới A ca sở. ${p.name} lên tới ${C.RANKS[C.CHILD.WARD_RANK].name} sẽ được đón con về.`, 'phong'), 3000);
   const hard = opt.hard ?? care < 2, k = hard ? .5 : 1;
@@ -1040,8 +1040,13 @@ function sinhTick0() {
     if (S.hard) { S.phase = 'kho'; S.until = now() + C.SINH.KHO_MIN * 60e3; news(`⚠️ Thái y quỳ trước Hoàng thượng: ${S.name} khó sinh, cần gấp nhân sâm ngàn năm!`, 'phong'); return sinhEmit(); }
     S.phase = 'bao';
   } else if (S.phase === 'kho') S.phase = 'bao';
+  else if (S.phase === 'bao' && !S.sex && !S.names) { // Hoàng thượng đưa tên, người mẹ chọn
+    S.sexPre = Math.random() < .5 ? 'trai' : 'gai'; const used = new Set((p.children || []).map(c => c.name));
+    S.names = C.CHILD_NAMES[S.sexPre].filter(n => !used.has(n)).sort(() => Math.random() - .5).slice(0, 4); if (S.names.length < 2) S.names = C.CHILD_NAMES[S.sexPre].slice(0, 4);
+    S.until = now() + C.SINH.TEN_SEC * 1000; const s = sockOf(p.id); if (s) s.emit('sinhTen', { sex: S.sexPre, names: S.names }); return;
+  }
   else if (S.phase === 'bao' && !S.sex) {
-    const r = birth(p, { hard: S.hard && !S.sam, event: true }); S.sex = r.sex; S.child = r.name; S.promoted = r.promoted; S.until = now() + C.SINH.BAO_SEC * 1000;
+    const r = birth(p, { hard: S.hard && !S.sam, event: true, sex: S.sexPre, name: S.nameSel || S.names[0] }); S.sex = r.sex; S.child = r.name; S.promoted = r.promoted; S.until = now() + C.SINH.BAO_SEC * 1000;
     const here = Object.values(DB.players).filter(q => q.loc === 'sansinh' && online.has(q.id) && q.id !== p.id);
     for (const q of here) { q.silver += C.SINH.LOC; addPts(q, 3); toast(q, `Hoàng thượng vui mừng ban lộc cho người có mặt chờ tin: +${C.SINH.LOC} bạc.`, 'good'); push(q); }
     if (S.sam) { const g = P(S.sam); if (g) { htGain(g, 10); addPts(g, 15); relAdd(g, 'thaiy', 4, 'dâng nhân sâm cứu người'); news(`🌿 Nhờ nhân sâm của ${g.name}, ${S.name} mẹ tròn con vuông. Hoàng thượng ghi nhận công lao.`); push(g); } }
@@ -1054,6 +1059,7 @@ function sinhSock(sock, getMe) {
   setTimeout(() => { const me = getMe(); sock.emit('sinh', DB.state.sinh?.test && !me?.admin ? null : sinhPub()); }, 1500);
   sock.on('sinhAct', d => quiet(DB.state.sinh?.test, () => {
     const me = getMe(), S = DB.state.sinh; if (!me || !S || !d) return; if (S.test && !me.admin) return;
+    if (d.op === 'ten') { if (me.id !== S.id || !S.names || S.sex) return; const n = S.names[+d.i]; if (!n) return; S.nameSel = n; S.until = now(); return; }
     if (d.op === 'tho') { if (me.id !== S.id || S.q != null) return; S.q = Math.max(0, Math.min(1, +d.q || 0)); toast(me, S.q >= .45 ? 'Bổn cung giữ được hơi thở đều, bà đỡ gật đầu yên tâm.' : 'Hơi thở rối loạn… bà đỡ lo lắng nhìn nhau.', S.q >= .45 ? 'good' : 'bad'); return; }
     if (me.id === S.id || me.loc !== 'sansinh') return;
     if (d.op === 'pray') { if (S.phase !== 'cho' || S.pray.includes(me.id)) return; S.pray.push(me.id); addPts(me, 4); relAdd(me, 'thaihau', 1, 'cầu phúc cho hoàng tự'); toast(me, 'Bổn cung thành tâm cầu phúc cho mẹ tròn con vuông.', 'good'); io.to('sansinh').emit('chat', { id: null, name: '🙏', text: `${me.name} quỳ xuống cầu phúc cho ${S.name}.` }); push(me); return sinhEmit(); }
@@ -1132,6 +1138,12 @@ function kidSock(sock, getMe) {
       }
       if (a === 'ru' || a === 'choi') { if (now() - (c.playAt || 0) < 3600e3) return toast(me, `${c.name} vừa chơi xong, để bé nghỉ chút.`); c.playAt = now(); c.ngoan = Math.min(100, c.ngoan + 2); c.hp = Math.min(100, c.hp + 1); addPts(me, 2); return done(a === 'ru' ? `Bổn cung bế ${c.name} ru hát, bé cười tít mắt.` : `Bổn cung chơi đùa với ${c.name}, tiếng cười vang cả cung.`); }
       return toast(me, `${c.name} đang ngoan, không khóc.`);
+    }
+    if (d.op === 'gan') {
+      const A = { hon: 'Bổn cung hôn lên trán con, bé cười toe.', nung: 'Bổn cung nựng đôi má phúng phính, bé khúc khích.', hat: 'Bổn cung bế con khẽ hát ru, bé lim dim ngủ.', om: `Bổn cung ôm ${c.name} vào lòng, con rúc đầu vào ngực mẹ.`, tron: `Hai mẹ con chơi trốn tìm, ${c.name} cười nắc nẻ.`, tapdi: `Bổn cung nắm tay ${c.name} tập đi từng bước.`, kechuyen: `Bổn cung kể chuyện cổ tích, ${c.name} nghe say sưa.`, chaitoc: `Bổn cung chải tóc cho ${c.name}, con ngồi im ngoan ngoãn.`, dayviet: `Bổn cung cầm tay ${c.name} viết từng nét chữ.` };
+      const a = String(d.act || ''); if (!A[a]) return; if (!near()) return toast(me, `Phải ở bên ${c.name} mới gần gũi được.`);
+      c.gan = c.gan || {}; if (now() - (c.gan[a] || 0) < 20 * 60e3) return toast(me, 'Vừa làm rồi, lát nữa nhé.', 'info'); c.gan[a] = now();
+      c.ngoan = Math.min(100, c.ngoan + 2); c.hp = Math.min(100, c.hp + 1); if (a === 'kechuyen') c.duc += 1; if (a === 'dayviet') c.van += 1; addPts(me, 2); cnt(me, 'gancon'); return done(A[a]);
     }
     if (d.op === 'nhumau') { if (!c.cry) return toast(me, `${c.name} đang ngoan.`); if (me.silver < K.NHUMAU) return toast(me, `Cần ${K.NHUMAU} bạc.`, 'bad'); me.silver -= K.NHUMAU; c.cry = null; c.hp = Math.min(100, c.hp + 2); c.cryAt = now() + K.CRY_MIN[1] * 60e3; return done(`Nhũ mẫu đã dỗ ${c.name} nín (-${K.NHUMAU} bạc).`); }
     if (d.op === 'thaiy') { if (!c.sick && c.hp >= 70) return toast(me, `${c.name} khỏe mạnh, không cần mời Thái y.`); if (me.silver < K.THAIY) return toast(me, `Cần ${K.THAIY} bạc.`, 'bad'); me.silver -= K.THAIY; c.sick = false; c.hp = Math.max(c.hp, 85); relAdd(me, 'thaiy', 2, `chữa bệnh cho ${c.name}`); return done(`Thái y bốc thuốc, ${c.name} đã khỏe lại.`); }

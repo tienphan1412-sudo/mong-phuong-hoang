@@ -118,7 +118,7 @@ async function enterScene(loc, players, venue, seatId) {
   if (seatId) sitSelfAt(seatId); else sendMove('dung_cho');
   if (sceneLying && o.myBed) { lying = true; lieOn(selfC); }
   if (!window._updChk) { window._updChk = 1; setTimeout(() => showUpdate(), 3000); }
-  snapCam = true; refreshClueMarkers(); if (nb) renderNotebook(); syncFeastHT(); syncVua(); syncKids(); leObj = null; leSync(null); if (loc === 'sansinh') { sinhFx = null; sinhAmbient(); if (sinhMine() && selfC) selfC.root.visible = false; if (sinhSt?.phase === 'bao' && sinhSt.sex) sinhAnnounce(sinhSt); } hideLoading();
+  snapCam = true; refreshClueMarkers(); if (nb) renderNotebook(); syncFeastHT(); syncVua(); syncKids(); leObj = null; leSync(null); if (loc === 'sansinh') { sinhFx = null; sinhAmbient(); if (sinhMine() && selfC) { selfC.root.visible = false; specCam = { loc: 'sansinh', keep: true, pos: new THREE.Vector3(-1.6, 1.25, 2.4), look: new THREE.Vector3(.7, .85, -3.2), until: Date.now() + 36e5 }; } if (sinhSt?.phase === 'bao' && sinhSt.sex) sinhAnnounce(sinhSt); } hideLoading();
   if (loc === 'tamcung' && !me.htTalked) setTimeout(() => { if (world?.loc === 'tamcung') startHtTalk(); }, 2500);
   for (const p of players || []) addOther(p);
   renderMap(); renderActs();
@@ -220,7 +220,7 @@ renderer.setAnimationLoop(() => {
       let p = selfC.root.position;
       if (seated?.ht?.c) { p = p.clone().add(seated.ht.c.root.position).multiplyScalar(.5); p.y = 0; }
       const want = new THREE.Vector3(p.x + Math.sin(camYaw) * camDist, camH, p.z + Math.cos(camYaw) * camDist);
-      if (['phong', 'tamcung', 'lanhcung', 'ngutien', 'duongtam', 'tuninh', 'acaso'].includes(world.loc)) { const b = world.bounds, m = .3; want.x = Math.min(b.maxX + m, Math.max(b.minX - m, want.x)); want.z = Math.min(b.maxZ + m, Math.max(b.minZ - m, want.z)); }
+      if (['phong', 'tamcung', 'lanhcung', 'ngutien', 'duongtam', 'tuninh', 'acaso', 'sansinh'].includes(world.loc)) { const b = world.bounds, m = .3; want.x = Math.min(b.maxX + m, Math.max(b.minX - m, want.x)); want.z = Math.min(b.maxZ + m, Math.max(b.minZ - m, want.z)); }
       if (!Number.isFinite(camera.position.x + camera.position.y + camera.position.z)) snapCam = true;
       if (!Number.isFinite(want.x + want.y + want.z)) { want.set(0, 1.6, 3); }
       if (snapCam) { camera.position.copy(want); snapCam = false; } else camera.position.lerp(want, Math.min(1, dt * 6)); camera.lookAt(p.x, seated ? (world.bedTop || .4) + .32 : .85, p.z);
@@ -2246,8 +2246,11 @@ function openDay() {
 // =====================================================================
 // THÁNH CHỈ CẬP NHẬT: hiện một lần cho mỗi bản mới
 // =====================================================================
-const UPDATE_VER = 'u2026-11-13';
+const UPDATE_VER = 'u2026-11-13b';
 const UPDATE_NOTES = [
+  ['💞 Gần gũi với con', 'Mẹ có thể hôn trán, nựng má, bế hát ru bé sơ sinh; ôm con, chơi trốn tìm, dắt tay tập đi khi bé chập chững; kể chuyện, chải tóc, dạy viết chữ khi con đi học. Bé thêm ngoan, thêm khỏe.'],
+  ['✍️ Mẹ đặt tên con', 'Lúc sinh, Hoàng thượng đưa vài cái tên, người mẹ chọn tên cho con.'],
+  ['🏯 Cổng cung mới', 'Sân cung lúc chuyển dạ có mặt tiền song gỗ, cửa lớn bốn cánh mở hai cánh giữa. Thời gian chờ sinh rút ngắn còn vài phút.'],
   ['🏮 Chuyển dạ: cả cung chờ tin', 'Tới ngày sinh, cổng cung người mẹ treo đèn lồng đỏ. Hoàng thượng, Thái hậu và các phi tần ngồi nhà chờ ngoài sân. Người mẹ thở theo nhịp bà đỡ; người chờ có thể cầu phúc, dâng lễ mừng, hoặc… lén mua chuộc bà đỡ (40% bị Thái hậu bắt quả tang). Khó sinh thì ai dâng nhân sâm ngàn năm sẽ được ghi công. Ma ma bế bé ra báo tin, Hoàng thượng ban lộc 20 bạc cho mọi người có mặt.'],
   ['👑 Mẫu bằng tử quý', 'Sinh hoàng tử được thưởng nhiều hơn công chúa. Con trai đầu lòng: người mẹ được tấn phong lên một bậc.'],
   ['🛁 Lễ tẩy tam', 'Bé sơ sinh được làm lễ tắm ở cung riêng: khách tới thả trứng đỏ, hành, tiền vàng, ngải cứu, hoa quế vào chậu, mỗi món một lời chúc tăng chỉ số cho bé.'],
@@ -2647,14 +2650,14 @@ function kidFrame(dt) {
     }
     else if (e.kind === 'carry') { const c = e.c;
       const B = c.B.spine2 || c.B.spine; if (!B) continue; c.root.updateMatrixWorld(true); B.getWorldPosition(kidWorldPos); const ry = c.root.rotation.y;
-      e.mesh.position.set(kidWorldPos.x + Math.sin(ry) * .2, kidWorldPos.y - .2, kidWorldPos.z + Math.cos(ry) * .2); e.mesh.rotation.set(0, ry + Math.PI / 2, 0); e.mesh.rotateX(-.35); e.mesh.visible = c.root.visible;
+      const lift = e.c === selfC ? ganFx.lift || 0 : 0; e.mesh.position.set(kidWorldPos.x + Math.sin(ry) * (.2 - lift * .4), kidWorldPos.y - .2 + lift, kidWorldPos.z + Math.cos(ry) * .2); e.mesh.rotation.set(0, ry + Math.PI / 2, 0); e.mesh.rotateX(-.35); e.mesh.visible = c.root.visible;
       if (cry) e.mesh.userData.mouth.scale.set(1.4, 1.4, 1); else e.mesh.userData.mouth.scale.set(1, .4, 1); }
     else if (e.kind === 'follow') { const c = e.c, m = e.mesh, p = c.root.position, ry = c.root.rotation.y; let tx, tz;
       if (kidLesson?.cid === e.cid && (kidLesson.pos || world.kidDesks)) { const d = kidLesson.pos || world.kidDesks[kidLesson.desk]; tx = d.x; tz = d.z; } else { tx = p.x - Math.sin(ry) * .65 + Math.cos(ry) * .4; tz = p.z - Math.cos(ry) * .65 - Math.sin(ry) * .4; }
       const dx = tx - m.position.x, dz = tz - m.position.z, dist = Math.hypot(dx, dz); let moving = false;
       if (cry && e.stage === 'chap') { kidAnim(e, dt, false, 'fall'); continue; }
       let fast = false; if (dist > 6) { m.position.set(tx, 0, tz); } else if (dist > .12) { fast = dist > 1.2; const sp = Math.min(dist, dt * (fast ? 1.6 : .78)); m.position.x += dx / dist * sp; m.position.z += dz / dist * sp; m.rotation.y = Math.atan2(dx, dz); moving = true; }
-      else if (kidLesson?.cid === e.cid) { m.rotation.y = kidLesson.pos ? kidLesson.pos.ry : Math.PI; kidAnim(e, dt, false, 'sit'); continue; } else m.rotation.y += (Math.atan2(p.x - m.position.x, p.z - m.position.z) - m.rotation.y) * Math.min(1, dt * 3);
+      else if (kidLesson?.cid === e.cid) { m.rotation.y = kidLesson.pos ? kidLesson.pos.ry : Math.PI; kidAnim(e, dt, false, kidLesson.stand ? null : 'sit'); continue; } else m.rotation.y += (Math.atan2(p.x - m.position.x, p.z - m.position.z) - m.rotation.y) * Math.min(1, dt * 3);
       m.position.y = world.floorAt ? world.floorAt(m.position.x, m.position.z) : 0; kidAnim(e, dt, moving, cry ? 'cry' : null, fast); }
     else if (e.kind === 'cradle') { e.rock.rotation.x = Math.sin(kidT * (cry ? 6 : 1.2)) * (cry ? .12 : .05); e.baby.userData.mouth.scale.set(cry ? 1.4 : 1, cry ? 1.4 : .4, 1); }
     else if (e.kind === 'desk') kidAnim(e, dt, false, 'sit');
@@ -2664,6 +2667,8 @@ function kidFrame(dt) {
   }
   for (const O of kidOwners()) { const c = O.c; c._carry = !!O.kid.carry; c._preg = (O.kid.tp || 0) > .4;
     if (!c.post2) c.post2 = cc => { if (cc.pose || cc.post || cc.curName === 'ngoi') return;
+      if (cc._hug) { aim(cc.root, cc.B.rArm, cc.B.rFore, v3([-.35, -.55, .75])); aim(cc.root, cc.B.rFore, cc.B.rHand, v3([.7, -.2, .55])); aim(cc.root, cc.B.lArm, cc.B.lFore, v3([.35, -.55, .75])); aim(cc.root, cc.B.lFore, cc.B.lHand, v3([-.7, -.2, .55])); aim(cc.root, cc.B.neck, cc.B.head, v3([0, .8, .55])); return; }
+      if (cc._brush) { aim(cc.root, cc.B.rArm, cc.B.rFore, v3([-.3, -.3, .9])); aim(cc.root, cc.B.rFore, cc.B.rHand, v3([.2, -.4 + Math.sin(cc.t * 6) * .35, .85])); aim(cc.root, cc.B.neck, cc.B.head, v3([0, .8, .55])); }
       if (cc._carry) { aim(cc.root, cc.B.rArm, cc.B.rFore, v3([-.15, -.8, .5])); aim(cc.root, cc.B.rFore, cc.B.rHand, v3([.8, .15, .5])); aim(cc.root, cc.B.lArm, cc.B.lFore, v3([.15, -.8, .5])); aim(cc.root, cc.B.lFore, cc.B.lHand, v3([-.8, .15, .5])); }
       else if (cc._preg && cc.curName === 'dung_cho') { aim(cc.root, cc.B.lArm, cc.B.lFore, v3([.25, -.75, .5])); aim(cc.root, cc.B.lFore, cc.B.lHand, v3([-.75, -.15, .45])); } }; }
 
@@ -2699,7 +2704,7 @@ function kidActs(add) {
     else if (inPhong || withMe) {
       if (k.stage === 'so') add(me.carry === k.id ? `👐 Đặt ${k.name} vào nôi` : `🤱 Bế ${k.name}`, me.carry === k.id ? '' : 'Bế con đi khắp cung, ra Dưỡng Tâm điện khoe Hoàng thượng', () => socket.emit('con', { op: 'be', cid: k.id }));
       else add(me.follow === k.id ? `🏠 Để ${k.name} ở lại cung` : `👣 Dắt ${k.name} đi theo`, me.follow === k.id ? '' : k.stage === 'hoc' ? 'Dắt con tới Thượng thư phòng học, ra mắt Hoàng thượng' : 'Bé lon ton chạy theo bổn cung', () => socket.emit('con', { op: 'theo', cid: k.id }));
-      if (!k.cry) add(`🎐 ${k.stage === 'so' ? 'Ru' : 'Chơi với'} ${k.name}`, 'Mỗi giờ 1 lần · bé thêm ngoan', () => { if (!me.carry) emote('cui_chao'); socket.emit('con', { op: 'care', cid: k.id, act: k.stage === 'so' ? 'ru' : 'choi' }); });
+      if (!k.cry) add(`💞 Gần gũi với ${k.name}`, k.stage === 'so' ? 'Hôn trán, nựng má, bế hát ru' : k.stage === 'chap' ? 'Ôm con, trốn tìm, tập đi' : 'Ôm con, kể chuyện, chải tóc, dạy viết', () => openGan(k));
     }
     if (near && (k.sick || k.hp < 70)) add(`🩺 Mời Thái y khám cho ${k.name}`, `20 bạc · sức khỏe ${k.hp}${k.sick ? ' · đang ốm' : ''}`, () => socket.emit('con', { op: 'thaiy', cid: k.id }));
     if (L === 'duongtam' && withMe) { if (k.stage === 'hoc') add(`📜 Cho ${k.name} trình bài với phụ hoàng`, k.khao ? 'Hôm nay đã trình bài' : 'Mỗi ngày 1 lần · đối đáp trôi chảy cả mẹ lẫn con được khen', () => socket.emit('con', { op: 'khaoStart', cid: k.id }), k.khao); else add(`🐉 Cho ${k.name} ra mắt Hoàng thượng`, 'Mỗi ngày 1 lần · sủng ái', () => socket.emit('con', { op: 'khoe', cid: k.id })); }
@@ -2803,7 +2808,7 @@ const SINH_CHEER = { kieu: 'Chúc mừng… ừm, chúc mừng.', xao: 'Ôi chú
 // không khí chờ: cung nữ bưng thau chạy ra vào, tiếng vọng từ trong cung
 function sinhAmbient() {
   if (sinhFx) return; const w = world; let t = 0, said = 0;
-  sinhFx = dt => { if (world !== w || !sinhSt) { sinhFx = null; if (selfC) { selfC.root.visible = true; if (selfC.label) selfC.label.visible = true; } return false; } t += dt;
+  sinhFx = dt => { if (world !== w || !sinhSt) { sinhFx = null; if (specCam?.loc === 'sansinh') specCam = null; if (selfC) { selfC.root.visible = true; if (selfC.label) selfC.label.visible = true; } return false; } t += dt;
     if (sinhMine() && selfC) { selfC.root.visible = false; if (selfC.label) selfC.label.visible = false; } // người mẹ đang ở trong cung
     const cn = w.npcs.find(n => n.talk === 'sinhCN' && n.c); if (cn && sinhSt.phase !== 'bao') { const k = (Math.sin(t * .45) + 1) / 2, x = -.7 + k * 1.2, z = -3.25 + k * 1.6; const r = cn.c.root, dx = x - r.position.x, dz = z - r.position.z; if (Math.hypot(dx, dz) > .002) { r.rotation.y = Math.atan2(dx, dz); if (cn.c.curName !== 'di') cn.c.play('di'); } r.position.x = x; r.position.z = z; }
     if (t - said > 7 && sinhSt.phase !== 'bao') { said = t; const g = w.gate; if (cn?.label) bubble(cn.label, rpick(['Nước nóng đây!', 'Nương nương cố lên!', 'Bà đỡ ơi, khăn sạch đây!'])); const f = w.npcs.filter(n => n.talk === 'sinhFei' || n.talk === 'sinhHT'); const n = rpick(f); if (n?.label && Math.random() < .5) sinhTalk(n); } };
@@ -2901,3 +2906,42 @@ function leSync(prev) {
         showScroll('Lễ trảo chu', `<b>${esc(leSt.child)}</b> lẫm chẫm bước tới, bốc lấy <b>${nm}</b>!<br><br>${leSt.pick === 'an' ? 'Điềm đại quý! Cả cung xôn xao, ngày sau ắt làm nên nghiệp lớn.' : 'Từ nay đó là năng khiếu của bé: học môn này tiến bộ nhanh hơn.'}`, [['Chúc mừng', hideCut]]); } });
   }
 }
+
+// ---- mẹ và con: ôm, hôn, kể chuyện, chải tóc, trốn tìm… ----
+let ganFx = {};
+const GAN = { so: [['hon', '😘 Hôn lên trán con'], ['nung', '🥰 Nựng má con'], ['hat', '🎶 Bế con hát ru']], chap: [['om', '🤗 Ôm con vào lòng'], ['tron', '🙈 Chơi trốn tìm'], ['tapdi', '👣 Dắt tay tập đi']], hoc: [['om', '🤗 Ôm con vào lòng'], ['kechuyen', '📖 Kể chuyện cổ tích'], ['chaitoc', '🪮 Chải tóc cho con'], ['dayviet', '🖌 Dạy con viết chữ']] };
+function hearts(x, y, z) { burst(x, y, z, 18, .45, [0xff7aa2, 0xffb3c8, 0xffe0ea], 1.4, -.25, .05); }
+async function openGan(k) {
+  const i = await say(k.sex === 'trai' ? 'hoangtu1' : 'congchua1', esc(k.name), k.stage === 'so' ? '(Bé mở to đôi mắt tròn xoe nhìn mẹ, tay nhỏ quơ quơ…)' : rpick(['Mẫu thân! Mẫu thân!', 'Mẫu thân chơi với con đi mà…', 'Hôm nay con ngoan lắm đó!']), [...GAN[k.stage].map(([a, t]) => [t, a, '']), ['Để sau', 0, 'gold']]);
+  dlgClose(); if (!i) return; socket.emit('con', { op: 'gan', cid: k.id, act: i }); ganPlay(k, i);
+}
+function ganKid(cid) { for (const e of kidEnts.values()) if (e.cid === cid && e.w === world) return e; return null; }
+function ganPlay(k, act) {
+  if (!selfC) return; const r = selfC.root, fx = Math.sin(r.rotation.y), fz = Math.cos(r.rotation.y), e = ganKid(k.id);
+  const at = (d, stand, ry) => { kidLesson = { cid: k.id, stand, pos: { x: r.position.x + fx * d, z: r.position.z + fz * d, ry: ry ?? r.rotation.y + Math.PI } }; };
+  const end = (ms, f) => setTimeout(() => { selfC._hug = selfC._brush = false; ganFx = {}; if (kidLesson?.cid === k.id) kidLesson = null; f?.(); }, ms);
+  const heartAt = (o, dy = .6) => { const p = new THREE.Vector3(); (o || r).getWorldPosition(p); hearts(p.x, p.y + dy, p.z); };
+  selfC.target = null;
+  if (k.stage === 'so') {
+    if (e?.kind === 'cradle') { const p = new THREE.Vector3(); e.rock.getWorldPosition(p); selfC.target = clampPos(p.x + .45, p.z); setTimeout(() => { emote('cui_chao'); heartAt(e.rock, .4); }, 1500); return end(4000); }
+    if (act === 'hon') { ganFx.lift = .14; setTimeout(() => heartAt(null, 1.0), 600); return end(2200); }
+    if (act === 'nung') { ganFx.lift = .06; for (let t = 0; t < 3; t++) setTimeout(() => heartAt(null, .8), t * 500); return end(2000); }
+    ganFx.rock = true; let t = 0; FX.push(dt => { if (!ganFx.rock) return false; t += dt; ganFx.lift = .04 + Math.sin(t * 3) * .03; }); for (let i = 0; i < 4; i++) setTimeout(() => heartAt(null, .9), i * 800); return end(3600);
+  }
+  if (act === 'om') { at(.32, true); setTimeout(() => { selfC._hug = true; heartAt(null, .9); setTimeout(() => heartAt(null, .9), 700); }, 1500); return end(4200); }
+  if (act === 'tron') { const a = Math.random() * 6.28; kidLesson = { cid: k.id, stand: true, pos: { ...clampPos(r.position.x + Math.cos(a) * 2.2, r.position.z + Math.sin(a) * 2.2), ry: a } }; emote('che_mieng'); setTimeout(() => { at(.35, true); toast('“Bắt được con rồi nhé!”'); }, 3500); setTimeout(() => heartAt(null, .9), 5200); return end(6000); }
+  if (act === 'tapdi') { selfC.target = clampPos(r.position.x + fx * 1.6, r.position.z + fz * 1.6); setTimeout(() => heartAt(null, .9), 2500); return end(3500); }
+  if (act === 'chaitoc') { at(.3, true, r.rotation.y); setTimeout(() => { selfC._brush = true; }, 1500); setTimeout(() => heartAt(null, .9), 3000); return end(4800); }
+  at(.38, false); setTimeout(() => { emote('cui_chao'); heartAt(null, .8); }, 1800); return end(act === 'kechuyen' ? 5000 : 4200);
+}
+socket.on('sinhTen', async d => {
+  const i = await say('hoangthuong', 'Hoàng thượng', `${d.sex === 'trai' ? 'Là một tiểu hoàng tử!' : 'Là một tiểu công chúa!'} Trẫm nghĩ được mấy cái tên, nàng chọn cho con đi.`, d.names.map((n, k) => [esc(n), String(k), '']));
+  dlgClose(); socket.emit('sinhAct', { op: 'ten', i: +i });
+});
+// thu gọn bảng việc bên phải
+let actsOpen = false; try { actsOpen = localStorage.getItem('mph_acts') === '1'; } catch {}
+const _renderActs = renderActs;
+renderActs = function () { _renderActs(); const a = $('acts'); if (!a) return; const bs = [...a.querySelectorAll(':scope > button')]; const SHOW = 4; if (bs.length <= SHOW + 1) return;
+  const urgent = b => /😭|🏮|🐉|🌸|🙏|🌿|chuyển dạ|trình bài|Nghênh giá/.test(b.textContent); bs.filter(urgent).reverse().forEach(b => a.insertBefore(b, a.querySelector(':scope > button')));
+  const all = [...a.querySelectorAll(':scope > button')]; if (!actsOpen) all.slice(SHOW).forEach(b => b.style.display = 'none');
+  const t = document.createElement('button'); t.className = 'more'; t.innerHTML = actsOpen ? '▴ Thu gọn' : `▾ Xem thêm ${all.length - SHOW} việc`; t.onclick = () => { actsOpen = !actsOpen; try { localStorage.setItem('mph_acts', actsOpen ? '1' : '0'); } catch {} renderActs(); }; a.appendChild(t); };
