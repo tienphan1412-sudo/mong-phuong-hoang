@@ -3,6 +3,7 @@ import * as THREE from 'three';
 import { CSS2DRenderer, CSS2DObject } from 'three/addons/renderers/CSS2DRenderer.js';
 import { buildLocation, DECOR, makeGuzheng, makeFan, makeScroll, makeSword, makeCup, makeRibbon, makeCleaver, makeLadle } from './scenes.js';
 import { makeIngredient, makeDish } from './food.js';
+import * as GOL from './go.js';
 import { spawn, seatPlacement, ready, loadModel, aim, v3, kneelOn } from './chars.js';
 import * as music from './music.js';
 
@@ -154,6 +155,7 @@ function clickWorld(e) {
   if (cookTarget && ray.intersectObject(cookTarget.g, true).length) return cookTarget.fn();
   if (taiOn) return;
   if (world.myBed && !lying && ray.intersectObject(world.myBed.obj, true).length) return openMyBed();
+  if (world.kangs?.length && !lying) { const K = world.kangs.find(k => ray.intersectObject(k.obj, true).length); if (K) return openKang(K); }
   if (lying) return getUp();
   if (world.seats && world.loc !== 'yentiec') { const hs = world.seats.find(st => ray.intersectObject(st.obj, true).length); if (hs) return socket.emit('sit', { seat: hs.id }); }
   if (chairSeat) { if (world.loc === 'yentiec') return; standChair(); }
@@ -1194,7 +1196,7 @@ socket.on('htTalkResult', async r => { htGesture(r.score >= 2 ? 'nam_tay' : 'dun
 // TIỆM NỘI VỤ PHỦ
 // =====================================================================
 const SHOP = { sam: ['🌿 Nhân sâm bồi bổ', '+1 lượt (mỗi ngày 1 lần)', 80], huong: ['🪷 Hương mê điệp', 'Lần lật thẻ tới dễ được chọn hơn', 120], le: ['🎁 Lễ vật tiến Thái hậu', 'Thái hậu hài lòng +8', 60] };
-const DECOR_PRICE = { denlong: 60, binhsu: 80, luhuong: 100, tham: 40, giuong: 200 };
+const DECOR_PRICE = { denlong: 60, binhsu: 80, luhuong: 100, tham: 40, giuong: 200, lahan: 350 };
 const JEWELS = { hoatai: ['📿 Hoa tai trân châu', 'Mỗi lần thỉnh an Thái hậu hài lòng thêm 1', 250], tramthuy: ['💚 Trâm phỉ thúy', 'Luôn dễ được lật thẻ hơn một chút', 300], vongngoc: ['🟢 Vòng ngọc Hòa Điền', 'Mỗi ngày tự được thêm 2 sủng ái', 400], tramphuong: ['👑 Trâm phượng vàng', 'Dâng tiết mục ở yến tiệc được cộng điểm', 600] };
 function openShop() {
   closeModal();
@@ -1725,7 +1727,7 @@ function renderTL() {
   tlEl.innerHTML = `<div class="tt">🍶 TỬU LỆNH · còn <b>${Math.max(0, Math.ceil((tl.end - Date.now()) / 1000))}</b> giây</div><div class="tq">${esc(tl.q)} <span>…?</span></div><div class="th">Gõ vế còn lại vào ô chat rồi Enter. Ai nhanh nhất được Hoàng thượng thưởng rượu!</div>`;
 }
 setInterval(() => { if (tl) renderTL(); }, 1000);
-window.__mph = { get renderer() { return renderer; }, get cam() { return camera.position.toArray(); }, get others() { return others; }, get selfC() { return selfC; }, get camYaw() { return camYaw; } };
+window.__mph = { kang() { openKang(world.kangs[0]); }, get renderer() { return renderer; }, get cam() { return camera.position.toArray(); }, get others() { return others; }, get selfC() { return selfC; }, get camYaw() { return camYaw; } };
 
 // =====================================================================
 // PHÁO HOA, PHẢN ỨNG KHÁN GIẢ, ĐOÀN CA VŨ GIÁO PHƯỜNG
@@ -2057,12 +2059,15 @@ socket.on('keoKet', () => showScroll('Đêm dài', 'Hoàng thượng đã bỏ �
 let lying = false;
 function roomSeats(o) {
   if (!o || o.loc !== 'phong') return;
-  const L = decor.list || [], tables = L.filter(d => d.item === 'banTra'); o.seats = []; o.myBed = null;
+  const L = decor.list || [], tables = L.filter(d => d.item === 'banTra'); o.seats = []; o.myBed = null; o.kangs = [];
   L.forEach((d, i) => {
     if (d.item === 'ghedon') { const t = tables.sort((a, b) => Math.hypot(a.x - d.x, a.z - d.z) - Math.hypot(b.x - d.x, b.z - d.z))[0]; const ry = t && Math.hypot(t.x - d.x, t.z - d.z) < 1.4 ? Math.atan2(t.x - d.x, t.z - d.z) : d.ry; o.seats.push({ id: 'd' + i, x: d.x, z: d.z, ry, top: .22, kind: 'chair', obj: d.obj }); }
+    if (d.item === 'lahan') { const c = Math.cos(d.ry), sn = Math.sin(d.ry), at = lx => ({ x: d.x + lx * c + .06 * sn, z: d.z - lx * sn + .06 * c });
+      const a = at(-.56), b = at(.56), K = { i, obj: d.obj, board: d.obj.userData.board, seats: ['k' + i + 'a', 'k' + i + 'b'] }; o.kangs.push(K);
+      o.seats.push({ id: K.seats[0], ...a, ry: d.ry + Math.PI / 2, top: .36, kind: 'chair', obj: new THREE.Object3D() }, { id: K.seats[1], ...b, ry: d.ry - Math.PI / 2, top: .36, kind: 'chair', obj: new THREE.Object3D() }); }
     if (d.item === 'giuong' && !o.myBed) { const c = Math.cos(d.ry), sn = Math.sin(d.ry); o.myBed = { obj: d.obj, x: d.x, z: d.z, ry: d.ry, c, s: sn }; o.seats.push({ id: 'b0', x: d.x + sn * .22, z: d.z + c * .22, ry: d.ry, top: .32, kind: 'chair', obj: new THREE.Object3D() }); }
   });
-  o.blocks = [...(o.blocks || []).filter(b => !b.decor), ...L.filter(d => d.item !== 'tham').map(d => ({ x: d.x, z: d.z, r: d.item === 'giuong' ? .6 : d.item === 'ghedon' ? .12 : .28, decor: 1 }))];
+  o.blocks = [...(o.blocks || []).filter(b => !b.decor), ...L.filter(d => d.item !== 'tham').map(d => ({ x: d.x, z: d.z, r: d.item === 'giuong' ? .6 : d.item === 'lahan' ? .55 : d.item === 'ghedon' ? .12 : .28, decor: 1 }))];
 }
 function lieOn(c) {
   const B = world?.myBed; if (!B || !c) return;
@@ -2105,3 +2110,75 @@ socket.on('traInvite', d => {
   $('trNo').onclick = closeModal;
 });
 socket.on('traCheers', d => { for (const id of d.ids) { const c = id === me?.id ? selfC : others.get(id)?.c; if (c) cheers(c); } });
+
+// =====================================================================
+// SẬP LA HÁN: ngồi, uống trà, đánh cờ vây (với cung nữ hoặc người cùng phòng)
+// =====================================================================
+function openKang(K) {
+  const ppl = [...others.values()].filter(o => o.p && o.c).map(o => o.p);
+  const mySide = chairSeat && K.seats.includes(chairSeat.id);
+  modal(`<button class="close" onclick="window._close()">✕</button><h3>🪷 Sập La Hán</h3>
+  <div class="btns" style="flex-direction:column;align-items:stretch">
+    ${mySide ? '<button data-k="tea">🍵 Nâng chén trà</button><button data-k="up">🧍 Đứng dậy</button>' : '<button data-k="a">🪑 Ngồi bên trái</button><button data-k="b">🪑 Ngồi bên phải</button>'}
+    <button data-k="ai" class="gold">⚫⚪ Đánh cờ vây với cung nữ</button>
+    ${ppl.map(p => `<button data-w="${p.id}">⚫⚪ Mời ${esc(p.name)} đánh cờ</button>`).join('')}
+  </div><div style="color:var(--muted);font-size:12px">Cờ vây 9×9: bao vây quân đối phương để bắt, cuối ván ai chiếm nhiều đất hơn thì thắng. Hai bên cùng bỏ lượt là hết ván.</div>`);
+  $('mcard').querySelectorAll('[data-k]').forEach(b => b.onclick = () => { closeModal(); const k = b.dataset.k;
+    if (k === 'a' || k === 'b') return socket.emit('sit', { seat: K.seats[k === 'a' ? 0 : 1] });
+    if (k === 'up') return standChair();
+    if (k === 'tea') { cheers(selfC); socket.emit('emote', 'tai:rượu'); return; }
+    if (k === 'ai') { if (!mySide) socket.emit('sit', { seat: K.seats[0] }); return goOpen({ K, ai: true, my: 1, names: [me.name, 'Cung nữ Tiểu Thúy'] }); }
+  });
+  $('mcard').querySelectorAll('[data-w]').forEach(b => b.onclick = () => { closeModal(); if (!mySide) socket.emit('sit', { seat: K.seats[0] }); socket.emit('co', { op: 'invite', who: b.dataset.w, k: K.i }); });
+}
+socket.on('coInvite', d => {
+  modal(`<h3>⚫⚪ Lời mời đánh cờ</h3><div style="font-size:14px"><b>${esc(d.name)}</b> mời bổn cung một ván cờ vây trên sập La Hán.</div><div class="btns"><button class="gold" id="coOk">Nhận lời</button><button id="coNo">Để khi khác</button></div>`);
+  $('coOk').onclick = () => { closeModal(); const K = world?.kangs?.find(k => k.i === d.k); if (K) socket.emit('sit', { seat: K.seats[1] }); socket.emit('co', { op: 'accept', from: d.from, k: d.k }); };
+  $('coNo').onclick = closeModal;
+});
+let GOV = null; // ván đang xem/chơi
+function goStones(K, g) {
+  if (!K?.board) return; const B = K.board; [...B.children].slice(2).forEach(c => B.remove(c));
+  const blk = goStones.b || (goStones.b = new THREE.MeshStandardMaterial({ color: 0x141414, roughness: .25 })), wht = goStones.w || (goStones.w = new THREE.MeshStandardMaterial({ color: 0xf4f1e8, roughness: .3 })), geo = goStones.g || (goStones.g = new THREE.SphereGeometry(.0135, 10, 6));
+  g.b.forEach((v, i) => { if (!v) return; const m = new THREE.Mesh(geo, v === 1 ? blk : wht); m.scale.y = .45; m.position.set(((i % 9) - 4) * .0315, .022, (((i / 9) | 0) - 4) * .0315); B.add(m); });
+}
+function goOpen(o) { GOV = { ...o, g: GOL.newGame() }; goStones(o.K, GOV.g); goDraw(); if (o.ai && GOV.my !== 1) setTimeout(goAI, 600); }
+function goDraw(msg) {
+  const V = GOV; if (!V) return; const g = V.g, S = 300, c = S / 10;
+  const turnName = g.turn === 1 ? V.names[0] : V.names[1];
+  modal(`<h3>⚫⚪ Cờ vây · ${esc(V.names[0])} (đen) đấu ${esc(V.names[1])} (trắng)</h3>
+  <div style="font-size:12.5px;color:var(--muted)">${g.over ? '' : `Lượt: <b style="color:var(--gold2)">${g.turn === 1 ? '⚫' : '⚪'} ${esc(turnName)}</b>${g.turn === V.my ? ' (bổn cung)' : ''} · `}Bắt được: ⚫ ${g.cap[1]} · ⚪ ${g.cap[2]}${msg ? ` · ${esc(msg)}` : ''}</div>
+  <canvas id="goC" width="${S}" height="${S}" style="display:block;margin:8px auto;border-radius:8px;cursor:pointer;max-width:100%"></canvas>
+  <div class="btns">${g.over ? '<button class="gold" id="goX">Đóng</button>' : `<button id="goP" ${g.turn !== V.my ? 'disabled' : ''}>Bỏ lượt</button><button id="goR">Chịu thua</button><button id="goX">Thu nhỏ</button>`}</div>`);
+  const cv = $('goC'), x = cv.getContext('2d');
+  x.fillStyle = '#dcae62'; x.fillRect(0, 0, S, S); x.strokeStyle = '#3a2410'; x.lineWidth = 1;
+  for (let k = 0; k < 9; k++) { x.beginPath(); x.moveTo(c, c + k * c); x.lineTo(9 * c, c + k * c); x.stroke(); x.beginPath(); x.moveTo(c + k * c, c); x.lineTo(c + k * c, 9 * c); x.stroke(); }
+  x.fillStyle = '#3a2410'; for (const [a, b] of [[2, 2], [6, 2], [4, 4], [2, 6], [6, 6]]) { x.beginPath(); x.arc(c + a * c, c + b * c, 3, 0, 7); x.fill(); }
+  g.b.forEach((v, i) => { if (!v) return; const px = c + (i % 9) * c, py = c + ((i / 9) | 0) * c; const gr = x.createRadialGradient(px - 4, py - 4, 2, px, py, c * .45); if (v === 1) { gr.addColorStop(0, '#666'); gr.addColorStop(1, '#0a0a0a'); } else { gr.addColorStop(0, '#fff'); gr.addColorStop(1, '#cfcac0'); } x.fillStyle = gr; x.beginPath(); x.arc(px, py, c * .45, 0, 7); x.fill(); });
+  if (V.last != null && V.last >= 0) { x.strokeStyle = '#d23a2a'; x.lineWidth = 2; x.beginPath(); x.arc(c + (V.last % 9) * c, c + ((V.last / 9) | 0) * c, c * .2, 0, 7); x.stroke(); }
+  cv.onclick = e => { if (g.over || g.turn !== V.my) return; const r = cv.getBoundingClientRect(), sx = S / r.width; const i = Math.round((e.clientX - r.left) * sx / c) - 1, j = Math.round((e.clientY - r.top) * sx / c) - 1; if (i < 0 || j < 0 || i > 8 || j > 8) return; goMove(j * 9 + i); };
+  const P = $('goP'); if (P) P.onclick = () => goMove(-1);
+  const Rz = $('goR'); if (Rz) Rz.onclick = () => { if (!confirm('Chịu thua ván này?')) return; if (V.ai) goFinish(false, 'Bổn cung chịu thua.'); else socket.emit('co', { op: 'move', id: V.id, resign: true }); };
+  $('goX').onclick = () => { closeModal(); if (g.over) GOV = null; };
+}
+function goMove(i) {
+  const V = GOV; if (!V) return;
+  if (!V.ai) { if (i >= 0 && !GOL.legal(V.g, i)) return toast('Không đặt được ở đây (tự sát hoặc cướp ko).'); return socket.emit('co', { op: 'move', id: V.id, i }); }
+  if (GOL.play(V.g, i) === null) return toast('Không đặt được ở đây (tự sát hoặc cướp ko).');
+  V.last = i; goStones(V.K, V.g); if (V.g.over) return goEndAI(); goDraw(i < 0 ? 'Bổn cung bỏ lượt' : ''); setTimeout(goAI, 500 + Math.random() * 500);
+}
+function goAI() { const V = GOV; if (!V?.ai || V.g.over) return; const m = GOL.aiMove(V.g); GOL.play(V.g, m); V.last = m; goStones(V.K, V.g); if (V.g.over) return goEndAI(); goDraw(m < 0 ? 'Cung nữ bỏ lượt' : ''); }
+function goEndAI() { const s = GOL.score(GOV.g); goFinish(s.winner === GOV.my, `Đếm đất: đen ${s.black}, trắng ${s.white} (chấp 5.5).`); }
+function goFinish(win, text) { const V = GOV; V.g.over = true; socket.emit('co', { op: 'ai', win }); goDraw(text + (win ? ' Bổn cung thắng!' : ' Cung nữ thắng.')); if (win) fireworksSmall(); }
+function fireworksSmall() { if (selfC) { const p = selfC.root.position; burst(p.x, 1.1, p.z, 50, .8, [0xffd77a, 0xffffff], 1.4, .3, .06); } }
+socket.on('coStart', d => {
+  const K = world?.kangs?.find(k => k.i === d.k), my = d.black.id === me.id ? 1 : d.white.id === me.id ? 2 : 0;
+  const V = { id: d.id, K, my, names: [d.black.name, d.white.name], g: GOL.newGame() };
+  if (my) { GOV = V; goStones(K, V.g); goDraw(); } else { (window._watch = window._watch || {})[d.id] = V; goStones(K, V.g); }
+});
+socket.on('coMove', d => {
+  const V = GOV?.id === d.id ? GOV : window._watch?.[d.id]; if (!V) return;
+  if (d.resign) V.g.over = true; else { GOL.play(V.g, d.i, d.col); V.last = d.i; }
+  goStones(V.K, V.g); if (V === GOV) goDraw(d.i === -1 ? `${V.names[d.col - 1]} bỏ lượt` : '');
+});
+socket.on('coEnd', d => { const V = GOV?.id === d.id ? GOV : null; if (V) { V.g.over = true; goDraw(d.text); if (d.winner === me.id) fireworksSmall(); } if (window._watch) delete window._watch[d.id]; });

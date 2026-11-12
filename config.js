@@ -99,7 +99,7 @@ module.exports = {
   MUACHUOC_PRICE: 80,          // mua chuộc cung nữ nhà người khác để dò bí mật
   CATCHUP_RANK: 3,             // từ Thường tại trở xuống: công trạng nhận được x1.3
   NEWBIE_DAYS: 3,              // 3 ngày đầu mỗi ngày thêm 2 lượt
-  DECOR_PRICE: { denlong: 60, binhsu: 80, luhuong: 100, tham: 40, giuong: 200 }, // món không có tên ở đây là miễn phí
+  DECOR_PRICE: { denlong: 60, binhsu: 80, luhuong: 100, tham: 40, giuong: 200, lahan: 350 }, // món không có tên ở đây là miễn phí
   LAT_THE: { pts: 25, sung: 20, turns: 2 },
   LAT_THE_CROWD: 10,          // cung đông hơn số này thì mỗi lần lật 2 thẻ
   LAT_THE_GIFT: { silver: 6, sung: 1 }, // quà an ủi cho người không được lật thẻ

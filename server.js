@@ -499,6 +499,7 @@ const ACH = [
   { id: 'tuuluong', name: 'Tửu lượng hơn người', desc: 'Thắng tửu lệnh 5 lần', need: 5, cur: p => p.cnt?.tuulenh || 0 },
   { id: 'tinvat', name: 'Châu ngọc mãn lâu', desc: 'Gom đủ 8 tín vật Hoàng thượng ban', need: 8, cur: p => Object.keys(p.tinvat || {}).length },
   { id: 'thoho', name: 'Thi tình họa ý', desc: 'Đối thơ đúng cả 3 câu khi ngắm trăng', need: 1, cur: p => p.cnt?.thoOk || 0 },
+  { id: 'kythu', name: 'Kỳ thủ hậu cung', desc: 'Thắng 5 ván cờ vây', need: 5, cur: p => p.cnt?.coWin || 0 },
   { id: 'ngutru', name: 'Bàn tay ngự trù', desc: 'Tự tay nấu 10 món ở Ngự thiện phòng', need: 10, cur: p => p.cnt?.cook || 0 },
   { id: 'thanco', name: 'Thần cơ diệu toán', desc: 'Bỏ phiếu đúng thủ phạm một đại án', need: 1, cur: p => p.cnt?.bigRight || 0 },
   { id: 'hieutam', name: 'Hiếu tâm cảm động', desc: 'Góp sức nhiều nhất một kỳ đại lễ', need: 1, cur: p => p.cnt?.festTop || 0 },
@@ -908,6 +909,16 @@ function tuuLenhAnswer(p, text) {
   t.done = true; p.sung += 3; p.silver += 15; cnt(p, 'tuulenh'); festAdd(p, 5, 'tửu lệnh'); push(p);
   setTimeout(() => { roomSay(`${p.name} đối nhanh nhất: "${t.q} ${t.a}"! Được Hoàng thượng ban một chén ngự tửu (+3 sủng ái, +15 bạc). Những người còn lại phạt một chén!`, '🍶 Tửu lệnh'); htSay(pick(['Nhanh trí lắm! Thưởng!', 'Hay! Rót rượu cho nàng!', 'Giỏi, trẫm uống mừng nàng một chén.'])); io.to('yentiec').emit('tuulenh', null); }, 300);
 }
+// ---------- cờ vây giữa người chơi ----------
+const GO = import('./public/js/go.js'); const GAMES = {};
+function coEnd(X, G) {
+  const sc = G.score(X.g), win = X.resign ? 3 - X.resign : sc.winner; const W = P(win === 1 ? X.black : X.white), L = P(win === 1 ? X.white : X.black);
+  delete GAMES[X.id]; if (!W || !L) return;
+  const txt = X.resign ? `${L.name} chịu thua, ${W.name} thắng ván cờ vây.` : `Đếm quân: đen ${sc.black}, trắng ${sc.white} (đã cộng 5.5 mục chấp). ${W.name} thắng!`;
+  io.to(X.room).emit('coEnd', { id: X.id, text: txt, winner: W.id }); io.to(X.room).emit('chat', { id: null, name: '⚫⚪ Cờ vây', text: txt });
+  for (const [q, w] of [[W, 1], [L, 0]]) { q.coDay = q.coDay?.d === dayKey() ? q.coDay : { d: dayKey(), n: 0 }; if (q.coDay.n < 5) { q.coDay.n++; addPts(q, w ? 10 : 4); if (w) q.sung += 2; } cnt(q, 'co'); if (w) cnt(q, 'coWin'); push(q); }
+  if (X.g.moves > 30) news(`⚫⚪ ${W.name} thắng ${L.name} một ván cờ vây.`); save();
+}
 // ---------- THỊ TẨM: chuẩn bị, tâm sự, tâu chuyện, tín vật, tranh sủng, đối thơ, nhật ký ----------
 // mood index: 0 vui, 1 mệt, 2 buồn
 const PREP = {
@@ -992,7 +1003,7 @@ const LOCS = ['tuninh', 'hoavien', 'duongtam', 'phong', 'tamcung', 'lanhcung', '
 // ghế ngồi: loc -> { seatId: playerId }
 const SEATS = {}; const SEAT_IDS = { hoavien: ['hv0', 'hv1', 'hv2'], yentiec: ['f0', 'f1', 'f2', 'f3', 'f4', 'f5', 'f6', 'f7'] };
 function freeSeat(p) { for (const loc in SEATS) for (const k in SEATS[loc]) if (SEATS[loc][k] === p.id) delete SEATS[loc][k]; p.seat = null; }
-function takeSeat(p, id) { const rk = roomOf(p), L = (SEATS[rk] = SEATS[rk] || {}); if (p.loc === 'phong' ? !/^(d\d{1,2}|b0)$/.test(id) : !(SEAT_IDS[p.loc] || []).includes(id)) return false; if (L[id] && L[id] !== p.id && online.has(L[id])) return false; freeSeat(p); L[id] = p.id; p.seat = id; p.anim = 'sit:' + id; return true; }
+function takeSeat(p, id) { const rk = roomOf(p), L = (SEATS[rk] = SEATS[rk] || {}); if (p.loc === 'phong' ? !/^(d\d{1,2}|b0|k\d{1,2}[ab])$/.test(id) : !(SEAT_IDS[p.loc] || []).includes(id)) return false; if (L[id] && L[id] !== p.id && online.has(L[id])) return false; freeSeat(p); L[id] = p.id; p.seat = id; p.anim = 'sit:' + id; return true; }
 function roomOf(p) { return p.loc === 'phong' ? 'phong:' + (p.visit || p.id) : p.loc === 'tamcung' ? 'tamcung:' + p.id : p.loc; }
 function enter(p, loc, sock) {
   const old = roomOf(p); freeSeat(p);
@@ -1535,6 +1546,27 @@ io.on('connection', sock => {
     }
     save(); push(me);
   });
+  sock.on('co', async d => {
+    if (!me || !d) return; const G = await GO;
+    if (d.op === 'invite') {
+      const t = P(d.who); const sk = t && sockOf(t.id); if (!sk || t.id === me.id || roomOf(t) !== roomOf(me)) return toast(me, 'Người này không ở trong phòng.');
+      sk.emit('coInvite', { from: me.id, name: me.name, k: d.k }); toast(me, `Đã mời ${t.name} đánh một ván cờ vây.`, 'good');
+    } else if (d.op === 'accept') {
+      const h = P(d.from); if (!h || !online.has(h.id) || roomOf(h) !== roomOf(me)) return toast(me, 'Người mời đã rời phòng.');
+      const id = 'co' + now().toString(36); const black = Math.random() < .5 ? h : me, white = black === h ? me : h;
+      GAMES[id] = { id, black: black.id, white: white.id, room: roomOf(me), k: d.k, g: G.newGame(), t: now() };
+      io.to(roomOf(me)).emit('coStart', { id, black: { id: black.id, name: black.name }, white: { id: white.id, name: white.name }, k: d.k });
+      io.to(roomOf(me)).emit('chat', { id: null, name: '⚫⚪ Cờ vây', text: `${black.name} (đen) và ${white.name} (trắng) bày bàn cờ vây.` });
+    } else if (d.op === 'move') {
+      const X = GAMES[d.id]; if (!X || X.g.over) return; const col = X.black === me.id ? 1 : X.white === me.id ? 2 : 0; if (!col || X.g.turn !== col) return;
+      if (d.resign) { X.g.over = true; X.resign = col; } else if (G.play(X.g, +d.i, col) === null) return;
+      io.to(X.room).emit('coMove', { id: X.id, i: d.resign ? null : +d.i, col, resign: !!d.resign });
+      if (X.g.over) coEnd(X, G);
+    } else if (d.op === 'ai') { // ván với cung nữ: thưởng nhỏ, 3 ván/ngày
+      me.coDay = me.coDay?.d === dayKey() ? me.coDay : { d: dayKey(), n: 0 }; if (me.coDay.n >= 3) return; me.coDay.n++;
+      addPts(me, d.win ? 6 : 2); cnt(me, 'co'); if (d.win) cnt(me, 'coWin'); toast(me, d.win ? 'Thắng cung nữ một ván cờ vây: +6 công trạng.' : 'Thua cung nữ một ván, +2 công trạng vì đã luyện cờ.', d.win ? 'good' : 'info'); push(me); save();
+    }
+  });
   sock.on('pushKey', () => sock.emit('pushKey', vapid()));
   sock.on('pushSub', sub => { if (!me || !sub?.endpoint) return; me.pushSubs = (me.pushSubs || []).filter(x => x.endpoint !== sub.endpoint).concat([{ endpoint: String(sub.endpoint), keys: sub.keys }]).slice(-3); save(); push(me); sendPush(me, 'Đã bật thông báo', 'Khi bổn cung offline mà có chuyện trong cung, thông báo sẽ hiện ở đây.'); });
   sock.on('pushOff', () => { if (!me) return; me.pushSubs = []; save(); push(me); });
@@ -1608,7 +1640,7 @@ io.on('connection', sock => {
   });
   sock.on('decor', list => {
     if (!me || !Array.isArray(list)) return;
-    const ITEMS = ['binhphong', 'banTra', 'ghedon', 'chaucay', 'denlong', 'binhsu', 'giuong', 'tham', 'luhuong'];
+    const ITEMS = ['binhphong', 'banTra', 'ghedon', 'chaucay', 'denlong', 'binhsu', 'giuong', 'tham', 'luhuong', 'lahan'];
     me.decor = list.slice(0, 24).filter(i => ITEMS.includes(i.item) && (!C.DECOR_PRICE[i.item] || (me.decorOwned || []).includes(i.item))).map(i => ({ item: i.item, x: +i.x || 0, z: +i.z || 0, ry: +i.ry || 0 }));
     save(); toast(me, 'Đã lưu cách bài trí.', 'good');
   });
