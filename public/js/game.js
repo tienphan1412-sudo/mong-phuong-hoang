@@ -2241,9 +2241,9 @@ function openDay() {
 const UPDATE_VER = 'u2026-11-12d';
 const UPDATE_NOTES = [
   ['🌸 Ngự hoa viên rộng gấp đôi', 'Qua cổng hoa phía nam là vườn mẫu đơn, hồ sen có cầu đá lan can son và đình Vọng Nguyệt trên cao. Đình có đôn ngồi nghỉ, ngắm hồ.'],
-  ['🌸 Theo hầu Hoàng thượng dạo vườn', '10:00, 14:00, 16:30 (20 phút). Hoàng thượng đi một vòng hồ cá → vườn mẫu đơn → cầu hồ sen → đình Vọng Nguyệt rồi quay lại. Theo sau người, tới mỗi cảnh người dừng lại hỏi chuyện hợp cảnh đó, đáp 3 câu hợp tâm trạng được tới 18 sủng ái.'],
+  ['🌸 Theo hầu Hoàng thượng dạo vườn', '10:30, 14:30, 16:30 (20 phút, luôn cách giờ lật thẻ 30 phút). Hoàng thượng đi một vòng hồ cá → vườn mẫu đơn → cầu hồ sen → đình Vọng Nguyệt rồi quay lại. Theo sau người, tới mỗi cảnh người dừng lại hỏi chuyện hợp cảnh đó, đáp 3 câu hợp tâm trạng được tới 18 sủng ái.'],
   ['⚫⚪ Hầu cờ · 🖌 Mài mực · 📜 Đối thơ', 'Ở Dưỡng Tâm điện, mỗi việc 1 lần/ngày. Hầu cờ: Hoàng thượng rời ngai sang sập La Hán đánh cờ cùng bổn cung, quân cờ hiện trên bàn thật, có ước đếm để canh thua sít sao (trong 10 mục). Mài mực: đứng bên án thư mài mực trong lúc Hoàng thượng phê tấu chương, xong có thể liếc trộm tấu chương. Đối thơ có thêm nhiều câu mới.'],
-  ['🐉 Hoàng thượng ngự giá thăm cung', 'Khoảng 10:40, 13:30, 15:40, 19:30 người ghé cung một phi tần đang online. Có 10 phút về cung nghênh giá; cung bài trí đẹp, có trà, mặc đúng màu được nhiều điểm. Lỡ dịp cũng không bị phạt.'],
+  ['🐉 Hoàng thượng ngự giá thăm cung', 'Khoảng 9:30, 13:00, 15:30, 19:00 người ghé cung một phi tần đang online. Có 10 phút về cung nghênh giá; cung bài trí đẹp, có trà, mặc đúng màu được nhiều điểm. Lỡ dịp cũng không bị phạt.'],
   ['🌕 Ngắm trăng thả hoa đăng', '20:30 tối, ra hồ Ngự hoa viên viết lời ước thả hoa đăng (+2 sủng). Hết giờ Hoàng thượng nhặt một chiếc, đọc to lời ước cho cả cung: người được nhặt +12 sủng ái.'],
   ['⚖️ Ân sủng có chừng mực', 'Mỗi ngày nhận tối đa 40 sủng ái trọn vẹn từ các hoạt động cùng Hoàng thượng, vượt mức thì chỉ còn 1/3. Người mới vẫn đuổi kịp được.'],
   ['🍽 Giờ ngự thiện', 'Dâng món tự nấu lúc 11–13h hoặc 18–20h được ×1.5 sủng ái, nhưng nấu dở thì cả cung biết. Gây sự nay được 8 lần/ngày.'],
