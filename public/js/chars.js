@@ -119,6 +119,7 @@ export async function spawn(modelName) {
     if (male && !isHT && c.curName === 'dung_cho' && !c.pose) { root.updateMatrixWorld(true); maleStance(c); }
     if (c.pose) { root.updateMatrixWorld(true); POSES[c.pose](c, c.t); }
     if (c.post) { root.updateMatrixWorld(true); c.post(c, c.t); }
+    if (c.post2) { root.updateMatrixWorld(true); c.post2(c, c.t); }
     if (c.braid) c.braid(dt);
   };
   if (isHT) c.braid = makeBraid(c);

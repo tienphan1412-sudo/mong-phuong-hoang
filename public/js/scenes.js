@@ -267,6 +267,53 @@ function gardenSouth(o, m, t, tree) {
   // đèn đá dọc lối
   for (const [x, z] of [[1.15, 11.6], [-1.15, 11.6], [1.15, 20.7], [-1.15, 20.7]]) { const s = new THREE.Group(); s.position.set(x, 0, z); g.add(s); cyl(s, .12, .16, .7, m.stone, 0, .35, 0, 6); box(s, .3, .25, .3, m.stone, 0, .82, 0); const c = cyl(s, .22, .02, .18, m.stone, 0, 1.03, 0, 6); c.rotation.y = .5; const lt = new THREE.Mesh(new THREE.BoxGeometry(.16, .14, .16), m.candle); lt.position.y = .82; s.add(lt); B.push({ x, z, r: .22 }); }
 }
+// ---------- A ca sở · Thượng thư phòng: nơi nuôi dạy hoàng tự ----------
+function acaso(o) {
+  const m = mats(), g = o.group, W = 10, D = 8, H = 3.4;
+  const fl = new THREE.Mesh(new THREE.PlaneGeometry(W, D), m.floor); fl.rotation.x = -Math.PI / 2; fl.receiveShadow = true; fl.name = 'ground'; g.add(fl);
+  const ce = new THREE.Mesh(new THREE.PlaneGeometry(W, D), m.ceil); ce.rotation.x = Math.PI / 2; ce.position.y = H; g.add(ce);
+  for (const s of [-1, 1]) { box(g, .1, H, D, m.wall, s * (W / 2 + .05), H / 2, 0); for (let k = -1; k <= 1; k++) { const p = new THREE.Mesh(new THREE.PlaneGeometry(1.5, H - .6), m.lattice); p.position.set(s * (W / 2 - .01), (H - .6) / 2 + .2, k * 2.4); p.rotation.y = -s * Math.PI / 2; g.add(p); } }
+  box(g, W, H, .1, m.wall, 0, H / 2, -D / 2 - .05); box(g, W, H, .1, m.wall, 0, H / 2, D / 2 + .05);
+  for (const x of [-W / 2 + .3, -1.7, 1.7, W / 2 - .3]) for (const z of [-D / 2 + .3, D / 2 - .3]) cyl(g, .14, .14, H, m.red, x, H / 2, z, 16);
+  for (let k = -1; k <= 1; k++) box(g, W, .16, .2, m.red, 0, H - .1, k * 2.6);
+  const pl = new THREE.Mesh(new THREE.PlaneGeometry(1.9, .62), new THREE.MeshStandardMaterial({ map: plaqueTex('上書房', '#4a1010'), roughness: .5 })); pl.position.set(0, H - .6, -D / 2 + .02); g.add(pl);
+  const paper = new THREE.MeshStandardMaterial({ color: 0xf2e6c8, roughness: .9 }), ink = new THREE.MeshStandardMaterial({ color: 0x1a1a1a, roughness: .4 }), wood = new THREE.MeshStandardMaterial({ color: 0x5a2e16, roughness: .5 }), cush = new THREE.MeshStandardMaterial({ color: 0xb8323a, roughness: .8 });
+  for (const x of [-1.3, 1.3]) { const sc = box(g, .6, 1.5, .02, paper, x, 1.75, -D / 2 + .03); for (let k = 0; k < 4; k++) box(g, .05, .22, .01, ink, x, 2.2 - k * .3, -D / 2 + .05); box(g, .68, .05, .05, wood, x, 2.52, -D / 2 + .05); box(g, .68, .05, .05, wood, x, .98, -D / 2 + .05); }
+  // bàn Thái phó
+  const td = new THREE.Group(); td.position.set(0, 0, -2.5); g.add(td); box(td, 1.6, .06, .6, wood, 0, .72, 0); for (const sx of [-1, 1]) box(td, .08, .72, .55, wood, sx * .74, .36, 0);
+  for (let k = 0; k < 3; k++) box(td, .24, .04, .17, k % 2 ? paper : new THREE.MeshStandardMaterial({ color: 0x2b4a7a }), -.5, .77 + k * .04, 0); box(td, .3, .01, .22, paper, .1, .755, .05);
+  // bàn học của các hoàng tự
+  o.kidDesks = [];
+  for (const [x, z] of [[-2.2, -.4], [0, -.4], [2.2, -.4], [-2.2, 1.2], [0, 1.2], [2.2, 1.2]]) {
+    const d = new THREE.Group(); d.position.set(x, 0, z); g.add(d); box(d, .9, .04, .42, wood, 0, .38, 0); for (const sx of [-1, 1]) box(d, .05, .36, .38, wood, sx * .4, .18, 0);
+    box(d, .26, .005, .2, paper, -.1, .405, 0); box(d, .1, .02, .07, ink, .25, .41, 0); const cs = new THREE.Mesh(new THREE.CylinderGeometry(.24, .24, .08, 16), cush); cs.position.set(0, .04, .5); d.add(cs);
+    o.kidDesks.push({ x, z: z + .5, ry: Math.PI });
+  }
+  // góc A ca sở: nôi và bình phong
+  const bp = DECOR.binhphong.make(); bp.position.set(-3.1, 0, 2.6); bp.rotation.y = Math.PI / 2; g.add(bp);
+  o.cradles = [[-4.3, -2.6], [-4.3, -1.3], [-4.3, 0], [-4.3, 1.3]].map(([x, z]) => { const cr = makeCradle(); cr.position.set(x, 0, z); cr.rotation.y = Math.PI / 2; g.add(cr); return { x, z, obj: cr }; });
+  // bia bắn cung, giá sách
+  const tg = new THREE.Group(); tg.position.set(4.3, 0, -3.2); tg.rotation.y = -.6; g.add(tg); cyl(tg, .04, .04, 1.3, wood, -.3, .65, 0, 8); cyl(tg, .04, .04, 1.3, wood, .3, .65, 0, 8);
+  [[.42, 0xf2e6c8], [.32, 0xb8323a], [.2, 0xf2e6c8], [.1, 0xd9a845]].forEach(([r, c], i) => { const d = new THREE.Mesh(new THREE.CylinderGeometry(r, r, .03, 32), new THREE.MeshStandardMaterial({ color: c, roughness: .7 })); d.rotation.x = Math.PI / 2; d.position.set(0, 1.1, .02 + i * .006); tg.add(d); });
+  o.target = { x: 4.3, z: -3.2 };
+  for (const z of [-1.2, 1.2]) { const sh = new THREE.Group(); sh.position.set(4.75, 0, z); g.add(sh); box(sh, .35, 2, 1.4, wood, 0, 1, 0); for (let k = 0; k < 4; k++) { box(sh, .3, .03, 1.3, wood, -.02, .35 + k * .45, 0); for (let b = 0; b < 7; b++) box(sh, .2, .3, .1, [paper, new THREE.MeshStandardMaterial({ color: 0x2b4a7a }), new THREE.MeshStandardMaterial({ color: 0x7a2b2b })][(b + k) % 3], -.05, .52 + k * .45, -.55 + b * .17); } }
+  lanternHang(g, -2.2, H - .7, .4); lanternHang(g, 2.2, H - .7, .4); lanternHang(g, 0, H - .7, -2.4);
+  shade(g);
+  o.lights = { hemi: [0xfff0dc, 0x6a3a2a, 1.9], bg: 0x3a1c18, fog: [0x4a2a22, .012], exposure: 1.4 };
+  o.bounds = { minX: -W / 2 + .4, maxX: W / 2 - .4, minZ: -D / 2 + .4, maxZ: D / 2 - .4 };
+  o.blocks = [{ x: 0, z: -2.5, r: .75 }, ...o.kidDesks.map(d => ({ x: d.x, z: d.z - .5, r: .45 })), ...o.cradles.map(c => ({ x: c.x, z: c.z, r: .4 })), { x: 4.75, z: -1.2, r: .6 }, { x: 4.75, z: 1.2, r: .6 }];
+  o.spawn = { x: 0, z: 2.8 }; o.cam = { dist: 3.4, height: 1.8 };
+}
+// nôi gỗ đung đưa
+export function makeCradle() {
+  const g = new THREE.Group(), m = mats(), wood = new THREE.MeshStandardMaterial({ color: 0x7a3a1a, roughness: .45 }), cloth = new THREE.MeshStandardMaterial({ color: 0xf3d6a0, roughness: .9 });
+  const rock = new THREE.Group(); rock.name = 'rock'; g.add(rock);
+  for (const sx of [-1, 1]) { const r = new THREE.Mesh(new THREE.TorusGeometry(.5, .025, 6, 20, Math.PI * .5), wood); r.rotation.set(0, Math.PI / 2, Math.PI * .75); r.position.set(sx * .22, .5, 0); g.add(r); }
+  box(rock, .5, .05, .78, wood, 0, .24, 0); for (const sx of [-1, 1]) box(rock, .03, .22, .78, wood, sx * .25, .36, 0); for (const sz of [-1, 1]) box(rock, .5, .3, .03, wood, 0, .38, sz * .39);
+  box(rock, .44, .06, .72, cloth, 0, .29, 0); const pil = box(rock, .3, .05, .14, new THREE.MeshStandardMaterial({ color: 0xd94a5a, roughness: .8 }), 0, .33, -.26);
+  const hood = new THREE.Mesh(new THREE.CylinderGeometry(.27, .27, .3, 16, 1, true, 0, Math.PI), new THREE.MeshStandardMaterial({ color: 0xc23b3b, roughness: .8, side: THREE.DoubleSide })); hood.rotation.set(0, 0, Math.PI / 2); hood.position.set(0, .52, -.28); rock.add(hood);
+  g.userData.bed = { y: .33 }; return g;
+}
 // Dưỡng Tâm điện: án thư trước ngai (mài mực hầu bút) và sập cờ bên hông (hầu cờ)
 function duongtamProps(o) {
   const m = mats(), g = o.group, dz = o.dais.z, y = o.dais.y;
@@ -578,6 +625,7 @@ export function buildLocation(loc, opts = {}) {
   else if (loc === 'tamcung') { bedroom(o); o.npcs = [{ model: 'hoangthuong_dem', x: -.5, z: -.4, ry: .4, male: true, name: 'Hoàng thượng', idle: 'khoanh_tay' }]; }
   else if (loc === 'yentiec') { feastVenue(o, opts.venue !== 'in'); o.npcs = [{ model: 'hoangthuong', sit: true, male: true, name: 'Hoàng thượng' }, ...o.npcSeats.map(s => ({ model: s.model, x: s.x, z: s.z, ry: s.ry, name: s.name, kneel: s.top })), { model: 'thaigiam', x: -1.6, z: -3.6, ry: .6, male: true, name: 'Tổng quản Lý Đức Toàn' }, { model: 'cungnu', x: 1.6, z: -3.6, ry: -.6, name: 'Cung nữ dâng rượu' }]; }
   else if (loc === 'lanhcung') { coldPalace(o); o.npcs = [{ model: 'mama', x: 2, z: -2.2, ry: -2.5, name: 'Lão ma ma lãnh cung', talk: 'lanh' }, { model: 'aongu', x: -1.8, z: -1.6, ry: 2.2, name: 'Phế phi Trần thị', talk: 'phephi', idle: 'khoc' }]; }
+  else if (loc === 'acaso') { acaso(o); o.npcs = [{ model: 'thaiy', x: 0, z: -3.05, ry: 0, male: true, name: 'Thái phó Trương đại nhân', talk: 'thaipho' }, { model: 'mama', x: -3.4, z: 1.9, ry: -1.9, name: 'Nhũ mẫu A ca sở', talk: 'nhumau' }]; }
   else if (loc === 'ngutien') { kitchen(o); o.npcs = [{ model: 'thaigiam', x: 3.4, z: 2.2, ry: -2.2, male: true, name: 'Ngự trù Trương công công', talk: 'ngutru' }, { model: 'cungnu', x: -3.2, z: 1.1, ry: Math.PI, name: 'Cung nữ phụ bếp' }]; }
   return o;
 }
