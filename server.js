@@ -1637,6 +1637,34 @@ io.on('connection', sock => {
       me.feiDay.t[n.id] = 1; toast(me, msg, 'info'); save(); push(me);
     }
   });
+  sock.on('tt', d => {
+    if (!me || !d || me.lanh) return; const act = ['tat', 'da', 'day', 'quy', 'xinloi'].includes(d.act) ? d.act : null; if (!act) return;
+    const to = String(d.to || ''); let n = null, t = null;
+    if (to.startsWith('f:')) { n = feiPresent(me.loc).find(x => x.id === to.slice(2)); if (!n) return toast(me, 'Người này không có ở đây.'); }
+    else if (to.startsWith('p:')) { t = P(to.slice(2)); if (!t || t.id === me.id || !online.has(t.id) || roomOf(t) !== roomOf(me)) return toast(me, 'Người này không ở gần.'); }
+    else return;
+    const tname = n ? n.name : t.name, violent = ['tat', 'da', 'day'].includes(act);
+    me.ttDay = me.ttDay?.d === dayKey() ? me.ttDay : { d: dayKey(), v: 0, k: {} };
+    if (violent && me.ttDay.v >= 3) return toast(me, 'Hôm nay đã gây sự 3 lần rồi, làm nữa Thái hậu trị tội đấy.');
+    if (now() - (me.ttLast || 0) < 4000) return; me.ttLast = now();
+    let back = false;
+    const VERB = { tat: 'tát', da: 'đá', day: 'đẩy ngã', quy: 'quỳ lạy', xinloi: 'xin lỗi' };
+    if (violent) {
+      me.ttDay.v++; track(me, 'tt:' + act);
+      const pub = me.loc === 'tuninh' || me.loc === 'yentiec';
+      if (n) { feiAdd(me, n.id, act === 'tat' ? -15 : act === 'da' ? -20 : -25); if (!n.grudge?.[me.id] && feiRel(me, n.id) <= -40) { n.grudge = n.grudge || {}; n.grudge[me.id] = now() + (1 + Math.random() * 2) * 864e5; } back = act === 'tat' && ['kieu', 'danh'].includes(n.tinh) && Math.random() < .4; }
+      else { const higher = t.rank > me.rank || isHH(t); if (higher) { me.sung = Math.max(0, me.sung - 5); toast(me, `Dám ra tay với người cấp cao hơn: phạm thượng, sủng ái -5.`, 'bad'); } toast(t, `😤 ${me.name} ${VERB[act]} bổn cung!`, 'bad'); notify(t, '😤 Bị ' + VERB[act], `${me.name} ${VERB[act]} bổn cung.`); }
+      if (pub) { me.haiLong = Math.max(0, me.haiLong - 5); toast(me, `Làm loạn ở ${me.loc === 'tuninh' ? 'Từ Ninh cung trước mặt Thái hậu' : 'yến tiệc'}: Thái hậu hài lòng -5.`, 'bad'); }
+      news(`${act === 'tat' ? '✋' : act === 'da' ? '🦶' : '💥'} ${me.name} ${VERB[act]} ${tname} ${me.loc === 'hoavien' ? 'giữa Ngự hoa viên' : me.loc === 'tuninh' ? 'ngay tại Từ Ninh cung' : me.loc === 'yentiec' ? 'giữa yến tiệc' : ''}!${back ? ` ${tname} tát trả lại ngay tức khắc!` : ''}`, 'phat');
+    } else {
+      const k = act + to; const first = !me.ttDay.k[k]; me.ttDay.k[k] = 1;
+      if (n && first) { feiAdd(me, n.id, act === 'quy' ? 10 : 6); if (n.grudge?.[me.id] && feiRel(me, n.id) > (act === 'quy' ? -40 : -20)) { delete n.grudge[me.id]; toast(me, `${n.name} nguôi giận, bỏ qua chuyện cũ.`, 'good'); } else toast(me, `${n.name} ${act === 'quy' ? 'hả dạ' : 'gật đầu'}. Quan hệ tốt hơn.`, 'good'); }
+      if (t) { toast(t, act === 'quy' ? `🙇 ${me.name} quỳ lạy bổn cung.` : `🙏 ${me.name} xin lỗi bổn cung.`, 'good'); }
+      if (act === 'quy') news(`🙇 ${me.name} quỳ lạy ${tname}.`);
+    }
+    io.to(roomOf(me)).emit('tt', { from: 'p:' + me.id, to, act, back, fname: me.name, tname });
+    save(); push(me); if (t) push(t);
+  });
   sock.on('caocap', d => {
     if (!me || !d || me.lanh || me.rank < 6) return toast(me, 'Từ Phi trở lên mới được giao việc này.');
     me.ccDay = me.ccDay?.d === dayKey() ? me.ccDay : { d: dayKey() }; const C2 = me.ccDay;

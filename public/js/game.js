@@ -139,7 +139,7 @@ async function addOther(p) {
   const c = await spawn(p.outfit);
   if (others.get(p.id) !== holder || !world) return c.dispose();
   holder.c = c; c.root.position.set(p.x, 0, p.z); c.root.rotation.y = p.ry; world.group.add(c.root);
-  c.label = makeLabel(p.name, p.rankName, false, null, p.tt); c.root.add(c.label);
+  c.label = makeLabel(p.name, p.rankName, false, () => openTT('p:' + p.id, p.name), p.tt); c.root.add(c.label);
   applyAnim(holder, p.anim || 'dung_cho', false);
 }
 function removeOther(id) { const o = others.get(id); if (!o) return; if (o.c) { o.c.root.remove(o.c.label); o.c.label.element.remove(); o.c.dispose(); } others.delete(id); }
@@ -1741,7 +1741,7 @@ function renderTL() {
   tlEl.innerHTML = `<div class="tt">🍶 TỬU LỆNH · còn <b>${Math.max(0, Math.ceil((tl.end - Date.now()) / 1000))}</b> giây</div><div class="tq">${esc(tl.q)} <span>…?</span></div><div class="th">Gõ vế còn lại vào ô chat rồi Enter. Ai nhanh nhất được Hoàng thượng thưởng rượu!</div>`;
 }
 setInterval(() => { if (tl) renderTL(); }, 1000);
-window.__mph = { kang() { openKang(world.kangs[0]); }, get renderer() { return renderer; }, get cam() { return camera.position.toArray(); }, get others() { return others; }, get selfC() { return selfC; }, get camYaw() { return camYaw; } };
+window.__mph = { tt(to, act) { socket.emit('tt', { to, act }); }, fei() { return sceneFei.map(f => f.id); }, kang() { openKang(world.kangs[0]); }, get renderer() { return renderer; }, get cam() { return camera.position.toArray(); }, get others() { return others; }, get selfC() { return selfC; }, get camYaw() { return camYaw; } };
 
 // =====================================================================
 // PHÁO HOA, PHẢN ỨNG KHÁN GIẢ, ĐOÀN CA VŨ GIÁO PHƯỜNG
@@ -2202,8 +2202,9 @@ socket.on('feiTalk', async d => {
   const model = (sceneFei.find(f => f.id === d.id) || {}).model || 'phi';
   const relTxt = d.rel <= -40 ? '😠 Thù địch' : d.rel <= -10 ? '😒 Không ưa' : d.rel >= 40 ? '💞 Thân thiết' : d.rel >= 10 ? '🙂 Có thiện cảm' : '😐 Bình thường';
   const text = `${esc(d.line)}${d.tip ? `<br><i style="color:var(--gold2)">${esc(d.tip)}</i>` : ''}<br><small>Quan hệ: ${relTxt} (${d.rel})${d.done ? ' · hôm nay đã trò chuyện' : ''}</small>`;
-  const opts = d.opts.length ? d.opts.map(([k, t]) => [esc(t), k, '']) : [['Lui', null, '']];
+  const opts = [...d.opts.map(([k, t]) => [esc(t), k, '']), ['🤚 Hành động…', 'tt', ''], ...(d.opts.length ? [] : [['Lui', null, '']])];
   const i = await say(model, d.name, text, opts); dlgClose();
+  if (i === d.opts.length) return openTT('f:' + d.id, d.name);
   if (d.opts[i]) socket.emit('fei', { op: 'ans', id: d.id, a: d.opts[i][0] });
 });
 // ---------------- việc riêng bậc cao ----------------
@@ -2229,6 +2230,7 @@ function openDay() {
 const UPDATE_VER = 'u2026-11-12';
 const UPDATE_NOTES = [
   ['🎭 Hậu cung có thêm 6 phi tần', 'Tuệ Quý phi, Mẫn Phi, Uyển Tần, Lệ Tần, Hân Quý nhân, Mai Thường tại cũng tranh ghế, tranh lật thẻ. Gặp họ ở Ngự hoa viên, Từ Ninh cung, yến tiệc, bấm vào tên để trò chuyện: có người nói khích, có người lấy lòng. Thân thì được mách sở thích Hoàng thượng.'],
+  ['✋ Tát, đá, đẩy ngã, quỳ lạy, xin lỗi', 'Bấm vào tên người chơi khác hoặc phi tần NPC (chọn Hành động…) để ra tay hay làm lành. Gây sự tối đa 3 lần/ngày; làm loạn ở Từ Ninh cung, yến tiệc bị Thái hậu trách; đánh người cấp cao hơn là phạm thượng. NPC đanh đá có thể tát trả!'],
   ['🗡 Ân oán có trả có vay', 'Hãm hại phi tần NPC trong Danh sách hậu cung (từ Quý nhân). Nhưng họ nhớ mặt: vài ngày sau sẽ gài tang vật trả thù. Tìm đúng hung thủ thì họ bị giáng cấp, chỉ sai thì chủ tử bị phạt.'],
   ['🪑 Ghế có hạn, phải vượt mặt mà lên', 'Mỗi cấp có số ghế. Ghế đầy thì phải có công trạng cao hơn phi tần NPC đang ngồi, họ sẽ bị giáng để nhường chỗ. Lên Quý phi giờ cần 1300 công trạng, Hoàng quý phi 2000.'],
   ['👑 Việc riêng cho Phi trở lên', 'Ở cung riêng: Hiệp lý lục cung (bắt sổ sách gian lận), Dạy dỗ người mới (người được dạy +15 công trạng), Thiết yến mời cả cung.'],
@@ -2250,3 +2252,54 @@ function showUpdate(force) {
   $('mcard').classList.add('wide');
   $('updOk').onclick = () => { try { localStorage.setItem('mph_upd_' + me.id, UPDATE_VER); } catch {} closeModal(); };
 }
+
+// =====================================================================
+// HÀNH ĐỘNG GIỮA HAI NHÂN VẬT: tát, đá, đẩy ngã, quỳ lạy, xin lỗi
+// =====================================================================
+const TT = [['tat', '✋ Tát', 'bad'], ['da', '🦶 Đá', 'bad'], ['day', '💥 Đẩy ngã', 'bad'], ['quy', '🙇 Quỳ lạy', 'good'], ['xinloi', '🙏 Xin lỗi', 'good']];
+function openTT(to, name) {
+  if (me.lanh) return;
+  modal(`<button class="close" onclick="window._close()">✕</button><h3>Hành động với ${esc(name)}</h3>
+  <div class="btns" style="flex-wrap:wrap">${TT.map(([k, t, c]) => `<button data-t="${k}" class="${c === 'good' ? 'gold' : ''}">${t}</button>`).join('')}</div>
+  <div style="color:var(--muted);font-size:12px">Gây sự tối đa 3 lần/ngày. Làm loạn ở Từ Ninh cung hay yến tiệc bị Thái hậu trách; ra tay với người cấp cao hơn là phạm thượng. Phi tần NPC bị đánh sẽ ghi thù, quỳ lạy hoặc xin lỗi thì có thể nguôi giận.</div>`);
+  $('mcard').querySelectorAll('[data-t]').forEach(b => b.onclick = () => { closeModal(); socket.emit('tt', { to, act: b.dataset.t }); });
+}
+function ttChar(key) {
+  if (key === 'p:' + me?.id) return selfC;
+  if (key.startsWith('p:')) return others.get(key.slice(2))?.c;
+  const n = world?.npcs?.find(n => n.talk === 'fei:' + key.slice(2)); if (n?.c && !n.c.label) n.c.label = n.label; return n?.c;
+}
+function ttAnim(c, ms, fn) { const prev = c.post; let t0 = null; c.post = (cc, t) => { if (prev) prev(cc, t); if (t0 === null) t0 = t; fn(cc, Math.min(1, (t - t0) * 1000 / ms), t - t0); }; setTimeout(() => { if (c.post) c.post = prev; }, ms); }
+function playTT(d) {
+  const A = ttChar(d.from), V = ttChar(d.to); if (!A) return;
+  const ap = A.root.position, act = d.act;
+  if (V) { // đứng đối diện nhau
+    const vp = V.root.position, dx = ap.x - vp.x, dz = ap.z - vp.z, L = Math.hypot(dx, dz) || 1, gap = act === 'quy' ? .7 : .5;
+    ap.x = vp.x + dx / L * gap; ap.z = vp.z + dz / L * gap; A.root.rotation.y = Math.atan2(vp.x - ap.x, vp.z - ap.z);
+    if (act !== 'quy' && act !== 'xinloi') V.root.rotation.y = Math.atan2(ap.x - vp.x, ap.z - vp.z);
+    if (A === selfC) { selfC.target = null; sendMove('dung_cho'); } const o = d.from.startsWith('p:') && others.get(d.from.slice(2)); if (o) { o.tx = ap.x; o.tz = ap.z; o.try = A.root.rotation.y; }
+  }
+  const B = c => c.B;
+  if (act === 'tat') {
+    A.play('dung_cho');
+    ttAnim(A, 700, (cc, k) => { const sw = k < .45 ? -1 + k * 2 : Math.max(-1, 1 - (k - .45) * 6); aim(cc.root, B(cc).rArm, B(cc).rFore, v3([-.9 + (sw + 1) * .7, .25, .55])); aim(cc.root, B(cc).rFore, B(cc).rHand, v3([-.6 + (sw + 1) * .8, .25, .5])); });
+    if (V) setTimeout(() => { const hp = new THREE.Vector3(); V.B.head.getWorldPosition(hp); burst(hp.x, hp.y, hp.z, 25, .9, [0xffffff, 0xffe07a], .6, 0, .06); if (V.label) bubble(V.label, rpick(['Á!', 'Ngươi dám…!', 'Hức…'])); ttAnim(V, 900, (cc, k) => { const tw = Math.sin(Math.min(1, k * 2.5) * Math.PI) * .8; aim(cc.root, B(cc).neck, B(cc).head, v3([-tw, .85, .5])); aim(cc.root, B(cc).lArm, B(cc).lFore, v3([.3, .7, .5])); aim(cc.root, B(cc).lFore, B(cc).lHand, v3([-.2, .9, .4])); }); }, 320);
+  } else if (act === 'da') {
+    A.play('dung_cho');
+    ttAnim(A, 800, (cc, k) => { const up = Math.sin(Math.min(1, k * 1.6) * Math.PI); aim(cc.root, B(cc).hipR, B(cc).kneeR, v3([0, -1 + up * .9, up * 1.1])); aim(cc.root, B(cc).kneeR, B(cc).footR, v3([0, -1 + up * 1.2, up * .9])); aim(cc.root, B(cc).spine1, B(cc).spine2, v3([0, 1, -up * .25])); });
+    if (V) setTimeout(() => { const vp = V.root.position; burst(vp.x, .5, vp.z, 20, .7, [0xffffff, 0xd9c08a], .6, 0, .07); if (V.label) bubble(V.label, rpick(['Ối!', 'Đau quá!', 'Ngươi…!'])); const dx = Math.sin(A.root.rotation.y) * .25, dz = Math.cos(A.root.rotation.y) * .25; let t = 0; FX.push(dt => { t += dt; if (t > .3) return false; vp.x += dx * dt / .3; vp.z += dz * dt / .3; }); ttAnim(V, 900, (cc, k) => { const b = Math.sin(Math.min(1, k * 2) * Math.PI); aim(cc.root, B(cc).spine1, B(cc).spine2, v3([0, 1, b * .7])); }); }, 350);
+  } else if (act === 'day') {
+    A.play('dung_cho');
+    ttAnim(A, 700, (cc, k) => { const p = Math.sin(Math.min(1, k * 1.8) * Math.PI); for (const [arm, fore, hand, s] of [[B(cc).rArm, B(cc).rFore, B(cc).rHand, -1], [B(cc).lArm, B(cc).lFore, B(cc).lHand, 1]]) { aim(cc.root, arm, fore, v3([s * .25, .1, .9])); aim(cc.root, fore, hand, v3([s * .1, .2 + p * .2, 1])); } });
+    if (V) setTimeout(() => { if (V.label) bubble(V.label, rpick(['Á á á!', 'Cứu với!', 'Ngươi…!'])); const vp = V.root.position, dx = Math.sin(A.root.rotation.y) * .35, dz = Math.cos(A.root.rotation.y) * .35; let t = 0; FX.push(dt => { t += dt; if (t > .35) return false; vp.x += dx * dt / .35; vp.z += dz * dt / .35; }); V.play('nga', { restart: true }); setTimeout(() => { const p = V.root.position; burst(p.x, .1, p.z, 30, .6, [0xd9c08a, 0xffffff], .8, .5, .08); }, 600); setTimeout(() => { if (V === selfC && (chairSeat || lying)) return; V.play(V === selfC || !V.isNpc ? 'dung_cho' : 'dung_cho'); }, 4200); }, 350);
+  } else if (act === 'quy') {
+    A.play('quy', { restart: true }); if (A.label) bubble(A.label, rpick(['Xin nương nương bớt giận…', 'Thần thiếp biết tội rồi!', 'Mong tỷ tỷ rộng lòng tha thứ…']));
+    setTimeout(() => A.play('dung_cho'), 4500);
+  } else if (act === 'xinloi') {
+    A.play('cui_chao', { restart: true }); if (A.label) bubble(A.label, rpick(['Muội xin lỗi tỷ…', 'Là thần thiếp không phải.', 'Mong người bỏ qua cho.']));
+    setTimeout(() => A.play('dung_cho'), 3000);
+  }
+  if (d.back && V) setTimeout(() => playTT({ from: d.to, to: d.from, act: 'tat' }), 1500);
+}
+socket.on('tt', d => playTT(d));
+function rpick(a) { return a[Math.floor(Math.random() * a.length)]; }
