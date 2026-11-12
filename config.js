@@ -28,8 +28,8 @@ module.exports = {
     { name: 'Quý nhân',       pts: 250,  seats: 6, outfit: 'quynhan', extra: ['quynhan_lam'] },
     { name: 'Tần',            pts: 400,  seats: 4, outfit: 'tan', extra: ['tan_tim'] },
     { name: 'Phi',            pts: 600,  seats: 3, outfit: 'phi', extra: ['phi_lam'] },
-    { name: 'Quý phi',        pts: 850,  seats: 2, outfit: 'quyphi', extra: ['quyphi_phuong'] },
-    { name: 'Hoàng quý phi',  pts: 1150, seats: 1, outfit: 'hoangquyphi', extra: ['hoangquyphi_kim'] },
+    { name: 'Quý phi',        pts: 1300,  seats: 2, outfit: 'quyphi', extra: ['quyphi_phuong'] },
+    { name: 'Hoàng quý phi',  pts: 2000, seats: 1, outfit: 'hoangquyphi', extra: ['hoangquyphi_kim'] },
   ],
   FIGHT_RANK: 4,               // từ Quý nhân mới được hãm hại / bị hãm hại
   PALACE_RANK: 5,              // từ Tần được ban cung riêng
@@ -153,6 +153,18 @@ module.exports = {
     { at: .75, silver: 80, sung: 10, text: '80 bạc và 10 sủng ái' },
     { at: 1, silver: 150, haiLong: 15, text: '150 bạc, 15 hài lòng và đại yến khao cả cung' },
   ],
+  // ---------- phi tần NPC: đối thủ giữ ghế, cạnh tranh lật thẻ ----------
+  NPC_FEI: [
+    { id: 'npc1', name: 'Tuệ Quý phi', short: 'Cao Tuệ Nhàn', rank: 7, pts: 1450, sung: 90, model: 'quyphi' },
+    { id: 'npc2', name: 'Mẫn Phi', short: 'Chương Giai Mẫn', rank: 6, pts: 700, sung: 70, model: 'phi' },
+    { id: 'npc3', name: 'Uyển Tần', short: 'Đổng Uyển Nghi', rank: 5, pts: 470, sung: 55, model: 'tan' },
+    { id: 'npc4', name: 'Lệ Tần', short: 'Kim Lệ Hoa', rank: 5, pts: 430, sung: 50, model: 'tan_tim' },
+    { id: 'npc5', name: 'Hân Quý nhân', short: 'Lục Hân Nhiên', rank: 4, pts: 300, sung: 40, model: 'quynhan' },
+    { id: 'npc6', name: 'Mai Thường tại', short: 'Diệp Mai Chi', rank: 3, pts: 170, sung: 30, model: 'thuongtai_hong' },
+  ],
+  NPC_LATTHE: 0.2,             // tỉ lệ Hoàng thượng lật thẻ phi tần NPC thay vì người chơi
+  HIGH_RANK_SLOW: 0.7,         // từ Phi trở lên: công trạng nhận được x0.7
+  HAMHAI: { silver: 80, turns: 1, ok: 0.6 },
   HH_MIN_RANK: 5,              // từ Tần trở lên được ứng cử Hoàng hậu
   HH_CYCLE_DAYS: 14,           // bao lâu bầu phượng ấn một lần
   HH_VOTE_HOURS: 24,           // thời gian tiến cử
