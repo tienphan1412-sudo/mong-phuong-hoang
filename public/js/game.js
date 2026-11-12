@@ -84,7 +84,7 @@ async function enterScene(loc, players, venue, seatId) {
   if (loc === 'yentiec') { let k = 0; for (const n of o.npcs) { if (n.model === 'hoangthuong' || n.sit) continue; const f = sceneFei[k++]; if (!f) break; n.name = '🎭 ' + f.name; n.model = f.model; n.talk = 'fei:' + f.id; } }
   o.loc = loc; chairSeat = null; taiOn = false; vuaStage = null;
   await ready();
-  await Promise.all([...o.npcs.map(n => loadModel(n.model)), loadModel(me.outfit), ...(players || []).map(p => loadModel(p.outfit))]).catch(() => {});
+  await Promise.all([...o.npcs.map(n => loadModel(n.model)), loadModel(wear(me.outfit, me.kidPub)), ...(players || []).map(p => loadModel(wear(p.outfit, p.kid)))]).catch(() => {});
   if (tok !== loadToken) return;
   for (const n of o.npcs) {
     const c = await spawn(n.model); if (tok !== loadToken) { c.dispose(); o.npcs.forEach(x => x.c && x.c !== c && x.c.dispose()); return; }
@@ -125,18 +125,18 @@ async function enterScene(loc, players, venue, seatId) {
 }
 async function respawnSelf(x, z, ry) {
   const tok = loadToken;
-  const c = await spawn(me.outfit);
+  const c = await spawn(wear(me.outfit, me.kidPub));
   if (tok !== loadToken) return c.dispose();
   if (selfC) { selfC.label?.element.remove(); selfC.root.parent?.remove(selfC.root); selfC.dispose(); }
   selfC = c; c.root.position.set(x, 0, z); c.root.rotation.y = ry; world.group.add(c.root);
   c.label = makeLabel(me.name, me.rankName, false, null, myTitle()); c.root.add(c.label);
-  c.target = null; c.outfit = me.outfit;
+  c.target = null; c.outfit = wear(me.outfit, me.kidPub);
 }
 async function addOther(p) {
   if (others.has(p.id) || !world) return;
   const holder = { p, c: null, tx: p.x, tz: p.z, try: p.ry };
   others.set(p.id, holder);
-  const c = await spawn(p.outfit);
+  const c = await spawn(wear(p.outfit, p.kid));
   if (others.get(p.id) !== holder || !world) return c.dispose();
   holder.c = c; c.root.position.set(p.x, 0, p.z); c.root.rotation.y = p.ry; world.group.add(c.root);
   c.label = makeLabel(p.name, p.rankName, false, () => openTT('p:' + p.id, p.name), p.tt); c.root.add(c.label);
@@ -183,7 +183,7 @@ function stepSelf(dt) {
     const dx = selfC.target.x - r.position.x, dz = selfC.target.z - r.position.z, d = Math.hypot(dx, dz);
     if (d < 0.05) { selfC.target = null; }
     else {
-      const sp = 1.35 * dt, k = Math.min(1, sp / d);
+      const sp = 1.15 * dt, k = Math.min(1, sp / d);
       const np = clampPos(r.position.x + dx * k, r.position.z + dz * k); r.position.x = np.x; r.position.z = np.z; r.position.y = world.floorAt ? world.floorAt(np.x, np.z) : 0;
       const want = Math.atan2(dx, dz); let diff = want - r.rotation.y; diff = Math.atan2(Math.sin(diff), Math.cos(diff)); r.rotation.y += diff * Math.min(1, dt * 10);
       if (selfC.curName !== 'di') selfC.play('di');
@@ -273,7 +273,7 @@ socket.on('me', async m => {
   if (prev) floatDeltas(prev, me);
   if (feast) feast.mine = me.feast?.names?.includes(`${me.name} ${me.rankName}`) || feast.mine;
   renderHud(); renderMap(); renderActs(); syncKids();
-  if (selfC && world && oldOutfit && oldOutfit !== me.outfit && !stage) { const r = selfC.root; await respawnSelf(r.position.x, r.position.z, r.rotation.y); }
+  if (selfC && world && !stage && selfC.outfit && selfC.outfit !== wear(me.outfit, me.kidPub)) { const r = selfC.root; await respawnSelf(r.position.x, r.position.z, r.rotation.y); }
   if (selfC) { const tt = selfC.label.element.querySelector('.tt'); if (tt) tt.textContent = myTitle() ? '「' + myTitle() + '」' : ''; }
   if (selfC) { const r = selfC.label.element.querySelector('.r'); if (r) { const t = rankTier(me.rankName); r.className = 'r ' + t; r.textContent = (t === 't3' ? '★ ' : '') + me.rankName; } }
   if (!caseOpenId && me.cases?.length && !me.lanh) { caseOpenId = me.cases[0].id; nbMin = true; }
@@ -572,7 +572,7 @@ async function runSacPhong(d) {
       [tg, pc, ...maids].forEach(c => c.dispose()); scene.remove(o.group); stage = null;
       scene.add(saved.group); applyLights(saved.lights); world = saved;
       if (pendingScene) { const ps = pendingScene; pendingScene = null; await enterScene(ps.loc, ps.players, ps.venue, ps.seat); }
-      else if (selfC && selfC.outfit !== me.outfit) { const r = selfC.root; await respawnSelf(r.position.x, r.position.z, r.rotation.y); }
+      else if (selfC && selfC.outfit !== wear(me.outfit, me.kidPub)) { const r = selfC.root; await respawnSelf(r.position.x, r.position.z, r.rotation.y); }
       document.body.classList.remove('staging'); cutActive = false; await fade(false); sacBusy = false; { const f = cutDone; cutDone = () => {}; f(); }
       if (d.palace) { cutQ.unshift({ type: 'doncung', name: d.name, rankName: d.rankName }); nextCut(); } else if (d.type === 'phucvi') socket.emit('goto', 'phong');
     }]]);
@@ -828,7 +828,7 @@ async function stageEnd(S, queued) {
   S.chars.forEach(c => c.dispose()); scene.remove(S.o.group); stage = null;
   scene.add(S.saved.group); applyLights(S.saved.lights); world = S.saved;
   if (pendingScene) { const ps = pendingScene; pendingScene = null; await enterScene(ps.loc, ps.players, ps.venue, ps.seat); }
-  else if (selfC && selfC.outfit !== me.outfit) { const r = selfC.root; await respawnSelf(r.position.x, r.position.z, r.rotation.y); }
+  else if (selfC && selfC.outfit !== wear(me.outfit, me.kidPub)) { const r = selfC.root; await respawnSelf(r.position.x, r.position.z, r.rotation.y); }
   document.body.classList.remove('staging'); cutActive = false; snapCam = true;
   await fade(false); sacBusy = false;
   if (queued) { const f = cutDone; cutDone = () => {}; f(); }
@@ -2243,8 +2243,11 @@ function openDay() {
 // =====================================================================
 // THÁNH CHỈ CẬP NHẬT: hiện một lần cho mỗi bản mới
 // =====================================================================
-const UPDATE_VER = 'u2026-11-12f';
+const UPDATE_VER = 'u2026-11-12g';
 const UPDATE_NOTES = [
+  ['💃 Dáng đi yểu điệu', 'Mọi phi tần, cung nữ giờ bước đi nhẹ nhàng, thướt tha hơn.'],
+  ['🤰 Áo bầu', 'Từ ngày thứ hai mang long thai, nương nương tự khoác áo bầu, bụng tròn rõ ràng như thật. Sinh xong tự mặc lại áo cũ.'],
+  ['📐 Đồ đạc vừa người', 'Thượng thư phòng làm lại: bàn quỳ học thấp vừa tầm hoàng tự, bàn Thái phó, kệ sách, bia bắn cung đúng tỉ lệ. Nôi em bé và giường cũng thu lại cho vừa.'],
   ['👦👧 Hoàng tử, công chúa có dáng thật', 'Các con giờ là nhân vật 3D mặc thường phục cung đình, biết đi, chạy, khóc, quỳ học. Thái tử mặc áo vàng; công chúa giỏi giang (từ 60 điểm) được mặc áo đỏ thêu phượng.'],
   ['🤰 Mang long thai', 'Bụng to dần theo từng ngày, ai đi ngang cũng thấy, đứng yên thì tay xoa bụng.'],
   ['👶 Em bé sơ sinh (3 ngày đầu)', 'Bé nằm nôi ở cung riêng. Bé khóc thì xem gợi ý mà cho bú, thay tã hay ru ngủ cho đúng; để bé khóc quá 30 phút bé mệt, lâu ngày sinh bệnh phải mời Thái y. Bế con đi khắp cung, ra Dưỡng Tâm điện cho Hoàng thượng bế được sủng ái.'],
@@ -2575,7 +2578,7 @@ function kidBody(k, e) {
 }
 function kidAnim(e, dt, moving, mode, fast) {
   const c = e.char; if (!c) { if (e.mesh.userData.kid) animKid(e.mesh, kidT, moving, mode); else for (const ch of e.mesh.children) if (ch.userData?.kid) animKid(ch, kidT, moving, mode); return; }
-  if (mode === 'sit') { if (!e.sat) { e.sat = true; kneelOn(c, 0, .08, 0, 0); } c.update(dt); return; }
+  if (mode === 'sit') { if (!e.sat) { e.sat = true; kneelOn(c, 0, .045, 0, 0); } c.update(dt); return; }
   if (e.sat) { e.sat = false; c.pose = null; c.root.position.set(0, 0, 0); c.root.rotation.set(0, 0, 0); }
   let want = mode === 'fall' || mode === 'cry' ? 'khoc' : moving ? (fast ? 'chay' : 'di') : 'dung_cho'; if (want === 'chay' && !c.actions?.chay) want = 'di';
   if (c.curName !== want) c.play(want); c.update(dt);
@@ -2597,9 +2600,9 @@ function syncKids() {
   for (const e of kidEnts.values()) e.seen = false;
   for (const O of kidOwners()) {
     const K = O.kid;
-    if (K.tp > .03) kidEnt('belly:' + O.id, () => ({ kind: 'belly', c: O.c, mesh: makeBelly(O.c) })).tp = K.tp;
+    if (K.tp > .03 && K.tp < BAU_FROM) kidEnt('belly:' + O.id, () => ({ kind: 'belly', c: O.c, mesh: makeBelly(O.c) })).tp = K.tp;
     if (K.carry) { const e = kidEnt('carry:' + O.id + ':' + K.carry.cid, () => { const m = makeBaby(K.carry.sex); world.group.add(m); const lb = kidLabel(K.carry.name); m.add(lb); lb.position.set(0, .15, 0); return { kind: 'carry', c: O.c, mesh: m, label: lb, cid: K.carry.cid }; }); }
-    if (K.follow) { kidEnt('follow:' + O.id + ':' + K.follow.cid + ':' + K.follow.stage + ':' + !!K.follow.tt, () => { const e = { kind: 'follow', c: O.c, cid: K.follow.cid, stage: K.follow.stage }; const m = e.mesh = kidBody({ ...K.follow, id: K.follow.cid }, e); const p = O.c.root.position; m.position.set(p.x + .5, 0, p.z + .5); world.group.add(m); const lb = e.label = kidLabel(K.follow.name); m.add(lb); lb.position.y = K.follow.stage === 'chap' ? 1.0 : 1.22; return e; }); }
+    if (K.follow) { kidEnt('follow:' + O.id + ':' + K.follow.cid + ':' + K.follow.stage + ':' + !!K.follow.tt, () => { const e = { kind: 'follow', c: O.c, cid: K.follow.cid, stage: K.follow.stage }; const m = e.mesh = kidBody({ ...K.follow, id: K.follow.cid }, e); const p = O.c.root.position; m.position.set(p.x + .5, 0, p.z + .5); world.group.add(m); const lb = e.label = kidLabel(K.follow.name); m.add(lb); lb.position.y = K.follow.stage === 'chap' ? .68 : .82; return e; }); }
   }
   // bé trong cung riêng
   if (world.loc === 'phong') {
@@ -2614,7 +2617,7 @@ function kidStatic(k, o) {
   kidEnt('st:' + k.id + ':' + k.stage + ':' + !!k.tt, () => {
     const lb = kidLabel(k.name + (k.mother ? ` · con ${k.mother}` : ''));
     if (o.cradle) { const cr = o.existing || makeCradle(); if (!o.existing) { cr.position.set(o.cradle[0], 0, o.cradle[1]); world.group.add(cr); } const rock = cr.getObjectByName('rock'); const b = makeBaby(k.sex); b.position.set(0, .36, .04); rock.add(b); b.add(lb); lb.position.y = .3; return { kind: 'cradle', mesh: o.existing ? b : cr, extra: o.existing ? null : null, baby: b, rock, label: lb, cid: k.id }; }
-    const e = { cid: k.id, label: lb }; const m = e.mesh = kidBody(k, e); m.add(lb); lb.position.y = k.stage === 'chap' ? 1.0 : 1.22; world.group.add(m);
+    const e = { cid: k.id, label: lb }; const m = e.mesh = kidBody(k, e); m.add(lb); lb.position.y = k.stage === 'chap' ? .68 : .82; world.group.add(m);
     if (o.desk) { m.position.set(o.desk.x, 0, o.desk.z); m.rotation.y = o.desk.ry; return Object.assign(e, { kind: 'desk' }); }
     m.position.set(o.wander[0], 0, o.wander[1]); return Object.assign(e, { kind: 'wander', home: o.wander, tgt: null, next: 0 });
   });
@@ -2636,7 +2639,7 @@ function kidFrame(dt) {
       if (kidLesson?.cid === e.cid && world.kidDesks) { const d = world.kidDesks[kidLesson.desk]; tx = d.x; tz = d.z; } else { tx = p.x - Math.sin(ry) * .65 + Math.cos(ry) * .4; tz = p.z - Math.cos(ry) * .65 - Math.sin(ry) * .4; }
       const dx = tx - m.position.x, dz = tz - m.position.z, dist = Math.hypot(dx, dz); let moving = false;
       if (cry && e.stage === 'chap') { kidAnim(e, dt, false, 'fall'); continue; }
-      let fast = false; if (dist > 6) { m.position.set(tx, 0, tz); } else if (dist > .12) { fast = dist > 1.2; const sp = Math.min(dist, dt * (fast ? 2.4 : 1.4)); m.position.x += dx / dist * sp; m.position.z += dz / dist * sp; m.rotation.y = Math.atan2(dx, dz); moving = true; }
+      let fast = false; if (dist > 6) { m.position.set(tx, 0, tz); } else if (dist > .12) { fast = dist > 1.2; const sp = Math.min(dist, dt * (fast ? 2.0 : 1.15)); m.position.x += dx / dist * sp; m.position.z += dz / dist * sp; m.rotation.y = Math.atan2(dx, dz); moving = true; }
       else if (kidLesson?.cid === e.cid) { m.rotation.y = Math.PI; kidAnim(e, dt, false, 'sit'); continue; } else m.rotation.y += (Math.atan2(p.x - m.position.x, p.z - m.position.z) - m.rotation.y) * Math.min(1, dt * 3);
       m.position.y = world.floorAt ? world.floorAt(m.position.x, m.position.z) : 0; kidAnim(e, dt, moving, cry ? 'cry' : null, fast); }
     else if (e.kind === 'cradle') { e.rock.rotation.x = Math.sin(kidT * (cry ? 6 : 1.2)) * (cry ? .12 : .05); e.baby.userData.mouth.scale.set(cry ? 1.4 : 1, cry ? 1.4 : .4, 1); }
@@ -2651,7 +2654,13 @@ function kidFrame(dt) {
       else if (cc._preg && cc.curName === 'dung_cho') { aim(cc.root, cc.B.lArm, cc.B.lFore, v3([.25, -.75, .5])); aim(cc.root, cc.B.lFore, cc.B.lHand, v3([-.75, -.15, .45])); } }; }
 
 }
-socket.on('pkid', d => { if (d.id === me?.id) { if (me) { me.kidPub = d.kid; } } else { const o = others.get(d.id); if (o) o.p.kid = d.kid; } syncKids(); });
+socket.on('pkid', async d => {
+  if (d.id === me?.id) { if (me) { me.kidPub = d.kid; if (selfC && world && selfC.outfit !== wear(me.outfit, d.kid)) { const r = selfC.root; await respawnSelf(r.position.x, r.position.z, r.rotation.y); } } }
+  else { const o = others.get(d.id); if (o) { const before = wear(o.p.outfit, o.p.kid); o.p.kid = d.kid; if (before !== wear(o.p.outfit, d.kid)) { const p = { ...o.p, x: o.tx, z: o.tz, ry: o.try }; removeOther(d.id); addOther(p); } } }
+  syncKids(); });
+// mang thai từ ngày thứ 2: đổi sang áo bầu (giữ áo ngủ khi thị tẩm)
+const BAU_FROM = .34;
+function wear(outfit, kid) { return kid?.tp >= BAU_FROM && outfit !== 'aongu' ? 'phi_bau' : outfit; }
 // tiếng khóc em bé
 let kidAC = null;
 function kidCrySound() { try { kidAC = kidAC || new (window.AudioContext || window.webkitAudioContext)(); const ac = kidAC, t0 = ac.currentTime;
@@ -2734,3 +2743,4 @@ socket.on('conHoc', async d => {
     setTimeout(round, 400); return; }
 });
 window.__mph.kids = () => [...kidEnts].map(([k, e]) => [k, e.mesh?.position.toArray().map(v => +v.toFixed(2)), !!e.char, e.mesh?.parent === world.group, e.char?.curName, e.char && e.char.root.position.toArray().map(v => +v.toFixed(2))]);
+window.__mph.measure = () => { const b = new THREE.Box3(); const h = o => { b.setFromObject(o, true); return +(b.max.y - b.min.y).toFixed(2); }; return { self: selfC && h(selfC.root), kids: [...kidEnts.values()].filter(e => e.char).map(e => h(e.char.root)), npcs: (world?.npcs || []).map(n => [n.name, n.c && h(n.c.root)]) }; };

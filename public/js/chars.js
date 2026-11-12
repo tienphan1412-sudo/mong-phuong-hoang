@@ -17,7 +17,7 @@ function lock(clips) {
 }
 export function loadModel(name) {
   if (!cache[name]) cache[name] = loader.loadAsync(`models/${name}.glb`).then(g => {
-    if (name === 'hoangtu1' || name === 'congchua3') { const REN = { 'walk.001': 'di', 'female walk.001': 'di', 'run.001': 'chay', 'sit.001': 'ngoi', 'cry.001': 'khoc', 'laugh_01.001': 'cuoi', 'dance_01.001': 'mua' }; g.animations = g.animations.filter(a => REN[a.name]); g.animations.forEach(a => a.name = REN[a.name]); }
+    if (name === 'hoangtu1' || name === 'congchua3' || name === 'phi_bau') { const REN = { 'walk.001': 'di', 'female walk.001': 'di', 'run.001': 'chay', 'sit.001': 'ngoi', 'cry.001': 'khoc', 'laugh_01.001': 'cuoi', 'dance_01.001': 'mua' }; g.animations = g.animations.filter(a => REN[a.name]); g.animations.forEach(a => a.name = REN[a.name]); }
     if (name === 'thuongtai') FEMALE = lock(g.animations);
     if (name === 'hoangthuong') MALE = lock(g.animations); else lock(g.animations);
     g.scene.traverse(o => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; o.frustumCulled = false; } });
@@ -25,7 +25,11 @@ export function loadModel(name) {
   });
   return cache[name];
 }
-export async function ready() { await Promise.all([loadModel('thuongtai'), loadModel('hoangthuong')]); }
+export async function ready() {
+  await Promise.all([loadModel('thuongtai'), loadModel('hoangthuong')]);
+  // dáng đi yểu điệu (lấy từ model phi tần mang thai) dùng cho mọi nhân vật nữ
+  try { const w = (await loadModel('phi_bau')).animations.find(a => a.name === 'di'); if (w) { const i = FEMALE.findIndex(a => a.name === 'di'); if (i >= 0) FEMALE[i] = w; else FEMALE.push(w); } } catch {}
+}
 
 const MAPB = { Hips: 'hips', Spine: 'spine', Spine1: 'spine1', Spine2: 'spine2', Head: 'head', LeftArm: 'lArm', LeftForeArm: 'lFore', LeftHand: 'lHand', RightArm: 'rArm', RightForeArm: 'rFore', RightHand: 'rHand', LeftLeg: 'kneeL', RightLeg: 'kneeR', LeftShoulder: 'lSh', RightShoulder: 'rSh', Neck: 'neck', LeftUpLeg: 'hipL', RightUpLeg: 'hipR', LeftFoot: 'footL', RightFoot: 'footR' };
 const v3 = a => new THREE.Vector3(...a).normalize();
@@ -99,7 +103,7 @@ export async function spawn(modelName) {
     if (c.cur === a && !opts.restart) return;
     const once = ['nga', 'quy', 'hanh_le', 'cui_chao'].includes(name);
     a.reset(); a.setLoop(once ? THREE.LoopOnce : THREE.LoopRepeat); a.clampWhenFinished = once;
-    a.timeScale = name === 'di' ? (male ? 1.4 : 1.25) : 1;
+    a.timeScale = name === 'di' ? (male ? 1.4 : 1.65) : 1;
     if (c.cur && c.cur !== a) a.crossFadeFrom(c.cur, 0.3, false);
     a.play(); c.cur = a; c.curName = name; c.sitFix = name === 'ngoi';
   };
