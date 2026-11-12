@@ -1813,7 +1813,7 @@ io.on('connection', s => s.emit('top5', top5()));
 
 const PORT = process.env.PORT || 3000;
 loadDB().then(() => {
-  vapid(); save();
+  vapid(); if (DB.state.updNews !== 'u2026-11-12') { DB.state.updNews = 'u2026-11-12'; news('📜 Thánh chỉ: hậu cung có biến lớn! Thêm 6 phi tần mới tranh ghế, Ngự thiện phòng, cờ vây, thị tẩm mới… Xem chi tiết ở 📖 Hướng dẫn → Có gì mới.', 'phong'); } save();
   setInterval(nightTick, 5e3);
   const url = process.env.RENDER_EXTERNAL_URL;
   if (url) setInterval(() => { const h = vnNow().getUTCHours(); if (h >= C.KEEPALIVE_HOURS[0] && h < C.KEEPALIVE_HOURS[1]) fetch(url + '/health').catch(() => {}); }, 10 * 60e3);

@@ -117,6 +117,7 @@ async function enterScene(loc, players, venue, seatId) {
   if (tok !== loadToken) return;
   if (seatId) sitSelfAt(seatId); else sendMove('dung_cho');
   if (sceneLying && o.myBed) { lying = true; lieOn(selfC); }
+  if (!window._updChk) { window._updChk = 1; setTimeout(() => showUpdate(), 3000); }
   snapCam = true; refreshClueMarkers(); if (nb) renderNotebook(); syncFeastHT(); hideLoading();
   if (loc === 'tamcung' && !me.htTalked) setTimeout(() => { if (world?.loc === 'tamcung') startHtTalk(); }, 2500);
   for (const p of players || []) addOther(p);
@@ -1642,9 +1643,10 @@ const CAMNANG = [
 ];
 function openGuide() {
   modal(`<button class="close" onclick="window._close()">✕</button><h3>📖 Cẩm nang hậu cung</h3>
-  <div class="btns" style="margin-top:0"><button class="gold" id="gTour">Xem lại hướng dẫn nhanh</button></div>
+  <div class="btns" style="margin-top:0"><button class="gold" id="gTour">Xem lại hướng dẫn nhanh</button><button id="gNew">📜 Có gì mới</button></div>
   ${CAMNANG.map(([t, x]) => `<details class="cn"><summary>${t}</summary><div>${x}</div></details>`).join('')}`);
   $('gTour').onclick = () => { closeModal(); startTour(true); };
+  $('gNew').onclick = () => showUpdate(true);
 }
 
 // ---------------- ĐẠI ÁN: mỗi người một mảnh manh mối ----------------
@@ -2219,4 +2221,32 @@ function openDay() {
     $('mcard').querySelectorAll('[data-w]').forEach(b => b.onclick = () => { socket.emit('caocap', { op: 'day', who: b.dataset.w }); closeModal(); });
     $('dTn').onclick = () => { socket.emit('caocap', { op: 'day' }); closeModal(); };
   });
+}
+
+// =====================================================================
+// THÁNH CHỈ CẬP NHẬT: hiện một lần cho mỗi bản mới
+// =====================================================================
+const UPDATE_VER = 'u2026-11-12';
+const UPDATE_NOTES = [
+  ['🎭 Hậu cung có thêm 6 phi tần', 'Tuệ Quý phi, Mẫn Phi, Uyển Tần, Lệ Tần, Hân Quý nhân, Mai Thường tại cũng tranh ghế, tranh lật thẻ. Gặp họ ở Ngự hoa viên, Từ Ninh cung, yến tiệc, bấm vào tên để trò chuyện: có người nói khích, có người lấy lòng. Thân thì được mách sở thích Hoàng thượng.'],
+  ['🗡 Ân oán có trả có vay', 'Hãm hại phi tần NPC trong Danh sách hậu cung (từ Quý nhân). Nhưng họ nhớ mặt: vài ngày sau sẽ gài tang vật trả thù. Tìm đúng hung thủ thì họ bị giáng cấp, chỉ sai thì chủ tử bị phạt.'],
+  ['🪑 Ghế có hạn, phải vượt mặt mà lên', 'Mỗi cấp có số ghế. Ghế đầy thì phải có công trạng cao hơn phi tần NPC đang ngồi, họ sẽ bị giáng để nhường chỗ. Lên Quý phi giờ cần 1300 công trạng, Hoàng quý phi 2000.'],
+  ['👑 Việc riêng cho Phi trở lên', 'Ở cung riêng: Hiệp lý lục cung (bắt sổ sách gian lận), Dạy dỗ người mới (người được dạy +15 công trạng), Thiết yến mời cả cung.'],
+  ['🌙 Thị tẩm nhiều chuyện hơn', 'Lật thẻ mỗi 2 tiếng (8h–22h). Chuẩn bị tắm hoa, áo ngủ, hương xông; nghe Hoàng thượng tâm sự; gối đầu tâu chuyện; ngắm trăng đối thơ; nhận tín vật; nhật ký sủng hạnh. Coi chừng người khác giả bệnh kéo Hoàng thượng đi, nhớ níu tay giữ lại!'],
+  ['🍳 Ngự thiện phòng (từ Quý nhân)', 'Mở Bí kíp nhà bếp, chọn món, lấy nguyên liệu, thái, nấu, bày ra chén rồi bưng lên Dưỡng Tâm điện dâng Hoàng thượng. Món Hoàng thượng đang thèm được thưởng nhiều nhất.'],
+  ['🏠 Cung riêng ấm cúng hơn', 'Giường mới: ngồi, nằm nghỉ, cáo bệnh (2 giờ không ai hại được). Đôn sứ ngồi được. Mời bạn bè sang thưởng trà. Nội vụ phủ có thêm Sập La Hán để ngồi đánh cờ vây với tỷ muội hoặc cung nữ.'],
+  ['🎎 Yến tiệc rộn ràng', 'Giờ yến tiệc: 9h, 11h, 15h, 17h. Thêm múa lụa, kiếm vũ, hát; kính rượu; ra múa cùng nhau; tửu lệnh nối thành ngữ; pháo hoa sau tiết mục và khen chê; đoàn ca vũ Giáo phường biểu diễn.'],
+  ['📜 Đại án và 🏮 Đại lễ', 'Mỗi tuần một đại án cả cung cùng tra, mỗi người giữ một mảnh manh mối. Đại lễ thì cả cung góp sức, đạt mốc là ai cũng có quà.'],
+  ['✨ Lặt vặt', 'Lượt hồi mỗi 30 phút. Trang phục mới: Phi · xanh lam thêu vàng. Thư từ, thông báo về điện thoại (bấm 🔔), danh hiệu, nhiệm vụ tân thủ, điểm danh 7 ngày.'],
+];
+function showUpdate(force) {
+  try { if (!force && localStorage.getItem('mph_upd_' + me.id) === UPDATE_VER) return; } catch {}
+  if (!force && (tourOn || !$('modal').classList.contains('hidden'))) return setTimeout(() => showUpdate(), 4000);
+  modal(`<button class="close" onclick="window._close()">✕</button>
+  <div class="updhead"><div class="ut">聖旨</div><h3>Thánh chỉ · Hậu cung có biến</h3><small>Cập nhật ngày 12/11 · phụng thiên thừa vận, Hoàng đế chiếu viết…</small></div>
+  <div class="updlist">${UPDATE_NOTES.map(([t, x]) => `<div class="ud"><b>${t}</b><div>${x}</div></div>`).join('')}</div>
+  <div class="btns"><button class="gold" id="updOk">Thần thiếp lĩnh chỉ</button></div>
+  <div style="color:var(--muted);font-size:12px;text-align:center">Xem lại bất cứ lúc nào ở 📖 Hướng dẫn → Có gì mới</div>`);
+  $('mcard').classList.add('wide');
+  $('updOk').onclick = () => { try { localStorage.setItem('mph_upd_' + me.id, UPDATE_VER); } catch {} closeModal(); };
 }
