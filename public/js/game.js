@@ -183,7 +183,7 @@ function stepSelf(dt) {
     const dx = selfC.target.x - r.position.x, dz = selfC.target.z - r.position.z, d = Math.hypot(dx, dz);
     if (d < 0.05) { selfC.target = null; }
     else {
-      const sp = 1.15 * dt, k = Math.min(1, sp / d);
+      const sp = (me?.male ? 1.15 : .95) * dt, k = Math.min(1, sp / d);
       const np = clampPos(r.position.x + dx * k, r.position.z + dz * k); r.position.x = np.x; r.position.z = np.z; r.position.y = world.floorAt ? world.floorAt(np.x, np.z) : 0;
       const want = Math.atan2(dx, dz); let diff = want - r.rotation.y; diff = Math.atan2(Math.sin(diff), Math.cos(diff)); r.rotation.y += diff * Math.min(1, dt * 10);
       if (selfC.curName !== 'di') selfC.play('di');
@@ -2646,7 +2646,7 @@ function kidFrame(dt) {
       if (kidLesson?.cid === e.cid && (kidLesson.pos || world.kidDesks)) { const d = kidLesson.pos || world.kidDesks[kidLesson.desk]; tx = d.x; tz = d.z; } else { tx = p.x - Math.sin(ry) * .65 + Math.cos(ry) * .4; tz = p.z - Math.cos(ry) * .65 - Math.sin(ry) * .4; }
       const dx = tx - m.position.x, dz = tz - m.position.z, dist = Math.hypot(dx, dz); let moving = false;
       if (cry && e.stage === 'chap') { kidAnim(e, dt, false, 'fall'); continue; }
-      let fast = false; if (dist > 6) { m.position.set(tx, 0, tz); } else if (dist > .12) { fast = dist > 1.2; const sp = Math.min(dist, dt * (fast ? 2.0 : 1.15)); m.position.x += dx / dist * sp; m.position.z += dz / dist * sp; m.rotation.y = Math.atan2(dx, dz); moving = true; }
+      let fast = false; if (dist > 6) { m.position.set(tx, 0, tz); } else if (dist > .12) { fast = dist > 1.2; const sp = Math.min(dist, dt * (fast ? 1.8 : .95)); m.position.x += dx / dist * sp; m.position.z += dz / dist * sp; m.rotation.y = Math.atan2(dx, dz); moving = true; }
       else if (kidLesson?.cid === e.cid) { m.rotation.y = kidLesson.pos ? kidLesson.pos.ry : Math.PI; kidAnim(e, dt, false, 'sit'); continue; } else m.rotation.y += (Math.atan2(p.x - m.position.x, p.z - m.position.z) - m.rotation.y) * Math.min(1, dt * 3);
       m.position.y = world.floorAt ? world.floorAt(m.position.x, m.position.z) : 0; kidAnim(e, dt, moving, cry ? 'cry' : null, fast); }
     else if (e.kind === 'cradle') { e.rock.rotation.x = Math.sin(kidT * (cry ? 6 : 1.2)) * (cry ? .12 : .05); e.baby.userData.mouth.scale.set(cry ? 1.4 : 1, cry ? 1.4 : .4, 1); }

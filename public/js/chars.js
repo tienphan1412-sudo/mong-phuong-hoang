@@ -103,19 +103,13 @@ export async function spawn(modelName) {
     if (c.cur === a && !opts.restart) return;
     const once = ['nga', 'quy', 'hanh_le', 'cui_chao'].includes(name);
     a.reset(); a.setLoop(once ? THREE.LoopOnce : THREE.LoopRepeat); a.clampWhenFinished = once;
-    a.timeScale = name === 'di' ? (male ? 1.4 : 1.65) : 1;
+    a.timeScale = name === 'di' ? (male ? 1.4 : 1.45) : 1;
     if (c.cur && c.cur !== a) a.crossFadeFrom(c.cur, 0.3, false);
     a.play(); c.cur = a; c.curName = name; c.sitFix = name === 'ngoi';
   };
   c.update = (dt) => {
     c.t += dt; mixer.update(dt);
-    if (c.curName === 'di' && !male) for (const [bone, q] of idlePose) {
-      const n = bone.name;
-      if (/(Shoulder|Arm|ForeArm|Hand)$/.test(n)) bone.quaternion.slerp(q, .85);
-      else if (/UpLeg$/.test(n)) bone.quaternion.slerp(q, .45);
-      else if (/Leg$/.test(n)) bone.quaternion.slerp(q, .35);
-      else if (/Spine|Neck|Head$/.test(n)) bone.quaternion.slerp(q, .6);
-    }
+    // dáng đi nữ: giữ nguyên động tác gốc (trước đây bị ép cứng tay chân cho dáng đi cũ)
     if (c.sitFix) {
       for (const [bone, q] of idlePose) if (/(Spine|Spine1|Spine2|Neck|Head)$/.test(bone.name)) bone.quaternion.slerp(q, .85);
       root.updateMatrixWorld(true);
