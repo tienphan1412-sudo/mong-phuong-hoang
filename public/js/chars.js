@@ -103,7 +103,7 @@ export async function spawn(modelName) {
     if (c.cur === a && !opts.restart) return;
     const once = ['nga', 'quy', 'hanh_le', 'cui_chao'].includes(name);
     a.reset(); a.setLoop(once ? THREE.LoopOnce : THREE.LoopRepeat); a.clampWhenFinished = once;
-    a.timeScale = name === 'di' ? (male ? 1.4 : 1.45) : 1;
+    a.timeScale = name === 'di' ? (male ? 1.4 : 1.15) : 1;
     if (c.cur && c.cur !== a) a.crossFadeFrom(c.cur, 0.3, false);
     a.play(); c.cur = a; c.curName = name; c.sitFix = name === 'ngoi';
   };
