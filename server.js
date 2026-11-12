@@ -1645,7 +1645,7 @@ io.on('connection', sock => {
     else return;
     const tname = n ? n.name : t.name, violent = ['tat', 'da', 'day'].includes(act);
     me.ttDay = me.ttDay?.d === dayKey() ? me.ttDay : { d: dayKey(), v: 0, k: {} };
-    if (violent && me.ttDay.v >= 3) return toast(me, 'Hôm nay đã gây sự 3 lần rồi, làm nữa Thái hậu trị tội đấy.');
+    if (violent && me.ttDay.v >= 8) return toast(me, 'Hôm nay đã gây sự 8 lần rồi, làm nữa Thái hậu trị tội đấy.');
     if (now() - (me.ttLast || 0) < 4000) return; me.ttLast = now();
     let back = false;
     const VERB = { tat: 'tát', da: 'đá', day: 'đẩy ngã', quy: 'quỳ lạy', xinloi: 'xin lỗi' };

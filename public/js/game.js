@@ -2232,7 +2232,7 @@ const UPDATE_NOTES = [
   ['🎉 Ân điển cho hậu cung', 'Mỗi ngày nay có 8 lượt (trước 5), hồi 1 lượt mỗi 30 phút, tích tối đa 20. Hoàng thượng ưu tiên lật thẻ người chơi, phi tần NPC rất hiếm khi được chọn và chỉ khi các nương nương đều đã được sủng hạnh hôm đó.'],
   ['📒 Việc riêng bậc cao', 'Từ Phi trở lên, tại cung riêng: Hiệp lý lục cung và Dạy dỗ người mới mỗi việc 5 lần/ngày (mỗi người chỉ được dạy 1 lần/ngày). Thiết yến nay mỗi ngày 1 lần.'],
   ['🎭 Hậu cung có thêm 6 phi tần', 'Tuệ Quý phi, Mẫn Phi, Uyển Tần, Lệ Tần, Hân Quý nhân, Mai Thường tại cũng tranh ghế, tranh lật thẻ. Gặp họ ở Ngự hoa viên, Từ Ninh cung, yến tiệc, bấm vào tên để trò chuyện: có người nói khích, có người lấy lòng. Thân thì được mách sở thích Hoàng thượng.'],
-  ['✋ Tát, đá, đẩy ngã, quỳ lạy, xin lỗi', 'Bấm vào tên người chơi khác hoặc phi tần NPC (chọn Hành động…) để ra tay hay làm lành. Gây sự tối đa 3 lần/ngày; làm loạn ở Từ Ninh cung, yến tiệc bị Thái hậu trách; đánh người cấp cao hơn là phạm thượng. NPC đanh đá có thể tát trả!'],
+  ['✋ Tát, đá, đẩy ngã, quỳ lạy, xin lỗi', 'Bấm vào tên người chơi khác hoặc phi tần NPC (chọn Hành động…) để ra tay hay làm lành. Gây sự tối đa 8 lần/ngày; làm loạn ở Từ Ninh cung, yến tiệc bị Thái hậu trách; đánh người cấp cao hơn là phạm thượng. NPC đanh đá có thể tát trả!'],
   ['🗡 Ân oán có trả có vay', 'Hãm hại phi tần NPC trong Danh sách hậu cung (từ Quý nhân). Nhưng họ nhớ mặt: vài ngày sau sẽ gài tang vật trả thù. Tìm đúng hung thủ thì họ bị giáng cấp, chỉ sai thì chủ tử bị phạt.'],
   ['🪑 Ghế có hạn, phải vượt mặt mà lên', 'Mỗi cấp có số ghế. Ghế đầy thì phải có công trạng cao hơn phi tần NPC đang ngồi, họ sẽ bị giáng để nhường chỗ. Lên Quý phi giờ cần 1300 công trạng, Hoàng quý phi 2000.'],
   ['👑 Việc riêng cho Phi trở lên', 'Ở cung riêng: Hiệp lý lục cung và Dạy dỗ người mới, mỗi việc 5 lần/ngày; Thiết yến mời cả cung mỗi ngày 1 lần.'],
@@ -2263,7 +2263,7 @@ function openTT(to, name) {
   if (me.lanh) return;
   modal(`<button class="close" onclick="window._close()">✕</button><h3>Hành động với ${esc(name)}</h3>
   <div class="btns" style="flex-wrap:wrap">${TT.map(([k, t, c]) => `<button data-t="${k}" class="${c === 'good' ? 'gold' : ''}">${t}</button>`).join('')}</div>
-  <div style="color:var(--muted);font-size:12px">Gây sự tối đa 3 lần/ngày. Làm loạn ở Từ Ninh cung hay yến tiệc bị Thái hậu trách; ra tay với người cấp cao hơn là phạm thượng. Phi tần NPC bị đánh sẽ ghi thù, quỳ lạy hoặc xin lỗi thì có thể nguôi giận.</div>`);
+  <div style="color:var(--muted);font-size:12px">Gây sự tối đa 8 lần/ngày. Làm loạn ở Từ Ninh cung hay yến tiệc bị Thái hậu trách; ra tay với người cấp cao hơn là phạm thượng. Phi tần NPC bị đánh sẽ ghi thù, quỳ lạy hoặc xin lỗi thì có thể nguôi giận.</div>`);
   $('mcard').querySelectorAll('[data-t]').forEach(b => b.onclick = () => { closeModal(); socket.emit('tt', { to, act: b.dataset.t }); });
 }
 function ttChar(key) {
