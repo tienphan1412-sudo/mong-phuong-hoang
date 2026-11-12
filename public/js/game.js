@@ -76,7 +76,7 @@ async function enterScene(loc, players, venue, seatId) {
   music.setMode(loc);
   // dựng cảnh mới ở hậu trường, cảnh cũ vẫn hiện cho tới khi xong
   const H = loc === 'phong' && sceneHost ? sceneHost : null, hName = H ? H.name : me?.name || '';
-  const o = buildLocation(loc, { palace: H ? H.palace : me?.hasPalace, palaceName: hName.split(' ').pop() + ' cung', venue });
+  const o = buildLocation(loc, { palace: H ? H.palace : me?.hasPalace, palaceName: hName.split(' ').pop() + ' cung', venue, sinhName: sinhSt ? sinhSt.name.split(' ').pop() + ' cung' : '', sinhFei: sinhSt?.fei || [] });
   if (H && H.id !== me.id) o.decorable = false;
   // phi tần NPC có mặt
   const FS = { hoavien: [[1.6, 1.4, 2.6], [2.6, -.4, -2], [-.8, 2.6, 3], [.6, -2.2, .4], [3.2, 2.2, -2.4], [-1.6, 4, 2.2]], tuninh: [[-1.6, 2.4, 2.4], [1.6, 2.4, -2.4], [-2.4, 1.6, 1.6], [2.4, 1.4, -1.6], [-1, 3.2, 3], [1, 3.2, -3]] };
@@ -94,7 +94,7 @@ async function enterScene(loc, players, venue, seatId) {
       o.throne.position.set(s.x, s.y - .04, s.z); o.throne.rotation.y = s.ry;
       for (const l of o.throne.userData.legs) { const h = s.y - .04 - o.dais.y; l.scale.y = h; l.position.y = -h / 2; }
       c.play('ngoi');
-    } else {
+    } else if (n.seat) { seatPose(c, n.seat); } else {
       c.root.position.set(n.x, 0, n.z); c.root.rotation.y = n.ry || 0;
       if (n.kneel) kneelOn(c, n.x, n.kneel, n.z, n.ry); else c.play(n.idle || (n.model === 'cungnu' || n.model === 'mama' ? 'chap_tay' : 'dung_cho'));
     }
@@ -118,7 +118,7 @@ async function enterScene(loc, players, venue, seatId) {
   if (seatId) sitSelfAt(seatId); else sendMove('dung_cho');
   if (sceneLying && o.myBed) { lying = true; lieOn(selfC); }
   if (!window._updChk) { window._updChk = 1; setTimeout(() => showUpdate(), 3000); }
-  snapCam = true; refreshClueMarkers(); if (nb) renderNotebook(); syncFeastHT(); syncVua(); syncKids(); hideLoading();
+  snapCam = true; refreshClueMarkers(); if (nb) renderNotebook(); syncFeastHT(); syncVua(); syncKids(); leObj = null; leSync(null); if (loc === 'sansinh') { sinhFx = null; sinhAmbient(); if (sinhMine() && selfC) selfC.root.visible = false; if (sinhSt?.phase === 'bao' && sinhSt.sex) sinhAnnounce(sinhSt); } hideLoading();
   if (loc === 'tamcung' && !me.htTalked) setTimeout(() => { if (world?.loc === 'tamcung') startHtTalk(); }, 2500);
   for (const p of players || []) addOther(p);
   renderMap(); renderActs();
@@ -133,7 +133,7 @@ async function respawnSelf(x, z, ry) {
   c.target = null; c.outfit = wear(me.outfit, me.kidPub);
 }
 async function addOther(p) {
-  if (others.has(p.id) || !world) return;
+  if (others.has(p.id) || !world || p.hidden) return;
   const holder = { p, c: null, tx: p.x, tz: p.z, try: p.ry };
   others.set(p.id, holder);
   const c = await spawn(wear(p.outfit, p.kid));
@@ -280,7 +280,7 @@ socket.on('me', async m => {
   if (caseOpenId) socket.emit('caseDetail', caseOpenId);
 });
 let sceneHost = null, sceneLying = false, sceneFei = [];
-socket.on('scene', async d => { pendingScene = d; sceneHost = d.host || null; kidAcaso = d.acaso || []; sceneLying = !!d.lying; sceneFei = d.fei || []; if (!stage) { await enterScene(d.loc, d.players, d.venue, d.seat); pendingScene = null; setTimeout(() => startTour(), 1200); } });
+socket.on('scene', async d => { pendingScene = d; sceneHost = d.host || null; kidAcaso = d.acaso || []; if (d.sinh !== undefined && d.loc === 'sansinh') sinhSt = d.sinh; sceneLying = !!d.lying; sceneFei = d.fei || []; if (!stage) { await enterScene(d.loc, d.players, d.venue, d.seat); pendingScene = null; setTimeout(() => startTour(), 1200); } });
 let pendingScene = null;
 socket.on('pjoin', p => addOther(p));
 socket.on('pleave', id => removeOther(id));
@@ -320,7 +320,7 @@ function renderHud() {
   const tb = $('todayBtn'); if (tb) tb.onclick = openToday; const bb = $('bigBtn'); if (bb) bb.onclick = openBig; const fb = $('festBtn'); if (fb) fb.onclick = openFest;
   const hb = $('hhBtn'); if (hb) hb.onclick = openHH; const vb = $('voteBtn'); if (vb) vb.onclick = openVote;
 }
-const LOCNAMES = { yentiec: '🎎 Yến tiệc', hoavien: 'Ngự hoa viên', tuninh: 'Từ Ninh cung', duongtam: 'Dưỡng Tâm điện', phong: 'Phòng riêng', tamcung: 'Tẩm cung', lanhcung: 'Lãnh cung', ngutien: '🍳 Ngự thiện phòng', acaso: '📚 Thượng thư phòng' };
+const LOCNAMES = { yentiec: '🎎 Yến tiệc', hoavien: 'Ngự hoa viên', tuninh: 'Từ Ninh cung', duongtam: 'Dưỡng Tâm điện', phong: 'Phòng riêng', tamcung: 'Tẩm cung', lanhcung: 'Lãnh cung', ngutien: '🍳 Ngự thiện phòng', acaso: '📚 Thượng thư phòng', sansinh: '🏮 Sân cung' };
 function renderMap() {
   if (!me) return;
   const m = $('map'); m.innerHTML = '';
@@ -329,7 +329,8 @@ function renderMap() {
   if (feast && !me.lanh) list.push('yentiec');
   if (!me.lanh && !me.camTuc && me.rank >= 4) list.splice(3, 0, 'ngutien');
   if (!me.lanh && !me.camTuc && me.children?.length) list.splice(list.indexOf('phong'), 0, 'acaso');
-  for (const l of list) { const b = document.createElement('button'); b.textContent = l === 'phong' && me.hasPalace ? 'Cung riêng' : LOCNAMES[l]; b.classList.toggle('on', world?.loc === l); b.onclick = () => socket.emit('goto', l); m.appendChild(b); }
+  if (sinhSt && !me.lanh && !me.camTuc) list.unshift('sansinh');
+  for (const l of list) { const b = document.createElement('button'); b.textContent = l === 'sansinh' ? `🏮 ${sinhSt.cung} (chuyển dạ)` : l === 'phong' && me.hasPalace ? 'Cung riêng' : LOCNAMES[l]; b.classList.toggle('on', world?.loc === l); b.onclick = () => socket.emit('goto', l); m.appendChild(b); }
 }
 function act(type, extra = {}) { socket.emit('action', { type, ...extra }); }
 function renderActs() {
@@ -367,7 +368,7 @@ function renderActs() {
   if (L === 'tuninh' && me.hhVote) add('👑 Bầu phượng ấn', me.hhVote.mine ? 'Đã tiến cử · có thể đổi' : 'Tiến cử người xứng làm Hoàng hậu', openVote);
   const B = me.big; if (B && !B.done && !me.lanh && ['hoavien', 'tuninh', 'duongtam'].includes(L)) add('📜 Tra đại án ở đây', B.invToday.length >= 2 ? 'Hôm nay đã tra đủ 2 lần · mai quay lại' : B.invToday.includes(L) ? 'Hôm nay đã tra ở đây · thử nơi khác' : `1 lượt · còn ${2 - B.invToday.length} lần hôm nay · mỗi người nhận manh mối khác nhau`, () => socket.emit('big', { op: 'inv' }), B.invToday.includes(L) || B.invToday.length >= 2);
   const F = me.fest; if (F && !F.done && !me.lanh) { if (L === 'phong') add('🧵 Thêu gấm cho đại lễ', F.today.theu ? 'Hôm nay đã thêu' : '1 lượt · mỗi ngày 1 lần · thêu khéo được nhiều điểm', () => gameRhythm('múa', q => socket.emit('fest', { op: 'theu', q })), F.today.theu); if (L === 'tuninh') add('📿 Chép kinh cho đại lễ', F.today.kinh ? 'Hôm nay đã chép' : '1 lượt · mỗi ngày 1 lần · +15 điểm đại lễ', () => socket.emit('fest', { op: 'kinh' }), F.today.kinh); }
-  vuaActs(add); kidActs(add);
+  vuaActs(add); kidActs(add); sinhActs(add); leActs(add);
   if (me.isHH) add('👑 Quyền Hoàng hậu', 'Ân xá · phạt cấm túc · thiết yến', openHH);
   renderMenu();
 }
@@ -395,6 +396,7 @@ function openEmotes() {
 function talk(n) {
   const c = me.cases[0];
   if (NPC_OF[n.talk]) return npcMenu(n);
+  if (n.talk?.startsWith('sinh')) return sinhTalk(n);
   if (n.talk === 'thaipho') { const ks = (me.children || []).filter(k => k.stage === 'hoc'); return say('thaiy', 'Thái phó Trương đại nhân', ks.length ? `Tham kiến nương nương. ${ks.map(k => `${esc(k.name)}: văn ${k.van}, ${k.sex === 'trai' ? 'võ ' + k.vo : 'nghệ ' + k.nghe}, đức ${k.duc}`).join(' · ')}. Học hành chăm chỉ thì ngày sau tất thành đại khí.` : 'Tham kiến nương nương. Hoàng tự từ 7 ngày tuổi sẽ tới đây theo thần học chữ, cung mã, lễ nghĩa.', [['Đa tạ Thái phó', 0, 'gold']]).then(dlgClose); }
   if (n.talk === 'nhumau') { const ks = kidAcaso.filter(k => k.mid === me.id); return say('mama', 'Nhũ mẫu A ca sở', ks.length ? `Nương nương yên tâm, ${ks.map(k => esc(k.name)).join(', ')} được nô tỳ chăm kỹ lắm. Nương nương thăng tới bậc Tần là được đón về tự nuôi.` : 'Theo tổ chế, phi tần dưới bậc Tần sinh hoàng tự thì đưa tới A ca sở cho nô tỳ nuôi. Nương nương cứ yên tâm.', [['Phiền nhũ mẫu', 0, 'gold']]).then(dlgClose); }
   if (String(n.talk).startsWith('fei:')) return socket.emit('fei', { op: 'talk', id: n.talk.slice(4) });
@@ -2244,8 +2246,13 @@ function openDay() {
 // =====================================================================
 // THÁNH CHỈ CẬP NHẬT: hiện một lần cho mỗi bản mới
 // =====================================================================
-const UPDATE_VER = 'u2026-11-12h';
+const UPDATE_VER = 'u2026-11-13';
 const UPDATE_NOTES = [
+  ['🏮 Chuyển dạ: cả cung chờ tin', 'Tới ngày sinh, cổng cung người mẹ treo đèn lồng đỏ. Hoàng thượng, Thái hậu và các phi tần ngồi nhà chờ ngoài sân. Người mẹ thở theo nhịp bà đỡ; người chờ có thể cầu phúc, dâng lễ mừng, hoặc… lén mua chuộc bà đỡ (40% bị Thái hậu bắt quả tang). Khó sinh thì ai dâng nhân sâm ngàn năm sẽ được ghi công. Ma ma bế bé ra báo tin, Hoàng thượng ban lộc 20 bạc cho mọi người có mặt.'],
+  ['👑 Mẫu bằng tử quý', 'Sinh hoàng tử được thưởng nhiều hơn công chúa. Con trai đầu lòng: người mẹ được tấn phong lên một bậc.'],
+  ['🛁 Lễ tẩy tam', 'Bé sơ sinh được làm lễ tắm ở cung riêng: khách tới thả trứng đỏ, hành, tiền vàng, ngải cứu, hoa quế vào chậu, mỗi món một lời chúc tăng chỉ số cho bé.'],
+  ['🎎 Lễ trảo chu', 'Bé chập chững bò tới bốc đồ: sách, kiếm, đàn, ấn ngọc, bàn tính, hộp son. Món bé bốc thành năng khiếu (học môn đó nhanh hơn). Bốc trúng ấn ngọc là điềm đại quý, được cộng điểm khi xét lập Thái tử.'],
+  ['💃 Dáng đi', 'Dáng đi yểu điệu dành cho phi tần, công chúa và Thái hậu; cung nữ, ma ma giữ dáng đi cũ.'],
   ['📜 Phụ hoàng kiểm tra bài', '11:30 và 19:30 Hoàng thượng ghé Thượng thư phòng. Dắt con tới trình bài: con quỳ trước phụ hoàng trả lời 3 câu chữ nghĩa, lễ nghĩa. Trôi chảy cả 3 thì con tăng văn, đức, mẹ được khen trước cả cung. Ngoài giờ đó, dắt con vào Dưỡng Tâm điện gặp cha cũng được, mỗi ngày 1 lần.'],
   ['👶 Em bé dễ chăm hơn', 'Bé khoảng 45 phút đòi chăm một lần, khóc quá 15 phút mới mệt. Mẹ vắng mặt (offline) thì nhũ mẫu tự chăm miễn phí, không bị trừ gì.'],
   ['💃 Dáng đi yểu điệu', 'Mọi phi tần, cung nữ giờ bước đi nhẹ nhàng, thướt tha hơn.'],
@@ -2598,7 +2605,7 @@ function makeBelly(c) {
 const kidEnts = new Map(); let kidAcaso = [];
 const kidWorldPos = new THREE.Vector3(), kidFwd = new THREE.Vector3();
 function kidCries(cid) { if ((me?.children || []).some(k => k.id === cid && k.cry)) return true; for (const [, o] of others) if (o.p.kid?.cry?.includes(cid)) return true; if (sceneHost?.kids?.some(k => k.id === cid && k.cry)) return true; return kidAcaso.some(k => k.id === cid && k.cry); }
-function kidOwners() { const L = []; if (selfC && me) L.push({ id: me.id, c: selfC, kid: me.kidPub || {} }); for (const [id, o] of others) if (o.c) L.push({ id, c: o.c, kid: o.p.kid || {} }); return L; }
+function kidOwners() { const L = []; if (selfC && me && !(sinhMine() && world?.loc === 'sansinh')) L.push({ id: me.id, c: selfC, kid: me.kidPub || {} }); for (const [id, o] of others) if (o.c) L.push({ id, c: o.c, kid: o.p.kid || {} }); return L; }
 function kidLabel(name) { const lb = makeLabel(name, '', true); lb.element.style.transform += ' scale(.8)'; return lb; }
 function kidEnt(key, make) { let e = kidEnts.get(key); if (!e) { e = make(); e.w = world; kidEnts.set(key, e); } e.seen = true; return e; }
 function kidDrop(e) { e.char?.dispose(); e.mesh?.parent?.remove(e.mesh); e.extra?.parent?.remove(e.extra); e.label?.element.remove(); }
@@ -2651,7 +2658,7 @@ function kidFrame(dt) {
       m.position.y = world.floorAt ? world.floorAt(m.position.x, m.position.z) : 0; kidAnim(e, dt, moving, cry ? 'cry' : null, fast); }
     else if (e.kind === 'cradle') { e.rock.rotation.x = Math.sin(kidT * (cry ? 6 : 1.2)) * (cry ? .12 : .05); e.baby.userData.mouth.scale.set(cry ? 1.4 : 1, cry ? 1.4 : .4, 1); }
     else if (e.kind === 'desk') kidAnim(e, dt, false, 'sit');
-    else if (e.kind === 'wander') { const m = e.mesh; if (cry) { kidAnim(e, dt, false, 'cry'); continue; }
+    else if (e.kind === 'wander') { const m = e.mesh; if (kidLesson?.cid === e.cid && kidLesson.pos) { e.tgt = [kidLesson.pos.x, kidLesson.pos.z]; e.next = kidT + 2; } else if (cry) { kidAnim(e, dt, false, 'cry'); continue; }
       if (!e.tgt || kidT > e.next) { e.tgt = [e.home[0] + (Math.random() - .5) * 2.2, e.home[1] + (Math.random() - .5) * 1.6]; if (world.bounds) { e.tgt[0] = Math.max(world.bounds.minX + .3, Math.min(world.bounds.maxX - .3, e.tgt[0])); e.tgt[1] = Math.max(world.bounds.minZ + .3, Math.min(world.bounds.maxZ - .3, e.tgt[1])); } e.next = kidT + 4 + Math.random() * 4; }
       const dx = e.tgt[0] - m.position.x, dz = e.tgt[1] - m.position.z, d = Math.hypot(dx, dz); const mv = d > .08; if (mv) { const sp = Math.min(d, dt * .9); m.position.x += dx / d * sp; m.position.z += dz / d * sp; m.rotation.y = Math.atan2(dx, dz); } kidAnim(e, dt, mv, null); }
   }
@@ -2768,3 +2775,129 @@ socket.on('conHoc', async d => {
 });
 window.__mph.kids = () => [...kidEnts].map(([k, e]) => [k, e.mesh?.position.toArray().map(v => +v.toFixed(2)), !!e.char, e.mesh?.parent === world.group, e.char?.curName, e.char && e.char.root.position.toArray().map(v => +v.toFixed(2))]);
 window.__mph.measure = () => { const b = new THREE.Box3(); const h = o => { b.setFromObject(o, true); return +(b.max.y - b.min.y).toFixed(2); }; return { self: selfC && h(selfC.root), kids: [...kidEnts.values()].filter(e => e.char).map(e => h(e.char.root)), npcs: (world?.npcs || []).map(n => [n.name, n.c && h(n.c.root)]) }; };
+
+// =====================================================================
+// CHUYỂN DẠ: sân cung, nhà chờ, bế con ra báo tin
+// =====================================================================
+let sinhSt = null, sinhFx = null;
+socket.on('sinh', d => { const prev = sinhSt; sinhSt = d; if (!me) return; renderMap(); if (world) renderActs(); sinhStage(prev, d); });
+const sinhMine = () => sinhSt && me && sinhSt.id === me.id;
+function sinhActs(add) {
+  const S = sinhSt; if (!S || world?.loc !== 'sansinh' || sinhMine()) return;
+  if (S.phase === 'cho') {
+    add('🙏 Cầu phúc cho mẹ tròn con vuông', S.prayed?.includes(me.id) ? 'Đã cầu phúc' : `${S.pray} người đã cầu phúc · càng đông càng dễ sinh thuận`, () => { emote('quy'); socket.emit('sinhAct', { op: 'pray' }); }, S.prayed?.includes(me.id));
+    add('🎁 Dâng lễ mừng', S.gave?.includes(me.id) ? 'Đã dâng lễ' : '20 bạc · khóa vàng trường mệnh, áo nhỏ', () => socket.emit('sinhAct', { op: 'gift' }), S.gave?.includes(me.id));
+    add('😈 Lén mua chuộc bà đỡ', '80 bạc · khiến ca sinh khó khăn hơn · 40% bị Thái hậu bắt quả tang', async () => { const i = await say('cungnu', 'Cung nữ thân tín', 'Nương nương… chuyện này mà lộ ra thì mất đầu như chơi. Thật sự muốn làm sao?', [['Cứ làm đi', 1, ''], ['Thôi, bỏ đi', 0, 'gold']]); dlgClose(); if (i) socket.emit('sinhAct', { op: 'sab' }); });
+  }
+  if (S.phase === 'kho') add('🌿 Dâng nhân sâm ngàn năm', S.sam ? `${S.sam} đã dâng nhân sâm` : '60 bạc · cứu mẹ con, được Hoàng thượng ghi công', () => socket.emit('sinhAct', { op: 'sam' }), !!S.sam);
+}
+function sinhTalk(n) {
+  const S = sinhSt; if (!S) return;
+  if (n.talk === 'sinhHT') return bubble(n.label, S.phase === 'bao' && S.sex ? 'Trẫm có thêm ' + (S.sex === 'trai' ? 'hoàng tử' : 'công chúa') + ' rồi!' : rpick(['Sao lâu thế…', 'Thái y đâu, vào xem tình hình!', 'Trẫm đứng ngồi không yên.']));
+  if (n.talk === 'sinhTH') return bubble(n.label, rpick(['Ai gia đã thắp hương cầu tổ tiên phù hộ.', 'Đừng nóng ruột, sinh nở xưa nay đều vậy.']));
+  if (n.talk === 'sinhFei') return bubble(n.label, rpick(SINH_FEI[n.tinh] || ['…']));
+  if (n.talk === 'sinhCN') return bubble(n.label, rpick(['Nước nóng! Mau mang nước nóng vào!', 'Bà đỡ bảo cố lên nương nương ơi!']));
+}
+const SINH_FEI = { kieu: ['Hừ, sinh con thôi mà làm rùm beng.', 'Để xem hoàng tử hay công chúa đã.'], xao: ['Bổn cung chúc mừng trước nhé, ha ha.', 'Mong mẹ tròn con vuông…'], hien: ['A di đà Phật, mong muội ấy bình an.'], danh: ['Đứng chờ mỏi cả chân.'], ninh: ['Hoàng thượng đừng lo, muội ấy phúc lớn.'], nhut: ['Thần thiếp hồi hộp quá…'] };
+const SINH_CHEER = { kieu: 'Chúc mừng… ừm, chúc mừng.', xao: 'Ôi chúc mừng Hoàng thượng, chúc mừng muội muội!', hien: 'A di đà Phật, mẹ tròn con vuông rồi!', danh: 'Chúc mừng Hoàng thượng!', ninh: 'Thần thiếp chúc mừng Hoàng thượng có thêm hoàng tự!', nhut: 'Bé dễ thương quá…' };
+// không khí chờ: cung nữ bưng thau chạy ra vào, tiếng vọng từ trong cung
+function sinhAmbient() {
+  if (sinhFx) return; const w = world; let t = 0, said = 0;
+  sinhFx = dt => { if (world !== w || !sinhSt) { sinhFx = null; if (selfC) { selfC.root.visible = true; if (selfC.label) selfC.label.visible = true; } return false; } t += dt;
+    if (sinhMine() && selfC) { selfC.root.visible = false; if (selfC.label) selfC.label.visible = false; } // người mẹ đang ở trong cung
+    const cn = w.npcs.find(n => n.talk === 'sinhCN' && n.c); if (cn && sinhSt.phase !== 'bao') { const k = (Math.sin(t * .45) + 1) / 2, x = -.7 + k * 1.2, z = -3.25 + k * 1.6; const r = cn.c.root, dx = x - r.position.x, dz = z - r.position.z; if (Math.hypot(dx, dz) > .002) { r.rotation.y = Math.atan2(dx, dz); if (cn.c.curName !== 'di') cn.c.play('di'); } r.position.x = x; r.position.z = z; }
+    if (t - said > 7 && sinhSt.phase !== 'bao') { said = t; const g = w.gate; if (cn?.label) bubble(cn.label, rpick(['Nước nóng đây!', 'Nương nương cố lên!', 'Bà đỡ ơi, khăn sạch đây!'])); const f = w.npcs.filter(n => n.talk === 'sinhFei' || n.talk === 'sinhHT'); const n = rpick(f); if (n?.label && Math.random() < .5) sinhTalk(n); } };
+  FX.push(sinhFx);
+}
+async function sinhStage(prev, S) {
+  if (!world || world.loc !== 'sansinh' || !S) return;
+  sinhAmbient();
+  if (S.phase === 'kho' && prev?.phase !== 'kho') { const ht = world.npcs.find(n => n.talk === 'sinhHT'); toast('⚠️ Thái y báo: khó sinh! Cần gấp nhân sâm ngàn năm.'); if (ht?.label) bubble(ht.label, 'Bằng mọi giá phải giữ được mẹ con nàng!');
+    if (!world.npcs.some(n => n.sinhTY)) { const c = await spawn('thaiy'); const g = world.gate; c.root.position.set(g.x + .5, 0, g.z + .9); c.root.rotation.y = .6; world.group.add(c.root); kneelOn(c, g.x + .5, .02, g.z + .9, .6); const lb = makeLabel('Thái y', '', true); c.root.add(lb); world.npcs.push({ c, name: 'Thái y', label: lb, sinhTY: true }); } }
+  if (S.phase === 'bao' && S.sex && !prev?.sex) sinhAnnounce(S);
+}
+async function sinhAnnounce(S) {
+  const w = world, g = w.gate, ht = w.npcs.find(n => n.talk === 'sinhHT');
+  kidCrySound(); toast('👶 Oe oe oe… tiếng trẻ khóc vang lên trong cung!');
+  const mm = await spawn('mama'); if (world !== w) return mm.dispose(); mm.root.position.set(g.x, 0, g.z); mm.root.rotation.y = 0; w.group.add(mm.root); const lb = makeLabel('Ma ma bà đỡ', '', true); mm.root.add(lb);
+  const baby = makeBaby(S.sex); w.group.add(baby); const n = { c: mm, name: 'Ma ma', label: lb }; w.npcs.push(n);
+  const target = ht ? { x: ht.c.root.position.x - .1, z: ht.c.root.position.z + .75 } : { x: 2.6, z: .2 }; let t = 0, stage = 0; const hp = new THREE.Vector3();
+  FX.push(dt => { if (world !== w) return false; t += dt; const r = mm.root;
+    if (stage === 0) { const dx = target.x - r.position.x, dz = target.z - r.position.z, d = Math.hypot(dx, dz); if (d > .05) { const sp = Math.min(d, dt * .7); r.position.x += dx / d * sp; r.position.z += dz / d * sp; r.rotation.y = Math.atan2(dx, dz); if (mm.curName !== 'di') mm.play('di'); } else { stage = 1; r.rotation.y = Math.PI; mm.play('cui_chao'); bubble(lb, `Chúc mừng Hoàng thượng! ${esc(S.name)} hạ sinh một tiểu ${S.sex === 'trai' ? 'hoàng tử' : 'công chúa'}, mẹ tròn con vuông!`); setTimeout(() => sinhCheer(S), 2200); } }
+    mm.root.updateMatrixWorld(true); (mm.B.spine2 || mm.B.spine).getWorldPosition(hp); const ry = r.rotation.y; baby.position.set(hp.x + Math.sin(ry) * .2, hp.y - .2, hp.z + Math.cos(ry) * .2); baby.rotation.set(0, ry + Math.PI / 2, 0); baby.rotateX(-.35);
+    if (!mm._carry) { mm._carry = true; mm.post2 = cc => { aim(cc.root, cc.B.rArm, cc.B.rFore, v3([-.15, -.8, .5])); aim(cc.root, cc.B.rFore, cc.B.rHand, v3([.8, .15, .5])); aim(cc.root, cc.B.lArm, cc.B.lFore, v3([.15, -.8, .5])); aim(cc.root, cc.B.lFore, cc.B.lHand, v3([-.8, .15, .5])); }; } });
+  specCam = { loc: 'sansinh', keep: true, pos: new THREE.Vector3(.4, 1.2, 1.7), look: new THREE.Vector3(2.3, .5, -.4), until: Date.now() + 20000 };
+}
+function sinhCheer(S) {
+  const w = world; if (!w) return; const ht = w.npcs.find(n => n.talk === 'sinhHT');
+  if (ht?.c) { ht.c.pose = null; ht.c.play('dung_cho'); ht.c.root.position.y = 0; ht.c.root.position.z += .35; if (ht.label) bubble(ht.label, S.sex === 'trai' ? 'Ha ha ha! Trẫm có thêm hoàng tử! Truyền chỉ: ban thưởng cho cả cung!' : 'Công chúa đáng yêu quá! Truyền chỉ: ban thưởng cho cả cung!'); }
+  for (const n of w.npcs) if (n.talk === 'sinhFei' && n.label) setTimeout(() => bubble(n.label, SINH_CHEER[n.tinh] || 'Chúc mừng!'), 600 + Math.random() * 2000);
+  const g = w.gate; for (let i = 0; i < 4; i++) setTimeout(() => world === w && burst(g.x + (Math.random() - .5) * 3, 2.6 + Math.random(), g.z + 1, 80, 1.6, [0xffd77a, 0xff6a6a, 0xffffff], 1.8, .6, .06), i * 450);
+  const mine = sinhMine();
+  setTimeout(() => showScroll(mine ? 'Mẹ tròn con vuông' : 'Hỷ sự hậu cung', mine
+    ? `Bổn cung hạ sinh <b>${S.sex === 'trai' ? 'tiểu hoàng tử' : 'tiểu công chúa'} ${esc(S.child)}</b>.${S.hard ? (S.sam ? `<br>Khó sinh nhưng nhờ nhân sâm của ${esc(S.sam)} mà mẹ con bình an.` : '<br>Ca sinh khó khăn, nương nương mất nhiều sức.') : ''}<br><br>Hoàng thượng vui mừng ban thưởng sủng ái, bạc và công trạng.${S.sex === 'trai' ? '<br><b>Hoàng tử là phúc lớn của hoàng gia: phần thưởng nhiều hơn công chúa, con trai đầu lòng được tấn phong một bậc.</b>' : ''}${me.rank < 5 ? '<br><i>Theo tổ chế, bé được đưa tới A ca sở cho nhũ mẫu nuôi.</i>' : '<br>Bé đã nằm trong nôi ở cung riêng.'}`
+    : `<b>${esc(S.name)}</b> hạ sinh <b>${S.sex === 'trai' ? 'hoàng tử' : 'công chúa'} ${esc(S.child)}</b>. Hoàng thượng vui mừng ban lộc cho mọi người có mặt chờ tin.`, [[mine ? 'Bế con về cung' : 'Chúc mừng', hideCut]]), 3500);
+}
+// mini-game của người mẹ: thở theo nhịp bà đỡ
+socket.on('sinhTho', () => {
+  setTimeout(async () => {
+    await say('mama', 'Bà đỡ', 'Nương nương, đã tới lúc rồi! Nghe lão nô đếm: hít vào khi vòng tròn lớn nhất, thở ra khi nhỏ nhất. Giữ hơi thở đều thì mẹ con bình an.', [['Bổn cung sẵn sàng', 0, 'gold']]); dlgClose();
+    if (mgOn) mgClose();
+    let t = 0, raf, taps = 0, good = 0; const N = 6;
+    mgOpen(`<div class="mgt">🫁 Thở theo nhịp bà đỡ: bấm đúng lúc vòng tròn <b id="thW">lớn nhất</b> (${N} lần)</div><div style="height:150px;display:flex;align-items:center;justify-content:center"><div id="thO" style="width:130px;height:130px;border-radius:50%;border:3px dashed #e2bf6b;display:flex;align-items:center;justify-content:center"><div id="thC" style="width:40px;height:40px;border-radius:50%;background:#f2a6b8"></div></div></div><div class="mgs">Đúng nhịp <b id="mgT">0</b>/${N}</div>`);
+    const C = $('thC'), O = $('thO'); let want = 1;
+    const loop = () => { t += .016 * (1 + taps * .08); const k = (Math.sin(t * 2.2) + 1) / 2; const sz = 30 + k * 100; C.style.width = C.style.height = sz + 'px'; C.dataset.k = k; raf = requestAnimationFrame(loop); };
+    const tap = () => { const k = +C.dataset.k; const ok = want ? k > .85 : k < .15; taps++; if (ok) good++; O.style.borderColor = ok ? '#7ed37e' : '#e06060'; setTimeout(() => O.style.borderColor = '#e2bf6b', 220); $('mgT').textContent = good; want = 1 - want; $('thW').textContent = want ? 'lớn nhất' : 'nhỏ nhất';
+      if (taps >= N) { cancelAnimationFrame(raf); removeEventListener('keydown', key); O.onpointerdown = null; setTimeout(() => { mgClose(); socket.emit('sinhAct', { op: 'tho', q: good / N }); toast('Bổn cung gắng sức… cả cung đang chờ tin bên ngoài.'); }, 600); } };
+    const key = e => { if (e.code === 'Space') { e.preventDefault(); tap(); } }; addEventListener('keydown', key); O.onpointerdown = tap; mgEl.onpointerdown = e => { if (e.target === mgEl) tap(); }; raf = requestAnimationFrame(loop);
+  }, 2500);
+});
+
+// =====================================================================
+// LỄ TẨY TAM và TRẢO CHU ở cung riêng
+// =====================================================================
+let leSt = null, leObj = null;
+socket.on('le', d => { const prev = leSt; leSt = d; if (!me) return; renderMap(); if (world) { renderActs(); leSync(prev); } });
+const leHere = () => leSt && world?.loc === 'phong' && ((me.id === leSt.host && !me.visit) || me.visit === leSt.host);
+const TAYTAM_OPT = [['trung', '🥚 Trứng nhuộm đỏ', 'bé khỏe mạnh'], ['hanh', '🌱 Hành lá', 'bé thông minh'], ['tien', '🪙 Đồng tiền vàng', 'phúc lộc'], ['ngai', '🌿 Ngải cứu', 'bé bình an'], ['que', '🌸 Hoa quế', 'đỗ đạt hiển vinh']];
+const TC_ITEMS = [['sach', '📖 Sách'], ['kiem', '🗡 Kiếm gỗ'], ['dan', '🎵 Cây đàn'], ['an', '💮 Ấn ngọc'], ['bantinh', '🧮 Bàn tính'], ['son', '💄 Hộp son']];
+function leActs(add) {
+  if (!leSt) { if (world.loc === 'phong' && !me.visit) for (const k of me.children || []) { if (k.ward) continue;
+      if (k.stage === 'so' && !k.taytam) add(`🛁 Làm lễ tẩy tam cho ${k.name}`, 'Mời cả cung tới thả lễ vào chậu chúc phúc · 10 phút', () => socket.emit('le', { op: 'start', kind: 'taytam', cid: k.id }));
+      if (k.stage === 'chap' && !k.traochu) add(`🎎 Làm lễ trảo chu cho ${k.name}`, 'Bày đồ cho bé bốc, đoán tương lai · món bé bốc thành năng khiếu', () => socket.emit('le', { op: 'start', kind: 'traochu', cid: k.id })); } return; }
+  if (leHere() && leSt.kind === 'taytam' && me.id !== leSt.host) add('🛁 Thả lễ vào chậu chúc phúc', `10 bạc · ${leSt.gifts.length} người đã thả lễ`, async () => { const i = await say('mama', 'Ma ma', 'Nương nương muốn thả gì vào chậu chúc phúc cho bé?', TAYTAM_OPT.map(([k, t, w]) => [`${t} · ${w}`, k, ''])); dlgClose(); socket.emit('le', { op: 'gift', item: i }); });
+  if (!leHere() && leSt.host !== me.id) add(leSt.kind === 'taytam' ? `🛁 Dự lễ tẩy tam ở cung ${leSt.hostName}` : `🎎 Xem lễ trảo chu ở cung ${leSt.hostName}`, `Bé ${leSt.child} · còn ${vuaLeft(leSt.end)}`, () => socket.emit('le', { op: 'join' }));
+}
+function leItemMesh(k) {
+  const g = new THREE.Group(), M = c => new THREE.MeshStandardMaterial({ color: c, roughness: .6 });
+  const B = (w, h, d, c, x = 0, y = 0, z = 0) => { const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), M(c)); m.position.set(x, y, z); g.add(m); return m; };
+  if (k === 'sach') { B(.11, .025, .08, 0x2b4a7a, 0, .013); B(.1, .02, .075, 0xf2e6c8, 0, .03); }
+  else if (k === 'kiem') { B(.018, .012, .2, 0xb08a5a, 0, .01, -.02); B(.06, .015, .015, 0xd9a845, 0, .012, .08); B(.016, .014, .05, 0x5a2a12, 0, .012, .11); }
+  else if (k === 'dan') { B(.22, .025, .07, 0x7a3a1a, 0, .013); for (let i = 0; i < 4; i++) B(.2, .003, .003, 0xf2f2f2, 0, .028, -.024 + i * .016); }
+  else if (k === 'an') { B(.06, .05, .06, 0x5fae8a, 0, .025); const kn = new THREE.Mesh(new THREE.SphereGeometry(.022, 10, 8), M(0x7fd0a8)); kn.position.y = .062; g.add(kn); }
+  else if (k === 'bantinh') { B(.15, .015, .09, 0x5a2a12, 0, .008); for (let r = 0; r < 3; r++) for (let c = 0; c < 5; c++) { const b = new THREE.Mesh(new THREE.SphereGeometry(.009, 6, 4), M(0x1a1a1a)); b.position.set(-.05 + c * .025, .02, -.025 + r * .025); g.add(b); } }
+  else if (k === 'son') { const c = new THREE.Mesh(new THREE.CylinderGeometry(.03, .03, .025, 14), M(0xc23b3b)); c.position.y = .013; g.add(c); const l = new THREE.Mesh(new THREE.CylinderGeometry(.031, .031, .008, 14), M(0xd9a845)); l.position.y = .03; g.add(l); }
+  g.traverse(o => { if (o.isMesh) o.castShadow = true; }); return g;
+}
+function leSync(prev) {
+  const here = leHere();
+  if (leObj && (!here || leObj.w !== world || leObj.kind !== leSt?.kind)) { leObj.g.parent?.remove(leObj.g); leObj = null; if (kidLesson?.le) kidLesson = null; }
+  if (!here) return;
+  const W = world.roomSize?.W || 5, D = world.roomSize?.D || 4.6;
+  if (!leObj) { const g = new THREE.Group(); world.group.add(g); leObj = { g, w: world, kind: leSt.kind, items: {} };
+    if (leSt.kind === 'taytam') { g.position.set(-W / 2 + 1.55, 0, -D / 2 + 1.15); const wood = new THREE.MeshStandardMaterial({ color: 0x8a5a2a, roughness: .5 });
+      const tub = new THREE.Mesh(new THREE.CylinderGeometry(.24, .19, .2, 24, 1, true), wood); tub.position.y = .1; tub.material.side = THREE.DoubleSide; g.add(tub); const bot = new THREE.Mesh(new THREE.CircleGeometry(.19, 24), wood); bot.rotation.x = -Math.PI / 2; bot.position.y = .01; g.add(bot);
+      for (const y of [.04, .17]) { const r = new THREE.Mesh(new THREE.TorusGeometry(.225 - y * .2, .008, 6, 28), new THREE.MeshStandardMaterial({ color: 0xd9a845, metalness: .6 })); r.rotation.x = Math.PI / 2; r.position.y = y; g.add(r); }
+      const water = new THREE.Mesh(new THREE.CircleGeometry(.225, 24), new THREE.MeshStandardMaterial({ color: 0x9fd4e0, roughness: .1, metalness: .2, transparent: true, opacity: .85 })); water.rotation.x = -Math.PI / 2; water.position.y = .16; g.add(water);
+      const stool = new THREE.Mesh(new THREE.CylinderGeometry(.12, .12, .1, 14), new THREE.MeshStandardMaterial({ color: 0xc23b3b })); stool.position.set(.45, .05, 0); g.add(stool); leObj.water = water; }
+    else { g.position.set(0, 0, D / 2 - 1.15); const rug = new THREE.Mesh(new THREE.CircleGeometry(.5, 32), new THREE.MeshStandardMaterial({ color: 0xc23b3b, roughness: .9 })); rug.rotation.x = -Math.PI / 2; rug.position.y = .006; g.add(rug); const rim = new THREE.Mesh(new THREE.RingGeometry(.47, .5, 32), new THREE.MeshStandardMaterial({ color: 0xd9a845 })); rim.rotation.x = -Math.PI / 2; rim.position.y = .008; g.add(rim);
+      TC_ITEMS.forEach(([k], i) => { const a = i / TC_ITEMS.length * Math.PI * 2, m = leItemMesh(k); m.position.set(Math.cos(a) * .33, .01, Math.sin(a) * .33); m.rotation.y = -a; g.add(m); leObj.items[k] = m; });
+      kidLesson = { cid: leSt.cid, le: true, pos: { x: g.position.x, z: g.position.z + .1, ry: Math.PI } }; } }
+  if (leSt.kind === 'taytam') { const n = leSt.gifts.length; while ((leObj.g.userData.n || 0) < n) { const k = leObj.g.userData.n = (leObj.g.userData.n || 0) + 1; const it = leItemMesh(['an', 'son', 'sach'][k % 3]); it.scale.setScalar(.6); it.position.set((Math.random() - .5) * .25, .155, (Math.random() - .5) * .25); leObj.g.add(it); const p = leObj.g.position; burst(p.x, .3, p.z, 25, .5, [0x9fd4e0, 0xffffff, 0xffd77a], .8, .5, .03); } }
+  if (leSt.kind === 'traochu' && leSt.pick && !prev?.pick) {
+    const it = leObj.items[leSt.pick], wp = new THREE.Vector3(); it.getWorldPosition(wp); kidLesson = { cid: leSt.cid, le: true, pos: { x: wp.x, z: wp.z + .14, ry: Math.PI } };
+    const nm = TC_ITEMS.find(x => x[0] === leSt.pick)[1]; let t = 0;
+    FX.push(dt => { if (!leObj || leObj.items[leSt?.pick] !== it) return false; t += dt; if (t > 2.6 && t < 3.6) it.position.y = .01 + (t - 2.6) * .35; if (t > 3.6 && !it.userData.done) { it.userData.done = true; const p = new THREE.Vector3(); it.getWorldPosition(p); burst(p.x, p.y + .1, p.z, 60, .9, [0xffd77a, 0xff8fa8, 0xffffff], 1.4, .4, .045);
+        showScroll('Lễ trảo chu', `<b>${esc(leSt.child)}</b> lẫm chẫm bước tới, bốc lấy <b>${nm}</b>!<br><br>${leSt.pick === 'an' ? 'Điềm đại quý! Cả cung xôn xao, ngày sau ắt làm nên nghiệp lớn.' : 'Từ nay đó là năng khiếu của bé: học môn này tiến bộ nhanh hơn.'}`, [['Chúc mừng', hideCut]]); } });
+  }
+}

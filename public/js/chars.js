@@ -25,10 +25,12 @@ export function loadModel(name) {
   });
   return cache[name];
 }
+let GRACE = null; // dáng đi yểu điệu: phi tần (người chơi), công chúa, Thái hậu; cung nữ và ma ma giữ dáng đi cũ
+const OLD_WALK = new Set(['cungnu', 'mama']);
 export async function ready() {
   await Promise.all([loadModel('thuongtai'), loadModel('hoangthuong')]);
   // dáng đi yểu điệu (lấy từ model phi tần mang thai) dùng cho mọi nhân vật nữ
-  try { const w = (await loadModel('phi_bau')).animations.find(a => a.name === 'di'); if (w) { const i = FEMALE.findIndex(a => a.name === 'di'); if (i >= 0) FEMALE[i] = w; else FEMALE.push(w); } } catch {}
+  try { GRACE = (await loadModel('phi_bau')).animations.find(a => a.name === 'di') || null; } catch {}
 }
 
 const MAPB = { Hips: 'hips', Spine: 'spine', Spine1: 'spine1', Spine2: 'spine2', Head: 'head', LeftArm: 'lArm', LeftForeArm: 'lFore', LeftHand: 'lHand', RightArm: 'rArm', RightForeArm: 'rFore', RightHand: 'rHand', LeftLeg: 'kneeL', RightLeg: 'kneeR', LeftShoulder: 'lSh', RightShoulder: 'rSh', Neck: 'neck', LeftUpLeg: 'hipL', RightUpLeg: 'hipR', LeftFoot: 'footL', RightFoot: 'footR' };
@@ -89,6 +91,7 @@ export async function spawn(modelName) {
   if (male) for (const clip of MALE) actions[clip.name] = mixer.clipAction(clip);
   for (const clip of g.animations || []) if (!actions[clip.name] || male) actions[clip.name] = mixer.clipAction(clip);
   if (isHT) for (const g2 of HT_G) if (!actions[g2.name]) actions[g2.name] = mixer.clipAction(g2);
+  const oldWalk = OLD_WALK.has(modelName); if (!male && !oldWalk && GRACE) actions.di = mixer.clipAction(GRACE);
   if (KIDC) for (const k of KIDC) actions[k.name] = mixer.clipAction(k);
   if (isHT && HT_IDLE) { actions.khoanh_tay = mixer.clipAction(HT_IDLE); actions.dung_cho = actions.khoanh_tay; }
   const idle = actions.dung_cho; idle.play(); mixer.update(0); root.updateMatrixWorld(true);
@@ -103,13 +106,19 @@ export async function spawn(modelName) {
     if (c.cur === a && !opts.restart) return;
     const once = ['nga', 'quy', 'hanh_le', 'cui_chao'].includes(name);
     a.reset(); a.setLoop(once ? THREE.LoopOnce : THREE.LoopRepeat); a.clampWhenFinished = once;
-    a.timeScale = name === 'di' ? (male ? 1.4 : 1.15) : 1;
+    a.timeScale = name === 'di' ? (male ? 1.4 : oldWalk ? 1.25 : 1.15) : 1;
     if (c.cur && c.cur !== a) a.crossFadeFrom(c.cur, 0.3, false);
     a.play(); c.cur = a; c.curName = name; c.sitFix = name === 'ngoi';
   };
   c.update = (dt) => {
     c.t += dt; mixer.update(dt);
-    // dáng đi nữ: giữ nguyên động tác gốc (trước đây bị ép cứng tay chân cho dáng đi cũ)
+    if (c.curName === 'di' && oldWalk) for (const [bone, q] of idlePose) { // dáng đi cũ của cung nữ, ma ma
+      const n = bone.name;
+      if (/(Shoulder|Arm|ForeArm|Hand)$/.test(n)) bone.quaternion.slerp(q, .85);
+      else if (/UpLeg$/.test(n)) bone.quaternion.slerp(q, .45);
+      else if (/Leg$/.test(n)) bone.quaternion.slerp(q, .35);
+      else if (/Spine|Neck|Head$/.test(n)) bone.quaternion.slerp(q, .6);
+    }
     if (c.sitFix) {
       for (const [bone, q] of idlePose) if (/(Spine|Spine1|Spine2|Neck|Head)$/.test(bone.name)) bone.quaternion.slerp(q, .85);
       root.updateMatrixWorld(true);

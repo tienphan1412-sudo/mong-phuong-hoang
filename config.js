@@ -119,6 +119,8 @@ module.exports = {
     { id: 'honghoa', name: 'Hồng hoa trộn trong thuốc an thai', crime: 'mưu hại long thai' },
     { id: 'xahuong2', name: 'Gối thêu nhồi xạ hương', crime: 'mưu hại long thai' },
   ],
+  LE: { TAYTAM_MIN: 10, TRAOCHU_SEC: 75, GIFT: 10 },
+  SINH: { CHO_MIN: 4, KHO_MIN: 2, BAO_SEC: 75, LOC: 20, GIFT: 20, SAB: 80, SAM: 60 }, // sự kiện chuyển dạ
   CHILD: { BABY_D: 3, TODDLER_D: 7, CRY_MIN: [40, 50], CRY_PATIENCE: 15, NHUMAU: 15, THAIY: 20, WARD_RANK: 5, THAITU_MIN: 60, THAITU_LEAD: 20 }, // ngày thật
   CHILD_NAMES: { trai: ['Vĩnh Kỳ', 'Vĩnh Hoằng', 'Vĩnh Diễm', 'Vĩnh Thành', 'Vĩnh Tinh', 'Vĩnh Lân'], gai: ['Hòa Kính', 'Hòa Gia', 'Cố Luân', 'Hòa Thạc', 'Minh Châu', 'Ngọc Dung'] },
   DET_CASES: [

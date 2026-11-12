@@ -128,7 +128,7 @@ function allowedOutfits(p) {
   return [...s];
 }
 function publicView(p) {
-  return { id: p.id, name: p.name, rank: p.rank, rankName: rankName(p), outfit: p.outfit, loc: p.loc, x: p.x, z: p.z, ry: p.ry, anim: p.anim || 'dung_cho', male: false, tt: achName(p.titleSel, p), thai: !!p.thai?.known, kid: kidPub(p) };
+  return { id: p.id, name: p.name, rank: p.rank, rankName: rankName(p), outfit: p.outfit, loc: p.loc, x: p.x, z: p.z, ry: p.ry, anim: p.anim || 'dung_cho', male: false, tt: achName(p.titleSel, p), thai: !!p.thai?.known, kid: kidPub(p), hidden: DB.state.sinh?.id === p.id && p.loc === 'sansinh' };
 }
 function selfView(p) {
   const open = Object.values(DB.state.cases).filter(c => c.victim === p.id && c.status === 'open').map(c => caseView(c, p));
@@ -320,25 +320,26 @@ function sayThai(p, why) {
   const s = sockOf(p.id); if (s) s.emit('cutscene', { type: 'saythai', name: p.name, why: why || '' });
   push(p); save();
 }
-function birth(p) {
-  if (!p.thai) return; const care = p.thai.care || 0; p.thai = null; p.bornAt = now();
+function birth(p, opt = {}) {
+  if (!p.thai) return {}; const care = p.thai.care || 0; p.thai = null; p.bornAt = now();
   const sex = Math.random() < .5 ? 'trai' : 'gai', name = pick(C.CHILD_NAMES[sex]);
-  p.children = p.children || []; const ward = p.rank < C.CHILD.WARD_RANK; p.children.push({ sex, name, born: now(), ward }); kidFix(p);
+  p.children = p.children || []; const firstSon = sex === 'trai' && !p.children.some(c => c.sex === 'trai'); const ward = p.rank < C.CHILD.WARD_RANK; p.children.push({ sex, name, born: now(), ward }); kidFix(p);
   if (ward) setTimeout(() => news(`🏯 Theo tổ chế, phi tần dưới bậc ${C.RANKS[C.CHILD.WARD_RANK].name} không được tự nuôi con: ${sex === 'trai' ? 'hoàng tử' : 'công chúa'} ${name} được đưa tới A ca sở. ${p.name} lên tới ${C.RANKS[C.CHILD.WARD_RANK].name} sẽ được đón con về.`, 'phong'), 3000);
-  const hard = care < 2, k = hard ? .5 : 1;
-  p.sung += Math.round(30 * k); p.silver += Math.round(200 * k); p.haiLong = Math.min(100, p.haiLong + 15);
+  const hard = opt.hard ?? care < 2, k = hard ? .5 : 1;
+  p.sung += Math.round((sex === 'trai' ? 30 : 20) * k); p.silver += Math.round(200 * k); p.haiLong = Math.min(100, p.haiLong + 15);
   const next = C.RANKS[p.rank + 1];
   news(`👶 ${title(p)} ${hard ? 'khó sinh suốt một đêm, cuối cùng ' : ''}hạ sinh ${sex === 'trai' ? 'hoàng tử' : 'công chúa'}, Hoàng thượng ban tên ${name}. ${sex === 'trai' ? 'Hoàng gia có thêm người nối dõi!' : 'Hoàng thượng yêu thương như ngọc.'}`, 'phong');
   notify(p, '👶 Hạ sinh hoàng tự!', `Bổn cung hạ sinh ${sex === 'trai' ? 'hoàng tử' : 'công chúa'} ${name}.`, 'sinh');
-  const s = sockOf(p.id); if (s) s.emit('cutscene', { type: 'sinhcon', name: p.name, sex, child: name, hard, ward }); setTimeout(() => kidEmit(p), 500);
-  if (next) p.pts = Math.max(p.pts + Math.round(80 * k), hard ? p.pts : next.pts);
-  tryPromote(p); push(p); save();
+  const s = sockOf(p.id); if (s && !opt.event) s.emit('cutscene', { type: 'sinhcon', name: p.name, sex, child: name, hard, ward }); setTimeout(() => kidEmit(p), 500);
+  // mẫu bằng tử quý: chỉ con trai đầu lòng mới được tấn phong lên một bậc
+  const r0 = p.rank; p.pts += Math.round((sex === 'trai' ? 80 : 50) * k); if (next && firstSon) p.pts = Math.max(p.pts, next.pts);
+  tryPromote(p); push(p); save(); return { sex, name, hard, promoted: p.rank > r0 };
 }
 function thaiTick() {
   for (const p of Object.values(DB.players)) {
     if (!p.thai) continue;
     if (!p.thai.known && now() - p.thai.since > 24 * 3600e3) revealThai(p, 'nghen');
-    else if (p.thai.known && now() >= p.thai.due && !Object.values(DB.state.cases).some(c => c.victim === p.id && c.status === 'open')) birth(p);
+    else if (p.thai.known && now() >= p.thai.due && !Object.values(DB.state.cases).some(c => c.victim === p.id && c.status === 'open')) { if (DB.state.sinh?.id === p.id) continue; if (online.has(p.id) && p.loc !== 'tamcung' && sinhStart(p)) continue; if (now() - p.thai.due > 12 * 3600e3) birth(p); }
   }
 }
 
@@ -961,6 +962,89 @@ function coEnd(X, G) {
   for (const [q, w] of [[W, 1], [L, 0]]) { q.coDay = q.coDay?.d === dayKey() ? q.coDay : { d: dayKey(), n: 0 }; if (q.coDay.n < 5) { q.coDay.n++; addPts(q, w ? 10 : 4); if (w) q.sung += 2; } cnt(q, 'co'); if (w) cnt(q, 'coWin'); push(q); }
   if (X.g.moves > 30) news(`⚫⚪ ${W.name} thắng ${L.name} một ván cờ vây.`); save();
 }
+// ---------- LỄ TẨY TAM (tắm 3 ngày) và TRẢO CHU (bốc đồ đoán tương lai) ----------
+const TAYTAM_ITEM = { trung: ['🥚 Trứng nhuộm đỏ', 'chúc bé khỏe mạnh', c => c.hp = Math.min(100, c.hp + 5)], hanh: ['🌱 Hành lá', 'chúc bé thông minh', c => c.van += 2], tien: ['🪙 Đồng tiền vàng', 'chúc bé phúc lộc đầy nhà', null], ngai: ['🌿 Ngải cứu', 'chúc bé bình an', c => c.ngoan = Math.min(100, c.ngoan + 3)], que: ['🌸 Hoa quế', 'chúc bé đỗ đạt hiển vinh', c => c.duc += 2] };
+const TRAOCHU = [['sach', '📖 Sách', 'van', 'Bé bốc quyển sách: ngày sau văn chương lỗi lạc!'], ['kiem', '🗡 Kiếm gỗ', 'vo', 'Bé cầm thanh kiếm: ngày sau võ nghệ hơn người!'], ['dan', '🎵 Cây đàn', 'nghe', 'Bé ôm cây đàn: ngày sau cầm kỳ thi họa tinh thông!'], ['an', '💮 Ấn ngọc', null, 'Bé nắm chặt ấn ngọc! Điềm đại quý, cả cung xôn xao!'], ['bantinh', '🧮 Bàn tính', null, 'Bé lắc lắc bàn tính: ngày sau giỏi tính toán, của cải đầy kho!'], ['son', '💄 Hộp son', 'duc', 'Bé mở hộp son: ngày sau dung mạo đoan trang, hiền thục!']];
+function lePub() { const L = DB.state.le; if (!L) return null; return { kind: L.kind, host: L.host, hostName: L.hostName, cid: L.cid, child: L.child, sex: L.sex, end: L.end, gifts: L.gifts.map(g => ({ name: g.name, item: g.item })), pick: L.pick || null }; }
+function leEmit() { io.emit('le', lePub()); }
+function leTick() {
+  const L = DB.state.le; if (!L || now() < L.end) return; const h = P(L.host), c = h && kidOf(h, L.cid);
+  if (L.kind === 'taytam') { DB.state.le = null; if (h && c) { addPts(h, 5 + 3 * L.gifts.length); news(`🛁 Lễ tẩy tam của ${kidTitle(c)} kết thúc, ${L.gifts.length} người tới thả lễ vào chậu chúc phúc.`); push(h); kidEmit(h); } leEmit(); save(); return; }
+  if (L.kind === 'traochu' && !L.pick) {
+    const k = Math.random() < .12 ? 3 : [0, 1, 2, 4, 5][rnd(5)]; const it = TRAOCHU[k]; L.pick = it[0]; L.end = now() + 25e3;
+    if (h && c) { c.talent = it[0]; c.traochu = true; if (it[2]) c[it[2]] += 8; if (it[0] === 'an') c.an = true; if (it[0] === 'bantinh') h.silver += 100;
+      news(`🎎 Lễ trảo chu của ${kidTitle(c)}: ${it[3]}`, it[0] === 'an' ? 'phong' : undefined); push(h); kidEmit(h); }
+    leEmit(); save(); return;
+  }
+  DB.state.le = null; leEmit();
+}
+function leSock(sock, getMe) {
+  sock.emit('le', lePub());
+  sock.on('le', d => {
+    const me = getMe(); if (!me || !d) return; const L = DB.state.le;
+    if (d.op === 'start') {
+      if (L) return toast(me, 'Trong cung đang có lễ khác, đợi xong đã.'); if (me.loc !== 'phong' || me.visit) return toast(me, 'Về cung riêng mới làm lễ được.');
+      const c = kidOf(me, String(d.cid || '')); if (!c || c.ward) return; const st = kidStage(c);
+      if (d.kind === 'taytam') { if (st !== 'so' || c.taytam) return toast(me, 'Lễ tẩy tam chỉ làm một lần khi bé còn sơ sinh.'); c.taytam = true; DB.state.le = { kind: 'taytam', host: me.id, hostName: me.name, cid: c.id, child: c.name, sex: c.sex, end: now() + C.LE.TAYTAM_MIN * 60e3, gifts: [] }; news(`🛁 ${title(me)} làm lễ tẩy tam cho ${kidTitle(c)}. Mời các tỷ muội tới cung thả lễ chúc phúc!`, 'phong'); }
+      else if (d.kind === 'traochu') { if (st !== 'chap' || c.traochu) return toast(me, 'Lễ trảo chu làm một lần lúc bé chập chững.'); DB.state.le = { kind: 'traochu', host: me.id, hostName: me.name, cid: c.id, child: c.name, sex: c.sex, end: now() + C.LE.TRAOCHU_SEC * 1000, gifts: [] }; news(`🎎 ${title(me)} bày lễ trảo chu cho ${kidTitle(c)}. Mời cả cung tới xem bé bốc đồ đoán tương lai!`, 'phong'); }
+      else return;
+      for (const q of Object.values(DB.players)) if (q.id !== me.id && !q.lanh && online.has(q.id)) notify(q, DB.state.le.kind === 'taytam' ? '🛁 Mời dự lễ tẩy tam' : '🎎 Mời xem lễ trảo chu', `Tới cung ${me.name}.`, 'le');
+      leEmit(); save(); return;
+    }
+    if (!L) return;
+    if (d.op === 'join') { if (me.id === L.host) return; const h = P(L.host); if (!h) return; me.visit = h.id; enter(me, 'phong', sock); push(me); return; }
+    if (d.op === 'gift' && L.kind === 'taytam') { if (me.id === L.host || me.visit !== L.host || me.loc !== 'phong') return; if (L.gifts.some(g => g.id === me.id)) return toast(me, 'Đã thả lễ rồi.'); const it = TAYTAM_ITEM[d.item]; if (!it) return; if (me.silver < C.LE.GIFT) return toast(me, `Cần ${C.LE.GIFT} bạc.`, 'bad');
+      me.silver -= C.LE.GIFT; L.gifts.push({ id: me.id, name: me.name, item: d.item }); addPts(me, 4); const h = P(L.host), c = h && kidOf(h, L.cid); if (c && it[2]) it[2](c); if (h && d.item === 'tien') { h.silver += 15; push(h); }
+      io.to(roomOf(me)).emit('chat', { id: null, name: '🛁', text: `${me.name} thả ${it[0]} vào chậu, ${it[1]}.` }); toast(me, 'Đã thả lễ chúc phúc.', 'good'); push(me); if (h) kidEmit(h); leEmit(); return; }
+  });
+}
+// ---------- CHUYỂN DẠ: cả cung chờ tin ở sân cung người mẹ ----------
+const SINH_LINES = { kieu: ['Hừ, sinh con thôi mà làm rùm beng cả hậu cung.', 'Để xem là hoàng tử hay công chúa đã.'], xao: ['Bổn cung chúc mừng muội muội trước nhé, ha ha.', 'Mong mẹ tròn con vuông…'], hien: ['A di đà Phật, mong muội ấy bình an.', 'Bổn cung đã chép kinh cầu phúc cho muội ấy.'], danh: ['Đứng chờ lâu mỏi cả chân.', 'Nhanh lên chứ.'], ninh: ['Hoàng thượng đừng lo, muội ấy phúc lớn mạng lớn.', 'Thần thiếp đã sai người hầm canh sâm sẵn.'], nhut: ['Thần thiếp… thần thiếp hồi hộp quá.', 'Có cần thần thiếp giúp gì không ạ?'] };
+function sinhPub() { const S = DB.state.sinh; if (!S) return null; return { id: S.id, name: S.name, cung: S.cung, phase: S.phase, until: S.until, pray: S.pray.length, gifts: S.gifts.length, prayed: S.pray, gave: S.gifts, sam: S.sam ? P(S.sam)?.name : null, sex: S.sex || null, child: S.child || null, hard: !!S.hard, fei: S.fei }; }
+function sinhEmit() { io.emit('sinh', sinhPub()); }
+function sinhStart(p) {
+  const s = sockOf(p.id); if (!s || DB.state.sinh) return false;
+  const fei = NPCF().filter(n => n.rank >= 3).sort((a, b) => b.rank - a.rank).slice(0, 3).map(n => ({ name: n.name, model: n.model, tinh: n.tinh }));
+  DB.state.sinh = { id: p.id, name: p.name, cung: (p.rank >= C.PALACE_RANK ? 'Cung ' : 'Phòng ') + p.name, start: now(), phase: 'cho', until: now() + C.SINH.CHO_MIN * 60e3, pray: [], gifts: [], sab: [], q: null, sam: null, fei };
+  news(`🏮 ${title(p)} chuyển dạ! Hoàng thượng đã tới sân cung chờ tin. Các phi tần mau tới cầu phúc.`, 'phong');
+  for (const q of Object.values(DB.players)) if (q.id !== p.id && !q.lanh) notify(q, `🏮 ${p.name} chuyển dạ`, 'Tới sân cung chờ tin cùng Hoàng thượng.', 'sinh');
+  enter(p, 'sansinh', s); sinhEmit(); s.emit('sinhTho'); save(); return true;
+}
+function sinhTick() {
+  const S = DB.state.sinh; if (!S) return; const p = P(S.id); if (!p) { DB.state.sinh = null; return sinhEmit(); }
+  if (now() < S.until) return;
+  if (S.phase === 'cho') {
+    const care = p.thai?.care || 0, q = S.q ?? .6, sabs = S.sab.filter(x => !x.caught).length;
+    const hp = Math.max(.05, Math.min(.95, (q < .45 ? .6 : .15) + (care < 2 ? .25 : 0) + .35 * sabs - .08 * S.pray.length));
+    S.hard = Math.random() < hp;
+    if (S.hard) { S.phase = 'kho'; S.until = now() + C.SINH.KHO_MIN * 60e3; news(`⚠️ Thái y quỳ trước Hoàng thượng: ${S.name} khó sinh, cần gấp nhân sâm ngàn năm!`, 'phong'); return sinhEmit(); }
+    S.phase = 'bao';
+  } else if (S.phase === 'kho') S.phase = 'bao';
+  else if (S.phase === 'bao' && !S.sex) {
+    const r = birth(p, { hard: S.hard && !S.sam, event: true }); S.sex = r.sex; S.child = r.name; S.promoted = r.promoted; S.until = now() + C.SINH.BAO_SEC * 1000;
+    const here = Object.values(DB.players).filter(q => q.loc === 'sansinh' && online.has(q.id) && q.id !== p.id);
+    for (const q of here) { q.silver += C.SINH.LOC; addPts(q, 3); toast(q, `Hoàng thượng vui mừng ban lộc cho người có mặt chờ tin: +${C.SINH.LOC} bạc.`, 'good'); push(q); }
+    if (S.sam) { const g = P(S.sam); if (g) { htGain(g, 10); addPts(g, 15); relAdd(g, 'thaiy', 4, 'dâng nhân sâm cứu người'); news(`🌿 Nhờ nhân sâm của ${g.name}, ${S.name} mẹ tròn con vuông. Hoàng thượng ghi nhận công lao.`); push(g); } }
+    sinhEmit(); return;
+  } else { DB.state.sinh = null; sinhEmit(); const s = sockOf(p.id); if (s && p.loc === 'sansinh') { enter(p, 'phong', s); push(p); }
+    for (const q of Object.values(DB.players)) if (q.loc === 'sansinh') { const s2 = sockOf(q.id); if (s2) { enter(q, 'hoavien', s2); push(q); } } return; }
+  sinhEmit();
+}
+function sinhSock(sock, getMe) {
+  sock.emit('sinh', sinhPub());
+  sock.on('sinhAct', d => {
+    const me = getMe(), S = DB.state.sinh; if (!me || !S || !d) return;
+    if (d.op === 'tho') { if (me.id !== S.id || S.q != null) return; S.q = Math.max(0, Math.min(1, +d.q || 0)); toast(me, S.q >= .45 ? 'Bổn cung giữ được hơi thở đều, bà đỡ gật đầu yên tâm.' : 'Hơi thở rối loạn… bà đỡ lo lắng nhìn nhau.', S.q >= .45 ? 'good' : 'bad'); return; }
+    if (me.id === S.id || me.loc !== 'sansinh') return;
+    if (d.op === 'pray') { if (S.phase !== 'cho' || S.pray.includes(me.id)) return; S.pray.push(me.id); addPts(me, 4); relAdd(me, 'thaihau', 1, 'cầu phúc cho hoàng tự'); toast(me, 'Bổn cung thành tâm cầu phúc cho mẹ tròn con vuông.', 'good'); io.to('sansinh').emit('chat', { id: null, name: '🙏', text: `${me.name} quỳ xuống cầu phúc cho ${S.name}.` }); push(me); return sinhEmit(); }
+    if (d.op === 'gift') { if (S.gifts.includes(me.id)) return; if (me.silver < C.SINH.GIFT) return toast(me, `Cần ${C.SINH.GIFT} bạc.`, 'bad'); me.silver -= C.SINH.GIFT; S.gifts.push(me.id); const m = P(S.id); if (m) { m.silver += C.SINH.GIFT; push(m); } addPts(me, 5); toast(me, 'Đã gửi lễ mừng: khóa vàng trường mệnh và bộ áo nhỏ.', 'good'); push(me); return sinhEmit(); }
+    if (d.op === 'sab') { if (S.phase !== 'cho' || S.sab.some(x => x.id === me.id)) return; if (me.silver < C.SINH.SAB) return toast(me, `Cần ${C.SINH.SAB} bạc để mua chuộc bà đỡ.`, 'bad'); me.silver -= C.SINH.SAB;
+      const caught = Math.random() < .4; S.sab.push({ id: me.id, caught });
+      if (caught) { me.sung -= 15; me.pts = Math.max(0, me.pts - 30); me.haiLong = Math.max(0, me.haiLong - 10); news(`🚨 ${title(me)} lén mua chuộc bà đỡ trong lúc ${S.name} chuyển dạ, bị Thái hậu bắt quả tang! Sủng ái và công trạng bị trừ nặng.`, 'phat'); io.to('sansinh').emit('chat', { id: null, name: '👑 Thái hậu', text: `Người đâu! Giải ${me.name} ra ngoài cho ai gia!` }); toast(me, 'Bị bắt quả tang!', 'bad'); }
+      else toast(me, 'Bà đỡ nhận bạc, khẽ gật đầu… không ai hay biết.', 'info'); push(me); return; }
+    if (d.op === 'sam') { if (S.phase !== 'kho' || S.sam) return; if (me.silver < C.SINH.SAM) return toast(me, `Cần ${C.SINH.SAM} bạc để sai người lấy nhân sâm ngàn năm.`, 'bad'); me.silver -= C.SINH.SAM; S.sam = me.id; io.to('sansinh').emit('chat', { id: null, name: '🩺 Thái y', text: `Có nhân sâm của ${me.name} rồi! Mau sắc thuốc!` }); push(me); return sinhEmit(); }
+  });
+}
 // ---------- HOÀNG TỰ: sơ sinh → chập chững → đi học ----------
 const KID = () => C.CHILD;
 function kidFix(p) { (p.children || []).forEach((c, i) => { c.id = c.id || 'k' + (c.born || now()).toString(36) + i; c.hp ??= 80; c.ngoan ??= 50; c.van ??= 0; c.vo ??= 0; c.nghe ??= 0; c.duc ??= 0; c.ward ??= false; }); return p.children || []; }
@@ -968,7 +1052,7 @@ const kidAge = c => (now() - c.born) / 864e5;
 const kidStage = c => kidAge(c) < KID().BABY_D ? 'so' : kidAge(c) < KID().TODDLER_D ? 'chap' : 'hoc';
 const kidOf = (p, cid) => kidFix(p).find(c => c.id === cid);
 const kidTitle = c => (c.sex === 'trai' ? 'Hoàng tử ' : 'Công chúa ') + c.name;
-function kidScore(c) { return Math.round(c.van + c.vo + c.nghe + c.duc + c.ngoan / 4); }
+function kidScore(c) { return Math.round(c.van + c.vo + c.nghe + c.duc + c.ngoan / 4 + (c.an ? 15 : 0)); }
 function kidPub(p) {
   const o = {}; if (p.thai?.known) o.tp = Math.max(0, Math.min(1, 1 - (p.thai.due - now()) / (C.THAI_DAYS * 864e5)));
   const ks = p.children || [];
@@ -977,7 +1061,7 @@ function kidPub(p) {
   o.cry = ks.filter(c => c.cry).map(c => c.id);
   return o;
 }
-function kidView(p) { return kidFix(p).map(c => ({ id: c.id, sex: c.sex, name: c.name, born: c.born, stage: kidStage(c), age: +kidAge(c).toFixed(2), hp: c.hp, ngoan: c.ngoan, van: c.van, vo: c.vo, nghe: c.nghe, duc: c.duc, ward: !!c.ward, sick: !!c.sick, cry: c.cry ? c.cry.need : null, hoc: c.hocD === dayKey() ? c.hoc || {} : {}, tham: c.thamD === dayKey(), khao: c.khaoD === dayKey(), thaitu: DB.state.thaitu?.cid === c.id, coluan: c.sex === 'gai' && kidScore(c) >= KID().THAITU_MIN })); }
+function kidView(p) { return kidFix(p).map(c => ({ id: c.id, sex: c.sex, name: c.name, born: c.born, stage: kidStage(c), age: +kidAge(c).toFixed(2), hp: c.hp, ngoan: c.ngoan, van: c.van, vo: c.vo, nghe: c.nghe, duc: c.duc, ward: !!c.ward, sick: !!c.sick, cry: c.cry ? c.cry.need : null, hoc: c.hocD === dayKey() ? c.hoc || {} : {}, tham: c.thamD === dayKey(), khao: c.khaoD === dayKey(), taytam: !!c.taytam, traochu: !!c.traochu, talent: c.talent || null, thaitu: DB.state.thaitu?.cid === c.id, coluan: c.sex === 'gai' && kidScore(c) >= KID().THAITU_MIN })); }
 const kidTT = c => c.sex === 'trai' ? DB.state.thaitu?.cid === c.id : kidScore(c) >= KID().THAITU_MIN;
 function kidEmit(p) { const s = sockOf(p.id); const pub = kidPub(p); io.to(roomOf(p)).emit('pkid', { id: p.id, kid: pub }); if (s) s.emit('pkid', { id: p.id, kid: pub }); }
 // trẻ nhỏ đòi chăm: khóc ngẫu nhiên khi mẹ online
@@ -1054,7 +1138,7 @@ function kidSock(sock, getMe) {
       if (!c.ward && me.follow !== c.id) return toast(me, `Dắt ${c.name} theo tới Thượng thư phòng đã.`);
       if (c.hocD !== dayKey()) { c.hocD = dayKey(); c.hoc = {}; }
       if (d.op === 'hocStart') { if (c.hoc[mon]) return toast(me, 'Hôm nay đã học môn này rồi.'); c.hoc[mon] = 'on'; sock.emit('conHoc', { cid: c.id, mon, name: c.name, sex: c.sex }); return; }
-      if (c.hoc[mon] !== 'on') return; c.hoc[mon] = 1; const q = Math.max(0, Math.min(1, +d.q || 0)); const g = Math.round((2 + 8 * q) * (c.ward ? .7 : 1)); c[mon] += g; addPts(me, 4); cnt(me, 'conhoc');
+      if (c.hoc[mon] !== 'on') return; c.hoc[mon] = 1; const q = Math.max(0, Math.min(1, +d.q || 0)); const T0 = { sach: 'van', kiem: 'vo', dan: 'nghe', son: 'duc' }; const g = Math.round((2 + 8 * q) * (c.ward ? .7 : 1) * (T0[c.talent] === mon ? 1.3 : 1)); c[mon] += g; addPts(me, 4); cnt(me, 'conhoc');
       const T = { van: 'chữ nghĩa', vo: 'cung mã', nghe: 'đàn hát', duc: 'lễ nghĩa' }[mon];
       if (q >= .99) news(`📚 ${kidTitle(c)} học ${T} được Thái phó khen ngợi hết lời.`);
       return done(`${c.name} học ${T}: +${g}${c.ward ? ' (ở A ca sở, mẹ ít kèm nên tiến bộ chậm hơn)' : ''}.`);
@@ -1288,7 +1372,7 @@ function nightTick() {
     if (days >= C.ABSENT_SICK_DAYS && days < C.ABSENT_LOSE_DAYS && !p.sick && !online.has(p.id)) { p.sick = true; news(`${p.name} cáo bệnh, đã ${Math.floor(days)} ngày không ra khỏi cung.`); }
     if (days >= C.ABSENT_LOSE_DAYS && !online.has(p.id)) { p.sick = false; const r = p.rank; p.rank = C.FIGHT_RANK - 1; p.trend = { dir: -1, t: now() }; p.outfit = C.RANKS[p.rank].outfit; news(`${p.name} vắng mặt quá lâu, nhường ghế ${C.RANKS[r].name}.`); freeSeatCheck(); }
   }
-  checkDeadlines(); thaiTick(); kidTick(); hhTick(); eventTick(); npcDaily(); grudgeTick(); bigTick(); festTick(); if (v.getUTCHours() >= 3) backup();
+  checkDeadlines(); thaiTick(); kidTick(); sinhTick(); leTick(); hhTick(); eventTick(); npcDaily(); grudgeTick(); bigTick(); festTick(); if (v.getUTCHours() >= 3) backup();
   // vụ án do hệ thống dàn dựng khi cung vắng người
   for (const p of Object.values(DB.players)) {
     if (!online.has(p.id) || p.lanh || p.rank < C.FIGHT_RANK) continue;
@@ -1300,7 +1384,7 @@ function nightTick() {
 }
 
 // ---------------- vị trí, phòng ----------------
-const LOCS = ['tuninh', 'hoavien', 'duongtam', 'phong', 'tamcung', 'lanhcung', 'yentiec', 'ngutien', 'acaso'];
+const LOCS = ['tuninh', 'hoavien', 'duongtam', 'phong', 'tamcung', 'lanhcung', 'yentiec', 'ngutien', 'acaso', 'sansinh'];
 // ghế ngồi: loc -> { seatId: playerId }
 const SEATS = {}; const SEAT_IDS = { hoavien: ['hv0', 'hv1', 'hv2', 'hv3', 'hv4'], yentiec: ['f0', 'f1', 'f2', 'f3', 'f4', 'f5', 'f6', 'f7'] };
 function freeSeat(p) { for (const loc in SEATS) for (const k in SEATS[loc]) if (SEATS[loc][k] === p.id) delete SEATS[loc][k]; p.seat = null; }
@@ -1317,7 +1401,7 @@ function enter(p, loc, sock) {
   if (loc === 'yentiec') { const free = SEAT_IDS.yentiec.find(id => !(SEATS.yentiec || {})[id] || !online.has(SEATS.yentiec[id])); if (free) { takeSeat(p, free); seat = free; } }
   if (loc === 'phong' && p.lying) p.anim = 'lie:b0';
   const host = loc === 'phong' ? (P(p.visit) || p) : null;
-  sock.emit('scene', { fei: feiPresent(loc).map(feiView), loc, players: others, venue: DB.state.feast?.venue || 'out', seat, host: host ? { id: host.id, name: host.name, decor: host.decor || [], palace: host.rank >= C.PALACE_RANK, kids: kidView(host).filter(c => !c.ward && c.id !== host.carry && c.id !== host.follow).map(c => ({ id: c.id, sex: c.sex, name: c.name, stage: c.stage, cry: c.cry, tt: c.thaitu || c.coluan })) } : null, acaso: loc === 'acaso' ? Object.values(DB.players).flatMap(q => kidView(q).filter(c => c.ward).map(c => ({ id: c.id, sex: c.sex, name: c.name, stage: c.stage, cry: c.cry, tt: c.thaitu || c.coluan, mother: q.name, mid: q.id }))) : null, lying: loc === 'phong' && !!p.lying });
+  sock.emit('scene', { fei: feiPresent(loc).map(feiView), loc, players: others, venue: DB.state.feast?.venue || 'out', seat, host: host ? { id: host.id, name: host.name, decor: host.decor || [], palace: host.rank >= C.PALACE_RANK, kids: kidView(host).filter(c => !c.ward && c.id !== host.carry && c.id !== host.follow).map(c => ({ id: c.id, sex: c.sex, name: c.name, stage: c.stage, cry: c.cry, tt: c.thaitu || c.coluan })) } : null, sinh: loc === 'sansinh' ? sinhPub() : null, acaso: loc === 'acaso' ? Object.values(DB.players).flatMap(q => kidView(q).filter(c => c.ward).map(c => ({ id: c.id, sex: c.sex, name: c.name, stage: c.stage, cry: c.cry, tt: c.thaitu || c.coluan, mother: q.name, mid: q.id }))) : null, lying: loc === 'phong' && !!p.lying });
   if (loc === 'yentiec' && DB.state.feast?.show && now() < DB.state.feast.show.at + 38e3) setTimeout(() => sock.emit('npcShow', DB.state.feast.show), 2000);
   if (loc === 'yentiec') { const t = DB.state.feast?.tl; setTimeout(() => sock.emit('tuulenh', t && !t.done ? { q: t.q, end: t.end } : null), 1500); }
   sock.to(room).emit('pjoin', publicView(p));
@@ -1385,6 +1469,8 @@ io.on('connection', sock => {
     if (loc === 'tamcung' && !(me.tamCungUntil > now())) return toast(me, 'Chỉ người được lật thẻ mới vào tẩm cung đêm nay.');
     if ((me.camTucUntil || 0) > now() && loc !== 'phong') return toast(me, 'Đang bị cấm túc, chưa được ra khỏi phòng.', 'bad');
     if (loc === 'yentiec' && !(DB.state.feast && !DB.state.feast.done)) return toast(me, 'Hiện không có yến tiệc.');
+    if (loc === 'sansinh' && !DB.state.sinh) return toast(me, 'Hiện không có ai chuyển dạ.');
+    if (DB.state.sinh?.id === me.id && DB.state.sinh.phase !== 'bao') return toast(me, 'Nương nương đang chuyển dạ, không đi đâu được!', 'bad');
     if (loc === 'ngutien' && me.rank < C.FIGHT_RANK) return toast(me, `Từ ${C.RANKS[C.FIGHT_RANK].name} mới được vào Ngự thiện phòng.`);
     if (me.lying && !(loc === 'phong' && !me.visit)) { me.lying = false; }
     me.visit = null;
@@ -1926,7 +2012,7 @@ io.on('connection', sock => {
     io.to(roomOf(me)).emit('tt', { from: 'p:' + me.id, to, act, back, fname: me.name, tname });
     save(); push(me); if (t) push(t);
   });
-  vuaSock(sock, () => me); kidSock(sock, () => me);
+  vuaSock(sock, () => me); kidSock(sock, () => me); sinhSock(sock, () => me); leSock(sock, () => me);
   sock.on('caocap', d => {
     if (!me || !d || me.lanh || me.rank < 6) return toast(me, 'Từ Phi trở lên mới được giao việc này.');
     me.ccDay = me.ccDay?.d === dayKey() ? me.ccDay : { d: dayKey() }; const C2 = me.ccDay;
@@ -2064,6 +2150,8 @@ function admin(p, text) {
   else if (cmd === '/cothai') { const who = [arg, ...rest].filter(Boolean).join(' ').toLowerCase(); const q = who ? findP(who) : p; if (!q) return toast(p, 'Không tìm thấy.', 'bad'); q.thai = { since: now() - 1000, known: false }; revealThai(q, 'mach'); }
   else if (cmd === '/lon') { const who = [arg, ...rest].filter(Boolean).join(' ').toLowerCase(); const q = who ? findP(who) : p; if (!q?.children?.length) return toast(p, 'Người này chưa có con.', 'bad'); for (const c of kidFix(q)) { c.born -= 3 * 864e5; c.cry = null; c.cryAt = 0; } push(q); kidEmit(q); return toast(p, `Các con của ${q.name} lớn thêm 3 ngày.`, 'good'); }
   else if (cmd === '/khoc') { for (const c of kidFix(p)) c.cryAt = 1; return toast(p, 'Các bé sẽ khóc ngay.', 'good'); }
+  else if (cmd === '/tua') { if (DB.state.sinh) DB.state.sinh.until = now() + 8000; if (DB.state.le) DB.state.le.end = now() + 6000; return toast(p, 'Tua nhanh sự kiện chuyển dạ.', 'good'); }
+  else if (cmd === '/chuyenda') { if (!p.thai?.known) return toast(p, 'Chưa có thai.', 'bad'); p.thai.due = now() - 1000; return toast(p, 'Sắp chuyển dạ…', 'good'); }
   else if (cmd === '/bung') { if (!p.thai?.known) return toast(p, 'Chưa có thai.', 'bad'); p.thai.due = now() + .15 * C.THAI_DAYS * 864e5; push(p); kidEmit(p); return toast(p, 'Bụng đã lớn.', 'good'); }
   else if (cmd === '/sinh') { const who = [arg, ...rest].filter(Boolean).join(' ').toLowerCase(); const q = who ? findP(who) : p; if (!q?.thai) return toast(p, 'Người này không mang thai.', 'bad'); if (!q.thai.known) revealThai(q); birth(q); }
   else if (cmd === '/baucu') { if (DB.state.hhVote) endHHVote(); else { DB.state.hhNext = 0; if (!hhEligible().length) return toast(p, `Chưa có ai từ ${C.RANKS[C.HH_MIN_RANK].name} trở lên để ứng cử.`, 'bad'); startHHVote(); } }
@@ -2088,7 +2176,7 @@ function admin(p, text) {
     if (rest[0] !== 'xacnhan') return toast(p, `Khôi phục sẽ đưa cả cung về ngày ${arg}, mất mọi thứ sau đó. Gõ: /khoiphuc ${arg} xacnhan`, 'bad');
     restore(arg).then(ok => { if (!ok) toast(p, 'Không có bản sao lưu ngày ' + arg, 'bad'); else console.log('restored', arg); }); return;
   }
-  else return toast(p, 'Lệnh: /latthe [trua] /yentiec [phút] /diem N /diemcho N tên /bac N /ngay /vuan /hethan /lanhcung /rakhoi [tên] /cothai [tên] /bung /sinh [tên] /lon [tên] /khoc /baucu /sukien [hoadang|disan|phatdan|dichbenh|hoica] /tuulenh /bieudien /daian [giờ] /daile [giờ] /dailediem N /xoaacc tên /saoluu /khoiphuc [ngày xacnhan]');
+  else return toast(p, 'Lệnh: /latthe [trua] /yentiec [phút] /diem N /diemcho N tên /bac N /ngay /vuan /hethan /lanhcung /rakhoi [tên] /cothai [tên] /bung /chuyenda /tua /sinh [tên] /lon [tên] /khoc /baucu /sukien [hoadang|disan|phatdan|dichbenh|hoica] /tuulenh /bieudien /daian [giờ] /daile [giờ] /dailediem N /xoaacc tên /saoluu /khoiphuc [ngày xacnhan]');
   toast(p, 'Đã chạy ' + cmd); push(p); save();
 }
 
