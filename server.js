@@ -973,7 +973,7 @@ function kidPub(p) {
   const o = {}; if (p.thai?.known) o.tp = Math.max(0, Math.min(1, 1 - (p.thai.due - now()) / (C.THAI_DAYS * 864e5)));
   const ks = p.children || [];
   if (p.carry) { const c = ks.find(k => k.id === p.carry); if (c && kidStage(c) === 'so' && !c.ward) o.carry = { cid: c.id, sex: c.sex, name: c.name }; else p.carry = null; }
-  if (p.follow) { const c = ks.find(k => k.id === p.follow); if (c && kidStage(c) !== 'so' && !c.ward) o.follow = { cid: c.id, sex: c.sex, name: c.name, stage: kidStage(c) }; else p.follow = null; }
+  if (p.follow) { const c = ks.find(k => k.id === p.follow); if (c && kidStage(c) !== 'so' && !c.ward) o.follow = { cid: c.id, sex: c.sex, name: c.name, stage: kidStage(c), tt: DB.state.thaitu?.cid === c.id }; else p.follow = null; }
   o.cry = ks.filter(c => c.cry).map(c => c.id);
   return o;
 }
@@ -1299,7 +1299,7 @@ function enter(p, loc, sock) {
   if (loc === 'yentiec') { const free = SEAT_IDS.yentiec.find(id => !(SEATS.yentiec || {})[id] || !online.has(SEATS.yentiec[id])); if (free) { takeSeat(p, free); seat = free; } }
   if (loc === 'phong' && p.lying) p.anim = 'lie:b0';
   const host = loc === 'phong' ? (P(p.visit) || p) : null;
-  sock.emit('scene', { fei: feiPresent(loc).map(feiView), loc, players: others, venue: DB.state.feast?.venue || 'out', seat, host: host ? { id: host.id, name: host.name, decor: host.decor || [], palace: host.rank >= C.PALACE_RANK, kids: kidView(host).filter(c => !c.ward && c.id !== host.carry && c.id !== host.follow).map(c => ({ id: c.id, sex: c.sex, name: c.name, stage: c.stage, cry: c.cry })) } : null, acaso: loc === 'acaso' ? Object.values(DB.players).flatMap(q => kidView(q).filter(c => c.ward).map(c => ({ id: c.id, sex: c.sex, name: c.name, stage: c.stage, cry: c.cry, mother: q.name, mid: q.id }))) : null, lying: loc === 'phong' && !!p.lying });
+  sock.emit('scene', { fei: feiPresent(loc).map(feiView), loc, players: others, venue: DB.state.feast?.venue || 'out', seat, host: host ? { id: host.id, name: host.name, decor: host.decor || [], palace: host.rank >= C.PALACE_RANK, kids: kidView(host).filter(c => !c.ward && c.id !== host.carry && c.id !== host.follow).map(c => ({ id: c.id, sex: c.sex, name: c.name, stage: c.stage, cry: c.cry, tt: c.thaitu })) } : null, acaso: loc === 'acaso' ? Object.values(DB.players).flatMap(q => kidView(q).filter(c => c.ward).map(c => ({ id: c.id, sex: c.sex, name: c.name, stage: c.stage, cry: c.cry, tt: c.thaitu, mother: q.name, mid: q.id }))) : null, lying: loc === 'phong' && !!p.lying });
   if (loc === 'yentiec' && DB.state.feast?.show && now() < DB.state.feast.show.at + 38e3) setTimeout(() => sock.emit('npcShow', DB.state.feast.show), 2000);
   if (loc === 'yentiec') { const t = DB.state.feast?.tl; setTimeout(() => sock.emit('tuulenh', t && !t.done ? { q: t.q, end: t.end } : null), 1500); }
   sock.to(room).emit('pjoin', publicView(p));

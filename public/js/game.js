@@ -2564,6 +2564,22 @@ function animKid(k, t, moving, mode) {
   else { u.arms.forEach((a, i) => { a.rotation.x = Math.sin(t * 1.6 + i) * .08; }); b.position.y = Math.sin(t * 2) * .006; u.head.rotation.y = Math.sin(t * .7) * .3; }
   if (mode === 'cry') { u.head.rotation.x = -.25; u.arms.forEach((a, i) => a.rotation.x = -2.2 + Math.sin(t * 10 + i) * .2); }
 }
+// hoàng tử dùng model 3D thật (3 bộ áo, Thái tử mặc áo vàng); công chúa tạm dùng hình tự dựng
+const KID_SC = { chap: .56, hoc: .68 };
+function kidBody(k, e) {
+  if (k.sex !== 'trai') return makeKid(k.sex, k.stage);
+  const g = new THREE.Group(); let h = 0; for (const ch of String(k.id || k.cid)) h = (h * 31 + ch.charCodeAt(0)) >>> 0;
+  const model = k.tt ? 'hoangtu3' : h % 2 ? 'hoangtu2' : 'hoangtu1', w = world;
+  spawn(model).then(c => { if (world !== w || !g.parent) return c.dispose(); c.root.scale.setScalar(KID_SC[k.stage] || .68); g.add(c.root); c.play('dung_cho'); e.char = c; }).catch(() => { g.add(makeKid(k.sex, k.stage)); });
+  g.userData = { modelKid: true }; return g;
+}
+function kidAnim(e, dt, moving, mode, fast) {
+  const c = e.char; if (!c) { if (e.mesh.userData.kid) animKid(e.mesh, kidT, moving, mode); else for (const ch of e.mesh.children) if (ch.userData?.kid) animKid(ch, kidT, moving, mode); return; }
+  if (mode === 'sit') { if (!e.sat) { e.sat = true; kneelOn(c, 0, .08, 0, 0); } c.update(dt); return; }
+  if (e.sat) { e.sat = false; c.pose = null; c.root.position.set(0, 0, 0); c.root.rotation.set(0, 0, 0); }
+  const want = mode === 'fall' || mode === 'cry' ? 'khoc' : moving ? (fast ? 'chay' : 'di') : 'dung_cho';
+  if (c.curName !== want) c.play(want); c.update(dt);
+}
 function makeBelly(c) {
   let mat = null; c.root.traverse(o => { if (!mat && o.isSkinnedMesh && o.material && !Array.isArray(o.material)) mat = o.material; });
   const m = new THREE.Mesh(new THREE.SphereGeometry(1, 20, 16), mat ? mat.clone() : kMat(0xb8323a)); m.castShadow = true; world.group.add(m); return m;
@@ -2575,7 +2591,7 @@ function kidCries(cid) { if ((me?.children || []).some(k => k.id === cid && k.cr
 function kidOwners() { const L = []; if (selfC && me) L.push({ id: me.id, c: selfC, kid: me.kidPub || {} }); for (const [id, o] of others) if (o.c) L.push({ id, c: o.c, kid: o.p.kid || {} }); return L; }
 function kidLabel(name) { const lb = makeLabel(name, '', true); lb.element.style.transform += ' scale(.8)'; return lb; }
 function kidEnt(key, make) { let e = kidEnts.get(key); if (!e) { e = make(); e.w = world; kidEnts.set(key, e); } e.seen = true; return e; }
-function kidDrop(e) { e.mesh?.parent?.remove(e.mesh); e.extra?.parent?.remove(e.extra); e.label?.element.remove(); }
+function kidDrop(e) { e.char?.dispose(); e.mesh?.parent?.remove(e.mesh); e.extra?.parent?.remove(e.extra); e.label?.element.remove(); }
 function syncKids() {
   if (!world || !me) return;
   for (const e of kidEnts.values()) e.seen = false;
@@ -2583,7 +2599,7 @@ function syncKids() {
     const K = O.kid;
     if (K.tp > .03) kidEnt('belly:' + O.id, () => ({ kind: 'belly', c: O.c, mesh: makeBelly(O.c) })).tp = K.tp;
     if (K.carry) { const e = kidEnt('carry:' + O.id + ':' + K.carry.cid, () => { const m = makeBaby(K.carry.sex); world.group.add(m); const lb = kidLabel(K.carry.name); m.add(lb); lb.position.set(0, .15, 0); return { kind: 'carry', c: O.c, mesh: m, label: lb, cid: K.carry.cid }; }); }
-    if (K.follow) { kidEnt('follow:' + O.id + ':' + K.follow.cid + ':' + K.follow.stage, () => { const m = makeKid(K.follow.sex, K.follow.stage); const p = O.c.root.position; m.position.set(p.x + .5, 0, p.z + .5); world.group.add(m); const lb = kidLabel(K.follow.name); m.add(lb); lb.position.y = K.follow.stage === 'chap' ? .75 : 1.0; return { kind: 'follow', c: O.c, mesh: m, label: lb, cid: K.follow.cid, stage: K.follow.stage }; }); }
+    if (K.follow) { kidEnt('follow:' + O.id + ':' + K.follow.cid + ':' + K.follow.stage + ':' + !!K.follow.tt, () => { const e = { kind: 'follow', c: O.c, cid: K.follow.cid, stage: K.follow.stage }; const m = e.mesh = kidBody({ ...K.follow, id: K.follow.cid }, e); const p = O.c.root.position; m.position.set(p.x + .5, 0, p.z + .5); world.group.add(m); const lb = e.label = kidLabel(K.follow.name); m.add(lb); lb.position.y = K.follow.sex === 'trai' ? (K.follow.stage === 'chap' ? 1.0 : 1.22) : K.follow.stage === 'chap' ? .75 : 1.0; return e; }); }
   }
   // bé trong cung riêng
   if (world.loc === 'phong') {
@@ -2595,12 +2611,12 @@ function syncKids() {
   for (const [key, e] of kidEnts) if (!e.seen || e.w !== world) { kidDrop(e); kidEnts.delete(key); }
 }
 function kidStatic(k, o) {
-  kidEnt('st:' + k.id + ':' + k.stage, () => {
+  kidEnt('st:' + k.id + ':' + k.stage + ':' + !!k.tt, () => {
     const lb = kidLabel(k.name + (k.mother ? ` · con ${k.mother}` : ''));
     if (o.cradle) { const cr = o.existing || makeCradle(); if (!o.existing) { cr.position.set(o.cradle[0], 0, o.cradle[1]); world.group.add(cr); } const rock = cr.getObjectByName('rock'); const b = makeBaby(k.sex); b.position.set(0, .36, .04); rock.add(b); b.add(lb); lb.position.y = .3; return { kind: 'cradle', mesh: o.existing ? b : cr, extra: o.existing ? null : null, baby: b, rock, label: lb, cid: k.id }; }
-    const m = makeKid(k.sex, k.stage); m.add(lb); lb.position.y = k.stage === 'chap' ? .75 : 1.0; world.group.add(m);
-    if (o.desk) { m.position.set(o.desk.x, 0, o.desk.z); m.rotation.y = o.desk.ry; return { kind: 'desk', mesh: m, label: lb, cid: k.id }; }
-    m.position.set(o.wander[0], 0, o.wander[1]); return { kind: 'wander', mesh: m, label: lb, cid: k.id, home: o.wander, tgt: null, next: 0 };
+    const e = { cid: k.id, label: lb }; const m = e.mesh = kidBody(k, e); m.add(lb); lb.position.y = k.sex === 'trai' ? (k.stage === 'chap' ? 1.0 : 1.22) : k.stage === 'chap' ? .75 : 1.0; world.group.add(m);
+    if (o.desk) { m.position.set(o.desk.x, 0, o.desk.z); m.rotation.y = o.desk.ry; return Object.assign(e, { kind: 'desk' }); }
+    m.position.set(o.wander[0], 0, o.wander[1]); return Object.assign(e, { kind: 'wander', home: o.wander, tgt: null, next: 0 });
   });
 }
 let kidT = 0, kidLesson = null;
@@ -2609,7 +2625,7 @@ function kidFrame(dt) {
   for (const [, e] of kidEnts) {
     if (e.w !== world) continue; const cry = e.cid && kidCries(e.cid);
     if (e.label && cry && kidT - (e.bub || 0) > 3.5) { e.bub = kidT; bubble(e.label, rpick(['Oe oe oe… 😭', 'Hu hu… 😢', 'Oaaa! 😭'])); }
-    if (e.kind === 'belly') { const c = e.c; if (!c.root.parent) { e.mesh.visible = false; continue; } e.mesh.visible = c.root.visible; const B = c.B.spine || c.B.hips; if (!B) continue; c.root.updateMatrixWorld(true); B.getWorldPosition(kidWorldPos); const ry = c.root.rotation.y, r = .06 + .045 * e.tp, f = .035 + .055 * e.tp;
+    if (e.kind === 'belly') { const c = e.c; if (!c.root.parent) { e.mesh.visible = false; continue; } e.mesh.visible = c.root.visible; const B = c.B.spine || c.B.hips; if (!B) continue; c.root.updateMatrixWorld(true); B.getWorldPosition(kidWorldPos); const ry = c.root.rotation.y, r = .05 + .035 * e.tp, f = .03 + .04 * e.tp;
       e.mesh.position.set(kidWorldPos.x + Math.sin(ry) * f, kidWorldPos.y - .05, kidWorldPos.z + Math.cos(ry) * f); e.mesh.scale.set(r * 1.05, r * 1.1, r * .85); e.mesh.rotation.y = ry;
     }
     else if (e.kind === 'carry') { const c = e.c;
@@ -2619,15 +2635,15 @@ function kidFrame(dt) {
     else if (e.kind === 'follow') { const c = e.c, m = e.mesh, p = c.root.position, ry = c.root.rotation.y; let tx, tz;
       if (kidLesson?.cid === e.cid && world.kidDesks) { const d = world.kidDesks[kidLesson.desk]; tx = d.x; tz = d.z; } else { tx = p.x - Math.sin(ry) * .65 + Math.cos(ry) * .4; tz = p.z - Math.cos(ry) * .65 - Math.sin(ry) * .4; }
       const dx = tx - m.position.x, dz = tz - m.position.z, dist = Math.hypot(dx, dz); let moving = false;
-      if (cry && e.stage === 'chap') { animKid(m, kidT, false, 'fall'); continue; }
-      if (dist > 6) { m.position.set(tx, 0, tz); } else if (dist > .12) { const sp = Math.min(dist, dt * (dist > 1.2 ? 2.4 : 1.4)); m.position.x += dx / dist * sp; m.position.z += dz / dist * sp; m.rotation.y = Math.atan2(dx, dz); moving = true; }
-      else if (kidLesson?.cid === e.cid) { m.rotation.y = Math.PI; animKid(m, kidT, false, 'sit'); continue; } else m.rotation.y += (Math.atan2(p.x - m.position.x, p.z - m.position.z) - m.rotation.y) * Math.min(1, dt * 3);
-      m.position.y = world.floorAt ? world.floorAt(m.position.x, m.position.z) : 0; animKid(m, kidT, moving, cry ? 'cry' : null); }
+      if (cry && e.stage === 'chap') { kidAnim(e, dt, false, 'fall'); continue; }
+      let fast = false; if (dist > 6) { m.position.set(tx, 0, tz); } else if (dist > .12) { fast = dist > 1.2; const sp = Math.min(dist, dt * (fast ? 2.4 : 1.4)); m.position.x += dx / dist * sp; m.position.z += dz / dist * sp; m.rotation.y = Math.atan2(dx, dz); moving = true; }
+      else if (kidLesson?.cid === e.cid) { m.rotation.y = Math.PI; kidAnim(e, dt, false, 'sit'); continue; } else m.rotation.y += (Math.atan2(p.x - m.position.x, p.z - m.position.z) - m.rotation.y) * Math.min(1, dt * 3);
+      m.position.y = world.floorAt ? world.floorAt(m.position.x, m.position.z) : 0; kidAnim(e, dt, moving, cry ? 'cry' : null, fast); }
     else if (e.kind === 'cradle') { e.rock.rotation.x = Math.sin(kidT * (cry ? 6 : 1.2)) * (cry ? .12 : .05); e.baby.userData.mouth.scale.set(cry ? 1.4 : 1, cry ? 1.4 : .4, 1); }
-    else if (e.kind === 'desk') animKid(e.mesh, kidT, false, 'sit');
-    else if (e.kind === 'wander') { const m = e.mesh; if (cry && kidT % 1 < 2) { animKid(m, kidT, false, m.userData.s < .7 ? 'fall' : 'cry'); continue; }
+    else if (e.kind === 'desk') kidAnim(e, dt, false, 'sit');
+    else if (e.kind === 'wander') { const m = e.mesh; if (cry) { kidAnim(e, dt, false, 'cry'); continue; }
       if (!e.tgt || kidT > e.next) { e.tgt = [e.home[0] + (Math.random() - .5) * 2.2, e.home[1] + (Math.random() - .5) * 1.6]; if (world.bounds) { e.tgt[0] = Math.max(world.bounds.minX + .3, Math.min(world.bounds.maxX - .3, e.tgt[0])); e.tgt[1] = Math.max(world.bounds.minZ + .3, Math.min(world.bounds.maxZ - .3, e.tgt[1])); } e.next = kidT + 4 + Math.random() * 4; }
-      const dx = e.tgt[0] - m.position.x, dz = e.tgt[1] - m.position.z, d = Math.hypot(dx, dz); const mv = d > .08; if (mv) { const sp = Math.min(d, dt * .9); m.position.x += dx / d * sp; m.position.z += dz / d * sp; m.rotation.y = Math.atan2(dx, dz); } animKid(m, kidT, mv, null); }
+      const dx = e.tgt[0] - m.position.x, dz = e.tgt[1] - m.position.z, d = Math.hypot(dx, dz); const mv = d > .08; if (mv) { const sp = Math.min(d, dt * .9); m.position.x += dx / d * sp; m.position.z += dz / d * sp; m.rotation.y = Math.atan2(dx, dz); } kidAnim(e, dt, mv, null); }
   }
   for (const O of kidOwners()) { const c = O.c; c._carry = !!O.kid.carry; c._preg = (O.kid.tp || 0) > .4;
     if (!c.post2) c.post2 = cc => { if (cc.pose || cc.post || cc.curName === 'ngoi') return;
@@ -2690,7 +2706,7 @@ socket.on('conHoc', async d => {
   const k = (me.children || []).find(x => x.id === d.cid); if (!k) return;
   const fk = kidEnts.get([...kidEnts.keys()].find(x => x.includes(':' + d.cid + ':')));
   if (fk?.kind === 'follow' && world.kidDesks) kidLesson = { cid: d.cid, desk: 1 };
-  specCam = { loc: 'acaso', keep: true, pos: new THREE.Vector3(1.2, 1.6, 1.9), look: new THREE.Vector3(0, .5, -.6), until: Date.now() + 36e5 };
+  specCam = { loc: 'acaso', keep: true, pos: new THREE.Vector3(1.1, 2.3, 2.3), look: new THREE.Vector3(0, .05, -.3), until: Date.now() + 36e5 };
   const fin = q => { kidLesson = null; if (specCam?.loc === 'acaso') specCam = null; socket.emit('con', { op: 'hoc', cid: d.cid, mon: d.mon, q }); };
   if (d.mon === 'van') { let ok = 0; const qs = [...HAN].sort(() => Math.random() - .5).slice(0, 4);
     for (const [ch, mean] of qs) { const opts = [mean, ...HAN.filter(h => h[1] !== mean).sort(() => Math.random() - .5).slice(0, 2).map(h => h[1])].sort(() => Math.random() - .5);
@@ -2717,3 +2733,4 @@ socket.on('conHoc', async d => {
       if (inp.length === seq.length) { if (lvl >= 4) { $('ngS').textContent = 'Hay lắm!'; setTimeout(() => { mgClose(); fin(1); }, 700); } else setTimeout(round, 700); } });
     setTimeout(round, 400); return; }
 });
+window.__mph.kids = () => [...kidEnts].map(([k, e]) => [k, e.mesh?.position.toArray().map(v => +v.toFixed(2)), !!e.char, e.mesh?.parent === world.group, e.char?.curName, e.char && e.char.root.position.toArray().map(v => +v.toFixed(2))]);

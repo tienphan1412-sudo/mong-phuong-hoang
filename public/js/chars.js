@@ -6,10 +6,10 @@ import * as SkeletonUtils from 'three/addons/utils/SkeletonUtils.js';
 const loader = new GLTFLoader();
 const cache = {};
 let FEMALE = null, MALE = null;
-export const MALE_MODELS = new Set(['hoangthuong', 'hoangthuong_dem', 'thaigiam', 'thive', 'thaiy']);
+export const MALE_MODELS = new Set(['hoangthuong', 'hoangthuong_dem', 'thaigiam', 'thive', 'thaiy', 'hoangtu1', 'hoangtu2', 'hoangtu3']);
 
 function lock(clips) {
-  const LOCK = ['di', 'mua', 'dung_cho', 'vo_tay', 'khoc', 'gian', 'nga', 'cuoi', 'ngoi', 'khoanh_tay', 'gio_tay', 'nam_tay', 'dung_cho_nam'];
+  const LOCK = ['di', 'chay', 'mua', 'dung_cho', 'vo_tay', 'khoc', 'gian', 'nga', 'cuoi', 'ngoi', 'khoanh_tay', 'gio_tay', 'nam_tay', 'dung_cho_nam'];
   for (const c of clips) if (LOCK.includes(c.name)) for (const t of c.tracks) if (/Hips\.position$/.test(t.name)) {
     const v = t.values, x0 = v[0], z0 = v[2]; for (let i = 0; i < v.length; i += 3) { v[i] = x0; v[i + 2] = z0; }
   }
@@ -17,6 +17,7 @@ function lock(clips) {
 }
 export function loadModel(name) {
   if (!cache[name]) cache[name] = loader.loadAsync(`models/${name}.glb`).then(g => {
+    if (name === 'hoangtu1') { const REN = { 'walk.001': 'di', 'run.001': 'chay', 'sit.001': 'ngoi', 'cry.001': 'khoc', 'laugh_01.001': 'cuoi' }; g.animations = g.animations.filter(a => REN[a.name]); g.animations.forEach(a => a.name = REN[a.name]); }
     if (name === 'thuongtai') FEMALE = lock(g.animations);
     if (name === 'hoangthuong') MALE = lock(g.animations); else lock(g.animations);
     g.scene.traverse(o => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; o.frustumCulled = false; } });
@@ -75,6 +76,7 @@ export async function spawn(modelName) {
   const male = MALE_MODELS.has(modelName);
   const root = SkeletonUtils.clone(g.scene);
   if (modelName.startsWith('hoangthuong')) root.scale.setScalar(1.08); // Hoàng thượng cao hơn phi tần
+  const KIDC = modelName.startsWith('hoangtu') ? (await loadModel('hoangtu1')).animations : null; // hoàng tử dùng chung động tác trẻ con
   const B = {};
   root.traverse(o => { if (o.isBone) { const n = o.name.replace(/^mixamorig:?/, ''); if (MAPB[n]) B[MAPB[n]] = o; } if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; o.frustumCulled = false; } });
   const mixer = new THREE.AnimationMixer(root);
@@ -83,6 +85,7 @@ export async function spawn(modelName) {
   if (male) for (const clip of MALE) actions[clip.name] = mixer.clipAction(clip);
   for (const clip of g.animations || []) if (!actions[clip.name] || male) actions[clip.name] = mixer.clipAction(clip);
   if (isHT) for (const g2 of HT_G) if (!actions[g2.name]) actions[g2.name] = mixer.clipAction(g2);
+  if (KIDC) for (const k of KIDC) actions[k.name] = mixer.clipAction(k);
   if (isHT && HT_IDLE) { actions.khoanh_tay = mixer.clipAction(HT_IDLE); actions.dung_cho = actions.khoanh_tay; }
   const idle = actions.dung_cho; idle.play(); mixer.update(0); root.updateMatrixWorld(true);
   const idlePose = new Map(); root.traverse(o => { if (o.isBone) idlePose.set(o, o.quaternion.clone()); });
