@@ -2178,7 +2178,14 @@ function adminRaw(p, text) {
   else if (cmd === '/xoathai') { p.thai = null; push(p); kidEmit(p); return toast(p, 'Đã xoá long thai thử.', 'good'); }
   else if (cmd === '/xoatin') { const n0 = DB.state.news.length, nm = p.name; DB.state.news = DB.state.news.filter(n => !n.text.includes(nm)); io.emit('newsAll', DB.state.news.slice(0, 30)); save(); return toast(p, `Đã gỡ ${n0 - DB.state.news.length} tin có tên ${nm} khỏi bảng tin.`, 'good'); }
   else if (cmd === '/tua') { if (DB.state.sinh) DB.state.sinh.until = now() + 8000; if (DB.state.le) DB.state.le.end = now() + 6000; return toast(p, 'Tua nhanh sự kiện chuyển dạ.', 'good'); }
-  else if (cmd === '/chuyenda') { if (!p.thai?.known) return toast(p, 'Chưa có thai.', 'bad'); p.thai.due = now() - 1000; return toast(p, 'Sắp chuyển dạ…', 'good'); }
+  else if (cmd === '/chuyenda') {
+    if (!p.thai) return toast(p, 'Chưa có thai. Gõ /cothai trước.', 'bad'); p.thai.known = true; p.thai.due = now() - 1000; p.thai.test = true;
+    const S = DB.state.sinh; if (S && (S.id === p.id || now() - S.until > 10 * 60e3 || !P(S.id))) DB.state.sinh = null; // dọn sự kiện cũ bị kẹt
+    if (DB.state.sinh) return toast(p, `${DB.state.sinh.name} đang chuyển dạ, đợi xong rồi thử lại.`, 'bad');
+    const cs = Object.values(DB.state.cases).find(c => c.victim === p.id && c.status === 'open'); if (cs) return toast(p, 'Đang có vụ án hãm hại long thai chưa xử xong nên chưa sinh được. Vào Từ Ninh cung xử án (hoặc /hethan) trước.', 'bad');
+    if (p.loc === 'tamcung') return toast(p, 'Đang ở tẩm cung, ra ngoài rồi thử lại.', 'bad');
+    if (!sinhStart(p)) return toast(p, 'Chưa bắt đầu được, thử lại sau vài giây.', 'bad');
+    return toast(p, 'Bắt đầu chuyển dạ (thử).', 'good'); }
   else if (cmd === '/bung') { if (!p.thai?.known) return toast(p, 'Chưa có thai.', 'bad'); p.thai.due = now() + .15 * C.THAI_DAYS * 864e5; push(p); kidEmit(p); return toast(p, 'Bụng đã lớn.', 'good'); }
   else if (cmd === '/sinh') { const who = [arg, ...rest].filter(Boolean).join(' ').toLowerCase(); const q = who ? findP(who) : p; if (!q?.thai) return toast(p, 'Người này không mang thai.', 'bad'); if (!q.thai.known) revealThai(q); birth(q); }
   else if (cmd === '/baucu') { if (DB.state.hhVote) endHHVote(); else { DB.state.hhNext = 0; if (!hhEligible().length) return toast(p, `Chưa có ai từ ${C.RANKS[C.HH_MIN_RANK].name} trở lên để ứng cử.`, 'bad'); startHHVote(); } }
