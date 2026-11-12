@@ -1431,6 +1431,7 @@ function tickNotice() {
   for (const [h, m, when] of sched.latThe) ev.push({ t: dayStart + (h * 60 + m) * 60e3, icon: '🏮', text: `${when} Hoàng thượng lật thẻ bài`, hint: me.lanh ? '' : 'Mặc đúng màu áo người thích, dâng hương mê điệp để dễ được chọn' });
   for (const [h, m, venue] of sched.feast) ev.push({ t: dayStart + (h * 60 + m) * 60e3, icon: '🎎', text: `Yến tiệc ${venue === 'in' ? 'trong điện' : 'ngoài trời'}`, hint: 'Chuẩn bị tiết mục đàn, múa hoặc thơ' });
   if (sched.vua && !me.lanh) { for (const [h, m] of sched.vua.WALK_SLOTS) ev.push({ t: dayStart + (h * 60 + m) * 60e3, icon: '🌸', text: 'Hoàng thượng dạo Ngự hoa viên', hint: 'Tới Ngự hoa viên theo hầu, đáp hợp tâm trạng người' });
+    if ((me.children || []).some(k => k.stage === 'hoc')) for (const [h, m] of sched.vua.KHAO_SLOTS || []) ev.push({ t: dayStart + (h * 60 + m) * 60e3, icon: '📜', text: 'Hoàng thượng kiểm tra bài ở Thượng thư phòng', hint: 'Dắt con đi học tới trình bài' });
     const [dh, dm] = sched.vua.DEN_SLOT; ev.push({ t: dayStart + (dh * 60 + dm) * 60e3, icon: '🏮', text: 'Ngắm trăng thả hoa đăng cùng Hoàng thượng', hint: 'Ra hồ Ngự hoa viên viết lời ước' }); }
   const lead = (sched.lead || 15) * 60e3;
   const up = ev.filter(e => e.t > nowVN && e.t - nowVN <= lead).sort((a, b) => a.t - b.t);
@@ -2243,8 +2244,10 @@ function openDay() {
 // =====================================================================
 // THÁNH CHỈ CẬP NHẬT: hiện một lần cho mỗi bản mới
 // =====================================================================
-const UPDATE_VER = 'u2026-11-12g';
+const UPDATE_VER = 'u2026-11-12h';
 const UPDATE_NOTES = [
+  ['📜 Phụ hoàng kiểm tra bài', '11:30 và 19:30 Hoàng thượng ghé Thượng thư phòng. Dắt con tới trình bài: con quỳ trước phụ hoàng trả lời 3 câu chữ nghĩa, lễ nghĩa. Trôi chảy cả 3 thì con tăng văn, đức, mẹ được khen trước cả cung. Ngoài giờ đó, dắt con vào Dưỡng Tâm điện gặp cha cũng được, mỗi ngày 1 lần.'],
+  ['👶 Em bé dễ chăm hơn', 'Bé khoảng 45 phút đòi chăm một lần, khóc quá 15 phút mới mệt. Mẹ vắng mặt (offline) thì nhũ mẫu tự chăm miễn phí, không bị trừ gì.'],
   ['💃 Dáng đi yểu điệu', 'Mọi phi tần, cung nữ giờ bước đi nhẹ nhàng, thướt tha hơn.'],
   ['🤰 Áo bầu', 'Từ ngày thứ hai mang long thai, nương nương tự khoác áo bầu, bụng tròn rõ ràng như thật. Sinh xong tự mặc lại áo cũ.'],
   ['📐 Đồ đạc vừa người', 'Thượng thư phòng làm lại: bàn quỳ học thấp vừa tầm hoàng tự, bàn Thái phó, kệ sách, bia bắn cung đúng tỉ lệ. Nôi em bé và giường cũng thu lại cho vừa.'],
@@ -2360,6 +2363,7 @@ function vuaMode() {
   if (L === 'hoavien' && vua.walk && Date.now() < vua.walk.end) return 'walk';
   if (L === 'hoavien' && vua.den && Date.now() < vua.den.end) return 'den';
   if (L === 'phong' && !me.visit && vua.visit?.id === me.id && Date.now() < vua.visit.until) return 'visit';
+  if (L === 'acaso' && vua.khao && Date.now() < vua.khao.end) return 'khao';
   return null;
 }
 function vuaDespawn() {
@@ -2375,11 +2379,13 @@ async function syncVua() {
   const c = await spawn('hoangthuong'); if (world !== w || vuaHT?.w !== w || vuaHT.mode !== mode) { c.dispose(); return; }
   if (mode === 'den') { c.root.position.set(-1.25, 0, -.4); c.root.rotation.y = -Math.PI / 2 - .3; }
   else if (mode === 'visit') { c.root.position.set(0, 0, .6); c.root.rotation.y = Math.PI; }
+  else if (mode === 'khao') { c.root.position.set(.7, 0, -2.0); c.root.rotation.y = 0; }
   c.play(mode === 'walk' ? 'di' : 'dung_cho'); w.group.add(c.root);
   const lb = makeLabel('Hoàng thượng', '', true, () => vuaTalk()); c.root.add(lb); c.label = lb;
   const n = { c, name: 'Hoàng thượng', model: 'hoangthuong', label: lb, talk: 'vua' }; w.npcs.push(n); Object.assign(vuaHT, { c, n, loading: false });
   if (mode === 'walk') FX.push(() => { if (vuaHT?.c !== c) return false; const p = walkPos((Date.now() - vua.walk.start) / 1000); c.root.position.set(p.x, w.floorAt ? w.floorAt(p.x, p.z) : 0, p.z); c.root.rotation.y = p.ry; const an = p.stop ? 'dung_cho' : 'di'; if (c.curName !== an) c.play(an); vuaHT.pos = p; walkStopCheck(p); });
   if (mode === 'visit') bubble(lb, `${me.name}, trẫm ghé qua thăm nàng.`);
+  if (mode === 'khao') bubble(lb, 'Các hoàng nhi lại đây, phụ hoàng kiểm tra bài.');
 }
 // theo sau Hoàng thượng khi đang hầu dạo vườn
 setInterval(() => { if (!vuaFollow || !vuaHT?.c || !selfC || seated || chairSeat) return; const h = vuaHT.c.root, p = vuaHT.pos; let bx, bz; if (p?.stop) { bx = h.position.x + Math.sin(h.rotation.y + 1.2) * .8; bz = h.position.z + Math.cos(h.rotation.y + 1.2) * .8; } else { bx = h.position.x - Math.sin(h.rotation.y) * .9; bz = h.position.z - Math.cos(h.rotation.y) * .9; } const dd = Math.hypot(bx - selfC.root.position.x, bz - selfC.root.position.z); if (dd > 6) { const q = clampPos(bx, bz); selfC.root.position.set(q.x, world.floorAt ? world.floorAt(q.x, q.z) : 0, q.z); selfC.target = null; sendMove('dung_cho'); } else if (dd > .35) selfC.target = clampPos(bx, bz); else if (p?.stop && !selfC.target) { const want = Math.atan2(h.position.x - selfC.root.position.x, h.position.z - selfC.root.position.z); if (Math.abs(want - selfC.root.rotation.y) > .3) { selfC.root.rotation.y = want; sendMove('dung_cho'); } } }, 300);
@@ -2403,6 +2409,7 @@ socket.on('denEnd', d => { const o = vuaLan.get(d.id); if (o && world?.loc === '
 function vuaTalk() {
   const m = vuaMode();
   if (m === 'walk') return vuaWalkGo(); if (m === 'den') return openDen(); if (m === 'visit') return socket.emit('vua', { op: 'visit' });
+  if (m === 'khao') { const k = (me.children || []).find(k => k.stage === 'hoc' && !k.khao && (k.ward || me.follow === k.id)); if (k) socket.emit('con', { op: 'khaoStart', cid: k.id }); else toast('Dắt con đang tuổi đi học tới đây để trình bài với Hoàng thượng.'); }
 }
 // 1) dạo vườn
 function vuaWalkGo() { if (mgOn) return; socket.emit('vua', { op: 'walk' }); }
@@ -2636,11 +2643,11 @@ function kidFrame(dt) {
       e.mesh.position.set(kidWorldPos.x + Math.sin(ry) * .2, kidWorldPos.y - .2, kidWorldPos.z + Math.cos(ry) * .2); e.mesh.rotation.set(0, ry + Math.PI / 2, 0); e.mesh.rotateX(-.35); e.mesh.visible = c.root.visible;
       if (cry) e.mesh.userData.mouth.scale.set(1.4, 1.4, 1); else e.mesh.userData.mouth.scale.set(1, .4, 1); }
     else if (e.kind === 'follow') { const c = e.c, m = e.mesh, p = c.root.position, ry = c.root.rotation.y; let tx, tz;
-      if (kidLesson?.cid === e.cid && world.kidDesks) { const d = world.kidDesks[kidLesson.desk]; tx = d.x; tz = d.z; } else { tx = p.x - Math.sin(ry) * .65 + Math.cos(ry) * .4; tz = p.z - Math.cos(ry) * .65 - Math.sin(ry) * .4; }
+      if (kidLesson?.cid === e.cid && (kidLesson.pos || world.kidDesks)) { const d = kidLesson.pos || world.kidDesks[kidLesson.desk]; tx = d.x; tz = d.z; } else { tx = p.x - Math.sin(ry) * .65 + Math.cos(ry) * .4; tz = p.z - Math.cos(ry) * .65 - Math.sin(ry) * .4; }
       const dx = tx - m.position.x, dz = tz - m.position.z, dist = Math.hypot(dx, dz); let moving = false;
       if (cry && e.stage === 'chap') { kidAnim(e, dt, false, 'fall'); continue; }
       let fast = false; if (dist > 6) { m.position.set(tx, 0, tz); } else if (dist > .12) { fast = dist > 1.2; const sp = Math.min(dist, dt * (fast ? 2.0 : 1.15)); m.position.x += dx / dist * sp; m.position.z += dz / dist * sp; m.rotation.y = Math.atan2(dx, dz); moving = true; }
-      else if (kidLesson?.cid === e.cid) { m.rotation.y = Math.PI; kidAnim(e, dt, false, 'sit'); continue; } else m.rotation.y += (Math.atan2(p.x - m.position.x, p.z - m.position.z) - m.rotation.y) * Math.min(1, dt * 3);
+      else if (kidLesson?.cid === e.cid) { m.rotation.y = kidLesson.pos ? kidLesson.pos.ry : Math.PI; kidAnim(e, dt, false, 'sit'); continue; } else m.rotation.y += (Math.atan2(p.x - m.position.x, p.z - m.position.z) - m.rotation.y) * Math.min(1, dt * 3);
       m.position.y = world.floorAt ? world.floorAt(m.position.x, m.position.z) : 0; kidAnim(e, dt, moving, cry ? 'cry' : null, fast); }
     else if (e.kind === 'cradle') { e.rock.rotation.x = Math.sin(kidT * (cry ? 6 : 1.2)) * (cry ? .12 : .05); e.baby.userData.mouth.scale.set(cry ? 1.4 : 1, cry ? 1.4 : .4, 1); }
     else if (e.kind === 'desk') kidAnim(e, dt, false, 'sit');
@@ -2688,7 +2695,8 @@ function kidActs(add) {
       if (!k.cry) add(`🎐 ${k.stage === 'so' ? 'Ru' : 'Chơi với'} ${k.name}`, 'Mỗi giờ 1 lần · bé thêm ngoan', () => { if (!me.carry) emote('cui_chao'); socket.emit('con', { op: 'care', cid: k.id, act: k.stage === 'so' ? 'ru' : 'choi' }); });
     }
     if (near && (k.sick || k.hp < 70)) add(`🩺 Mời Thái y khám cho ${k.name}`, `20 bạc · sức khỏe ${k.hp}${k.sick ? ' · đang ốm' : ''}`, () => socket.emit('con', { op: 'thaiy', cid: k.id }));
-    if (L === 'duongtam' && withMe) add(`🐉 Cho ${k.name} ra mắt Hoàng thượng`, 'Mỗi ngày 1 lần · sủng ái', () => socket.emit('con', { op: 'khoe', cid: k.id }));
+    if (L === 'duongtam' && withMe) { if (k.stage === 'hoc') add(`📜 Cho ${k.name} trình bài với phụ hoàng`, k.khao ? 'Hôm nay đã trình bài' : 'Mỗi ngày 1 lần · đối đáp trôi chảy cả mẹ lẫn con được khen', () => socket.emit('con', { op: 'khaoStart', cid: k.id }), k.khao); else add(`🐉 Cho ${k.name} ra mắt Hoàng thượng`, 'Mỗi ngày 1 lần · sủng ái', () => socket.emit('con', { op: 'khoe', cid: k.id })); }
+    if (L === 'acaso' && vua.khao && k.stage === 'hoc' && (k.ward || me.follow === k.id)) add(`📜 ${k.name} trình bài với phụ hoàng`, k.khao ? 'Hôm nay đã trình bài' : `Hoàng thượng đang ở đây · còn ${vuaLeft(vua.khao.end)}`, () => socket.emit('con', { op: 'khaoStart', cid: k.id }), k.khao);
     if (L === 'acaso' && k.stage === 'hoc' && (k.ward || me.follow === k.id)) for (const [mon, ic, t] of [['van', '📖', 'Học chữ'], k.sex === 'trai' ? ['vo', '🏹', 'Tập bắn cung'] : ['nghe', '🎵', 'Học đàn'], ['duc', '🙇', 'Học lễ nghĩa']]) add(`${ic} ${k.name}: ${t}`, k.hoc[mon] ? 'Hôm nay đã học' : 'Mỗi ngày 1 buổi · càng giỏi càng dễ được Hoàng thượng để mắt', () => socket.emit('con', { op: 'hocStart', cid: k.id, mon }), !!k.hoc[mon]);
     if (L === 'acaso' && k.stage === 'hoc' && !k.ward && me.follow !== k.id) add(`👣 ${k.name} đang ở cung`, 'Về cung dắt bé theo tới đây học', () => socket.emit('goto', 'phong'));
   }
@@ -2701,6 +2709,22 @@ function openKids() {
   <table style="width:100%;font-size:12.5px"><tr><th>Tên</th><th>Tuổi</th><th>Khỏe</th><th>Ngoan</th><th>Văn</th><th>Võ/Nghệ</th><th>Đức</th></tr>${ks.map(k => `<tr><td>${k.sex === 'trai' ? '👦' : '👧'} <b>${esc(k.name)}</b>${k.thaitu ? ' 👑 Thái tử' : ''}${k.ward ? '<br><small>ở A ca sở</small>' : ''}</td><td>${k.age.toFixed(1)} ngày<br><small>${STAGE_N[k.stage]}</small></td><td>${k.hp}${k.sick ? ' 🤒' : ''}</td><td>${k.ngoan}</td><td>${k.van}</td><td>${k.sex === 'trai' ? k.vo : k.nghe}</td><td>${k.duc}</td></tr>`).join('')}</table>
   <div style="color:var(--muted);font-size:12px;margin-top:8px">Sơ sinh 3 ngày đầu: bé khóc đòi bú, thay tã, ru ngủ. Ngày 3–7 chập chững chạy theo mẹ. Từ ngày 7 đi học ở Thượng thư phòng. Mỗi ngày sau 12h, hoàng tử giỏi nhất (văn + võ + đức, tối thiểu 60 điểm) được lập Thái tử.${me.rank < 5 ? '<br>Phi tần dưới bậc Tần chưa được tự nuôi con: bé ở A ca sở, lên Tần sẽ được đón về.' : ''}</div>`);
 }
+// ---- Hoàng thượng kiểm tra bài ----
+socket.on('conKhao', async d => {
+  const dt = world?.loc === 'duongtam', dz = world?.dais?.z ?? -3.8;
+  const pos = dt ? { x: 0, z: dz + 1.65, ry: Math.PI } : { x: .7, z: -1.3, ry: Math.PI };
+  kidLesson = { cid: d.cid, pos }; if (selfC) selfC.target = clampPos(pos.x + .65, pos.z + .35);
+  specCam = { loc: world.loc, keep: true, pos: new THREE.Vector3(pos.x + 1.6, 1.1, pos.z + 1.4), look: new THREE.Vector3(pos.x - .2, .45, pos.z - .5), until: Date.now() + 36e5 };
+  await new Promise(r => setTimeout(r, 1800));
+  let ok = 0; const qs = [...[...HAN].sort(() => Math.random() - .5).slice(0, 2).map(h => ['han', h]), ['le', rpick(LE)]];
+  await say('hoangthuong', 'Hoàng thượng', `${esc(d.name)} lại đây với phụ hoàng. Dạo này học hành thế nào, phụ hoàng hỏi thử con mấy câu.`, [[`${esc(d.name)} khấu kiến phụ hoàng`, 0, 'gold']]);
+  for (const [t, q] of qs) {
+    if (t === 'han') { const [ch, mean] = q; const opts = [mean, ...HAN.filter(h => h[1] !== mean).sort(() => Math.random() - .5).slice(0, 2).map(h => h[1])].sort(() => Math.random() - .5);
+      const i = await say('hoangthuong', 'Hoàng thượng', `Chữ này nghĩa là gì?<div style="font-size:54px;text-align:center;font-family:serif;margin:4px 0">${ch}</div>`, opts.map(o => [esc(o), o, ''])); if (i === mean) ok++; }
+    else { const [qq, [good, ...bad]] = q; const opts = [good, ...bad].sort(() => Math.random() - .5); const i = await say('hoangthuong', 'Hoàng thượng', esc(qq), opts.map(o => [esc(o), o, ''])); if (i === good) ok++; }
+  }
+  dlgClose(); kidLesson = null; if (specCam?.keep) specCam = null; socket.emit('con', { op: 'khao', cid: d.cid, ok });
+});
 // ---- học ở Thượng thư phòng ----
 const HAN = [['人', 'người'], ['山', 'núi'], ['水', 'nước'], ['日', 'mặt trời'], ['月', 'mặt trăng'], ['木', 'cây'], ['火', 'lửa'], ['天', 'trời'], ['地', 'đất'], ['心', 'lòng, tim'], ['孝', 'hiếu thảo'], ['忠', 'trung thành'], ['學', 'học'], ['父', 'cha'], ['母', 'mẹ'], ['子', 'con'], ['王', 'vua'], ['馬', 'ngựa'], ['花', 'hoa'], ['門', 'cửa'], ['口', 'miệng'], ['手', 'tay'], ['大', 'lớn'], ['小', 'nhỏ']];
 const LE = [
