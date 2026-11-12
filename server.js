@@ -357,7 +357,7 @@ function thaiTick() {
 function thaiOne(p) {
   {
     if (!p.thai.known && now() - p.thai.since > 24 * 3600e3) revealThai(p, 'nghen');
-    else if (p.thai.known && now() >= p.thai.due && !Object.values(DB.state.cases).some(c => c.victim === p.id && c.status === 'open')) { if (DB.state.sinh?.id === p.id) return; if (online.has(p.id) && p.loc !== 'tamcung' && sinhStart(p)) return; if (now() - p.thai.due > 12 * 3600e3) birth(p); }
+    else if (p.thai.known && now() >= p.thai.due && (p.thai.test || !Object.values(DB.state.cases).some(c => c.victim === p.id && c.status === 'open'))) { /* thai thử thì không chờ phá án */ if (DB.state.sinh?.id === p.id) return; if (online.has(p.id) && p.loc !== 'tamcung' && sinhStart(p)) return; if (now() - p.thai.due > 12 * 3600e3) birth(p); }
   }
 }
 
@@ -2182,7 +2182,6 @@ function adminRaw(p, text) {
     if (!p.thai) return toast(p, 'Chưa có thai. Gõ /cothai trước.', 'bad'); p.thai.known = true; p.thai.due = now() - 1000; p.thai.test = true;
     const S = DB.state.sinh; if (S && (S.id === p.id || now() - S.until > 10 * 60e3 || !P(S.id))) DB.state.sinh = null; // dọn sự kiện cũ bị kẹt
     if (DB.state.sinh) return toast(p, `${DB.state.sinh.name} đang chuyển dạ, đợi xong rồi thử lại.`, 'bad');
-    const cs = Object.values(DB.state.cases).find(c => c.victim === p.id && c.status === 'open'); if (cs) return toast(p, 'Đang có vụ án hãm hại long thai chưa xử xong nên chưa sinh được. Vào Từ Ninh cung xử án (hoặc /hethan) trước.', 'bad');
     if (p.loc === 'tamcung') return toast(p, 'Đang ở tẩm cung, ra ngoài rồi thử lại.', 'bad');
     if (!sinhStart(p)) return toast(p, 'Chưa bắt đầu được, thử lại sau vài giây.', 'bad');
     return toast(p, 'Bắt đầu chuyển dạ (thử).', 'good'); }
