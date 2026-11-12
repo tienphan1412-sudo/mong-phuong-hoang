@@ -170,6 +170,7 @@ module.exports = {
     DEN_SLOT: [20, 30], DEN_MIN: 25,                           // ngắm trăng thả hoa đăng
     VISIT_SLOTS: [[10, 40], [13, 30], [15, 40], [19, 30]], VISIT_MIN: 10, // ngự giá thăm cung
     MEAL: [[11, 13], [18, 20]],                                // giờ ngự thiện: dâng món ×1.5
+    DAY_CAP: 40,                                               // sủng ái từ Hoàng thượng/ngày, vượt mức chỉ nhận 1/3
   },
   CC_PER_DAY: 5,               // việc riêng từ Phi trở lên: mỗi việc 5 lần/ngày
   HAMHAI: { silver: 80, turns: 1, ok: 0.6 },

@@ -221,9 +221,75 @@ function hall(o, { plaque, screenGold = false }) {
 }
 
 // ---------- Ngự hoa viên ----------
+// Ngự hoa viên mở rộng phía nam: cổng, vườn mẫu đơn, hồ sen + cầu đá, đình Vọng Nguyệt
+function gardenSouth(o, m, t, tree) {
+  const g = o.group, B = o.southBlocks = [];
+  const pathM = new THREE.MeshStandardMaterial({ map: t.stone, roughness: .8 });
+  for (const [z, l] of [[10.2, 4.4], [21, 1.4]]) { const p = new THREE.Mesh(new THREE.PlaneGeometry(1.6, l), pathM); p.rotation.x = -Math.PI / 2; p.position.set(0, .012, z); p.receiveShadow = true; g.add(p); }
+  // cổng hoa nối hai khu vườn
+  const gate = new THREE.Group(); gate.position.set(0, 0, 8.9); g.add(gate);
+  for (const sx of [-1, 1]) { cyl(gate, .13, .15, 3, m.red, sx * 1.15, 1.5, 0, 12); cyl(gate, .24, .26, .2, m.stone, sx * 1.15, .1, 0, 12); B.push({ x: sx * 1.15, z: 8.9, r: .3 }); }
+  box(gate, 2.9, .22, .3, m.red, 0, 2.8, 0); box(gate, 3.4, .14, .7, m.roofTile, 0, 3.05, 0); box(gate, 1.4, .4, .06, m.gold, 0, 2.45, .16);
+  for (const sx of [-1, 1]) { const w = new THREE.Group(); w.position.set(sx * 7.1, 0, 8.9); g.add(w); box(w, 9.8, 1.6, .35, m.wall, 0, .8, 0); box(w, 9.8, .14, .6, m.roofTile, 0, 1.68, 0); B.push(...[-4, -2, 0, 2, 4].map(k => ({ x: sx * 7.1 + k, z: 8.9, r: 1.05 }))); }
+  // vườn mẫu đơn
+  const pet = [0xe0457b, 0xf6c1d3, 0xffffff, 0xf2c14e, 0xc23b5a].map(c => new THREE.MeshStandardMaterial({ color: c, roughness: .7 })), soil = new THREE.MeshStandardMaterial({ color: 0x4a3324 });
+  for (const [x, z] of [[-3, 11], [3, 11], [-6.6, 11], [6.6, 11], [-3, 21.2], [3, 21.2]]) {
+    const bed = new THREE.Group(); bed.position.set(x, 0, z); g.add(bed); box(bed, 2.6, .28, 1.3, m.stone, 0, .14, 0); box(bed, 2.45, .05, 1.15, soil, 0, .29, 0);
+    for (let k = 0; k < 9; k++) { const bx = rnd(-1.05, 1.05), bz = rnd(-.45, .45); const bu = new THREE.Mesh(new THREE.IcosahedronGeometry(rnd(.18, .26), 1), m.leaf); bu.position.set(bx, .45, bz); bed.add(bu);
+      for (let f = 0; f < 3; f++) { const fl = new THREE.Mesh(new THREE.SphereGeometry(rnd(.07, .1), 10, 8), pet[(k + f) % pet.length]); fl.position.set(bx + rnd(-.15, .15), .58 + rnd(0, .08), bz + rnd(-.15, .15)); fl.scale.y = .7; bed.add(fl); } }
+    B.push({ x: x - .7, z, r: .75 }, { x: x + .7, z, r: .75 }); }
+  // hồ sen
+  const lake = new THREE.Mesh(new THREE.CircleGeometry(1, 56), new THREE.MeshStandardMaterial({ map: t.water, roughness: .1, metalness: .3, color: 0xa9dccf })); lake.rotation.x = -Math.PI / 2; lake.scale.set(6.4, 3.5, 1); lake.position.set(0, .02, 16); g.add(lake);
+  for (let k = 0; k < 40; k++) { const a = k / 40 * Math.PI * 2; if (Math.abs(Math.sin(a)) > .93) continue; const r = new THREE.Mesh(new THREE.DodecahedronGeometry(rnd(.18, .34)), m.rock); r.position.set(Math.cos(a) * 6.5, .1, 16 + Math.sin(a) * 3.6); g.add(r); }
+  const pad = new THREE.MeshStandardMaterial({ color: 0x4f8f45, roughness: .7, side: THREE.DoubleSide }), lot = new THREE.MeshStandardMaterial({ color: 0xf3a6c0, roughness: .6 });
+  for (let k = 0; k < 40; k++) { const x = rnd(-5.6, 5.6), z = 16 + rnd(-2.8, 2.8); if (Math.abs(x) < 1.1 || (x * x) / 31 + ((z - 16) ** 2) / 8.4 > 1) continue; const lp = new THREE.Mesh(new THREE.CircleGeometry(rnd(.2, .34), 14, .3, Math.PI * 1.85), pad); lp.rotation.x = -Math.PI / 2; lp.rotation.z = rnd(0, 6); lp.position.set(x, .035, z); g.add(lp);
+    if (k % 3 === 0) { const fl = new THREE.Group(); fl.position.set(x + .05, .05, z); g.add(fl); for (let p = 0; p < 6; p++) { const pe = new THREE.Mesh(new THREE.SphereGeometry(.07, 8, 6), lot); pe.scale.set(.6, 1.3, .35); pe.position.set(Math.cos(p) * .05, .08, Math.sin(p) * .05); pe.rotation.set(Math.sin(p) * .5, 0, -Math.cos(p) * .5); fl.add(pe); } const c = new THREE.Mesh(new THREE.SphereGeometry(.035, 8, 6), m.gold); c.position.y = .1; fl.add(c); } }
+  B.push({ x: -3.55, z: 16, r: 2.85 }, { x: 3.55, z: 16, r: 2.85 }, { x: -5.2, z: 16, r: 2.5 }, { x: 5.2, z: 16, r: 2.5 });
+  // cầu đá lan can son đỏ
+  const br = new THREE.Group(); br.position.set(0, 0, 16); g.add(br);
+  box(br, 1.4, .14, 7.8, m.stone, 0, .09, 0);
+  for (const sx of [-1, 1]) { for (let k = 0; k <= 10; k++) cyl(br, .035, .035, .48, m.red, sx * .66, .38, -3.9 + k * .78, 8); box(br, .05, .05, 7.8, m.red, sx * .66, .62, 0); box(br, .04, .04, 7.8, m.red, sx * .66, .38, 0); }
+  for (const z of [-3.9, 3.9]) for (const sx of [-1, 1]) { const ball = new THREE.Mesh(new THREE.SphereGeometry(.07, 10, 8), m.gold); ball.position.set(sx * .66, .7, z); br.add(ball); }
+  // đình Vọng Nguyệt
+  const pv = new THREE.Group(); pv.position.set(0, 0, 23.4); g.add(pv);
+  box(pv, 4.4, .2, 4, m.stone, 0, .1, 0); box(pv, 4.1, .16, 3.7, m.stone, 0, .27, 0);
+  for (const sx of [-1, 1]) for (const sz of [-1, 1]) { cyl(pv, .1, .1, 2.6, m.red, sx * 1.75, 1.65, sz * 1.55, 12); B.push({ x: sx * 1.75, z: 23.4 + sz * 1.55, r: .2 }); }
+  for (const sz of [-1, 1]) box(pv, 3.7, .18, .14, m.red, 0, 2.85, sz * 1.55); for (const sx of [-1, 1]) box(pv, .14, .18, 3.3, m.red, sx * 1.75, 2.85, 0);
+  const rf = new THREE.Mesh(new THREE.ConeGeometry(3.4, 1.4, 4, 1, true), m.roofTile); rf.rotation.y = Math.PI / 4; rf.position.y = 3.6; pv.add(rf);
+  const rfIn = new THREE.Mesh(new THREE.ConeGeometry(3.38, 1.38, 4, 1, true), new THREE.MeshStandardMaterial({ color: 0x2a5a4c, side: THREE.BackSide })); rfIn.rotation.y = Math.PI / 4; rfIn.position.y = 3.59; pv.add(rfIn);
+  const fin = new THREE.Mesh(new THREE.SphereGeometry(.18, 12, 8), m.gold); fin.position.y = 4.35; pv.add(fin);
+  const plq = new THREE.Mesh(new THREE.PlaneGeometry(1.3, .42), new THREE.MeshStandardMaterial({ map: plaqueTex('望月亭'), roughness: .5 })); plq.position.set(0, 2.6, -1.63); plq.rotation.y = Math.PI; pv.add(plq);
+  const tb = new THREE.Group(); tb.position.set(0, .35, .1); pv.add(tb); cyl(tb, .45, .45, .06, m.stone, 0, .44, 0, 20); cyl(tb, .12, .22, .42, m.stone, 0, .21, 0, 12);
+  B.push({ x: 0, z: 23.5, r: .55 });
+  [-.85, .85].forEach((dx, i) => { const sd = DECOR.ghedon.make(); sd.position.set(dx, .35, .1); pv.add(sd); o.seats.push({ id: 'hv' + (3 + i), x: dx, z: 23.5, ry: dx < 0 ? Math.PI / 2 : -Math.PI / 2, top: .57, kind: 'chair', obj: sd }); });
+  // liễu, đào quanh hồ
+  for (const [x, z, s, p] of [[-8.4, 13, 1.2, false], [8.2, 13.6, 1.1, false], [-8, 19.5, 1.15, false], [8.6, 19, 1.2, false], [-9.5, 23.5, 1.1, true], [9.5, 23.5, 1.1, true], [-5.5, 24.3, .9, true], [5.5, 24.3, .9, true]]) { tree(x, z, s, p); B.push({ x, z, r: .3 }); }
+  // đèn đá dọc lối
+  for (const [x, z] of [[1.15, 11.6], [-1.15, 11.6], [1.15, 20.7], [-1.15, 20.7]]) { const s = new THREE.Group(); s.position.set(x, 0, z); g.add(s); cyl(s, .12, .16, .7, m.stone, 0, .35, 0, 6); box(s, .3, .25, .3, m.stone, 0, .82, 0); const c = cyl(s, .22, .02, .18, m.stone, 0, 1.03, 0, 6); c.rotation.y = .5; const lt = new THREE.Mesh(new THREE.BoxGeometry(.16, .14, .16), m.candle); lt.position.y = .82; s.add(lt); B.push({ x, z, r: .22 }); }
+}
+// Dưỡng Tâm điện: án thư trước ngai (mài mực hầu bút) và sập cờ bên hông (hầu cờ)
+function duongtamProps(o) {
+  const m = mats(), g = o.group, dz = o.dais.z, y = o.dais.y;
+  const wood = new THREE.MeshStandardMaterial({ color: 0x3a1a0e, roughness: .4 }), lac = new THREE.MeshStandardMaterial({ color: 0x7a1a12, roughness: .35 });
+  const desk = new THREE.Group(); desk.position.set(0, y, dz + .55); g.add(desk);
+  box(desk, 1.5, .05, .36, lac, 0, .4, 0); box(desk, 1.44, .07, .3, wood, 0, .34, 0);
+  for (const sx of [-1, 1]) { box(desk, .06, .38, .32, wood, sx * .68, .19, 0); box(desk, .1, .03, .38, m.gold, sx * .68, .02, 0); }
+  const yel = new THREE.MeshStandardMaterial({ color: 0xe8c04a, roughness: .7 }), paper = new THREE.MeshStandardMaterial({ color: 0xf5ecd6, roughness: .9 }), ink = new THREE.MeshStandardMaterial({ color: 0x111111, roughness: .25 });
+  for (let k = 0; k < 4; k++) { const b = box(desk, .2, .028, .13, k % 2 ? yel : paper, -.52, .44 + k * .03, -.02); b.rotation.y = (k - 1.5) * .08; }
+  const sc = box(desk, .36, .006, .22, paper, -.08, .428, .02); sc.rotation.y = .06;
+  for (let k = 0; k < 6; k++) box(desk, .004, .007, .16, ink, -.22 + k * .05, .432, .02);
+  box(desk, .16, .05, .05, wood, .22, .45, -.1); for (let k = 0; k < 4; k++) { cyl(desk, .006, .004, .2, wood, .16 + k * .04, .55, -.1, 6); }
+  const stone = box(desk, .17, .035, .12, new THREE.MeshStandardMaterial({ color: 0x2b2b30, roughness: .5 }), .5, .44, .04); box(desk, .12, .01, .07, ink, .5, .46, .03);
+  o.anthu = { y, z: dz + .55, top: y + .425, ink: { x: .5, y: y + .47, z: dz + .59 }, mai: { x: .98, z: dz + .3, ry: Math.atan2(.5 - .98, .59 - .3) } };
+  // sập La Hán đặt bàn cờ vây
+  const lh = DECOR.lahan.make(), X = 2.45, Z = .6, ry = Math.PI / 2; lh.position.set(X, 0, Z); lh.rotation.y = ry; g.add(lh);
+  const c = Math.cos(ry), sn = Math.sin(ry), at = lx => ({ x: X + lx * c + .06 * sn, z: Z - lx * sn + .06 * c });
+  o.goTable = { obj: lh, board: lh.userData.board, seats: [{ ...at(.56), ry: ry - Math.PI / 2, top: .36, kind: 'chair' }, { ...at(-.56), ry: ry + Math.PI / 2, top: .36, kind: 'chair' }] };
+  o.blocks = [...(o.blocks || []), { x: X, z: Z - .5, r: .5 }, { x: X, z: Z + .5, r: .5 }];
+}
 function garden(o) {
   const m = mats(), t = textures(), g = o.group;
-  const gr = new THREE.Mesh(new THREE.PlaneGeometry(40, 40), new THREE.MeshStandardMaterial({ map: t.grass, roughness: 1 })); gr.rotation.x = -Math.PI / 2; gr.receiveShadow = true; gr.name = 'ground'; g.add(gr);
+  const gr = new THREE.Mesh(new THREE.PlaneGeometry(36, 50), new THREE.MeshStandardMaterial({ map: t.grass, roughness: 1 })); gr.rotation.x = -Math.PI / 2; gr.position.z = 8; gr.receiveShadow = true; gr.name = 'ground'; g.add(gr);
   const path = new THREE.Mesh(new THREE.PlaneGeometry(1.6, 16), new THREE.MeshStandardMaterial({ map: t.stone, roughness: .8 })); path.rotation.x = -Math.PI / 2; path.position.set(0, .01, 0); path.receiveShadow = true; g.add(path);
   const path2 = path.clone(); path2.rotation.z = Math.PI / 2; path2.position.set(0, .011, -2); path2.scale.y = .7; g.add(path2);
   // hồ nước + cầu vòm
@@ -249,15 +315,16 @@ function garden(o) {
   // non bộ đá
   for (const [x, z] of [[1.8, -1], [-1.8, 1.5], [6, 3.5]]) { for (let k = 0; k < 4; k++) { const r = new THREE.Mesh(new THREE.DodecahedronGeometry(rnd(.25, .55)), m.rock); r.position.set(x + rnd(-.4, .4), rnd(.2, .6), z + rnd(-.4, .4)); r.scale.y = rnd(1, 1.8); g.add(r); } }
   // tường cung đỏ ngói vàng bao quanh
-  for (const [x, z, w, ry] of [[0, -10, 20, 0], [0, 10, 20, 0], [-10, 0, 20, Math.PI / 2], [10, 0, 20, Math.PI / 2]]) { const wall = new THREE.Group(); wall.position.set(x, 0, z); wall.rotation.y = ry; g.add(wall); box(wall, w, 2.4, .4, m.wall, 0, 1.2, 0); const rf = box(wall, w, .18, .8, m.roofTile, 0, 2.5, 0); rf.rotation.x = 0; }
+  for (const [x, z, w, ry] of [[0, -10, 24, 0], [0, 26, 24, 0], [-12, 8, 36, Math.PI / 2], [12, 8, 36, Math.PI / 2]]) { const wall = new THREE.Group(); wall.position.set(x, 0, z); wall.rotation.y = ry; g.add(wall); box(wall, w, 2.4, .4, m.wall, 0, 1.2, 0); const rf = box(wall, w, .18, .8, m.roofTile, 0, 2.5, 0); rf.rotation.x = 0; }
   // đèn đá
   for (const [x, z] of [[1, 2.5], [-1, 2.5], [1, -4.5], [-1, -4.5]]) { const s = new THREE.Group(); s.position.set(x, 0, z); g.add(s); cyl(s, .12, .16, .7, m.stone, 0, .35, 0, 6); box(s, .3, .25, .3, m.stone, 0, .82, 0); const c = cyl(s, .22, .02, .18, m.stone, 0, 1.03, 0, 6); c.rotation.y = .5; const lt = new THREE.Mesh(new THREE.BoxGeometry(.16, .14, .16), m.candle); lt.position.y = .82; s.add(lt); }
   shade(g);
-  const sun = new THREE.DirectionalLight(0xfff2d8, 3); sun.position.set(6, 10, 5); sun.castShadow = true; sun.shadow.mapSize.set(2048, 2048); Object.assign(sun.shadow.camera, { left: -12, right: 12, top: 12, bottom: -12 }); g.add(sun);
-  o.lights = { hemi: [0xdff0ff, 0x6a7a4a, 1.8], bg: 0xa9d3ea, fog: [0xcfe3ea, .02], exposure: 1.2 };
-  o.bounds = { minX: -9, maxX: 9, minZ: -9, maxZ: 9 };
-  o.blocks = [{ x: -4.5, z: -1, r: 3.1 }, { x: 4, z: -3, r: .55 }, ...o.seats.map(s => ({ x: s.x, z: s.z, r: .2 }))];
-  o.floorAt = (x, z) => Math.hypot(x - 4, z + 3) < 1.72 ? .25 : 0;
+  const sun = new THREE.DirectionalLight(0xfff2d8, 3); sun.position.set(6, 10, 5); sun.castShadow = true; sun.shadow.mapSize.set(2048, 2048); sun.position.set(7, 14, 14); sun.target.position.set(0, 0, 8); Object.assign(sun.shadow.camera, { left: -16, right: 16, top: 20, bottom: -20, far: 60 }); g.add(sun, sun.target);
+  gardenSouth(o, m, t, tree);
+  o.lights = { hemi: [0xdff0ff, 0x6a7a4a, 1.8], bg: 0xa9d3ea, fog: [0xcfe3ea, .013], exposure: 1.2 };
+  o.bounds = { minX: -11, maxX: 11, minZ: -9, maxZ: 25 };
+  o.blocks = [{ x: -4.5, z: -1, r: 3.1 }, { x: 4, z: -3, r: .55 }, ...o.seats.map(s => ({ x: s.x, z: s.z, r: .2 })), ...o.southBlocks];
+  o.floorAt = (x, z) => Math.hypot(x - 4, z + 3) < 1.72 ? .25 : (Math.abs(x) < .7 && z > 12.1 && z < 19.9) ? .16 : (Math.abs(x) < 2.05 && Math.abs(z - 23.4) < 1.85) ? .34 : 0;
   o.spawn = { x: 0, z: 2 };
   o.cam = { dist: 4, height: 2.2 };
 }
@@ -505,8 +572,8 @@ export function makeScroll() {
 export function buildLocation(loc, opts = {}) {
   const o = { group: new THREE.Group(), npcs: [], lights: null };
   if (loc === 'tuninh') { hall(o, { plaque: '慈寧宮' }); o.npcs = [{ model: 'thaihau', sit: true, name: 'Thái hậu', talk: 'thinhan' }, { model: 'thaiy', x: 2.4, z: 0, ry: -Math.PI / 2, name: 'Thái y', talk: 'thaiy' }, { model: 'mama', x: -2.4, z: 0.4, ry: Math.PI / 2, name: 'Quế ma ma', talk: 'mama' }]; }
-  else if (loc === 'duongtam') { hall(o, { plaque: '養心殿', screenGold: true }); o.npcs = [{ model: 'hoangthuong', sit: true, male: true, name: 'Hoàng thượng', talk: 'dangcanh' }, { model: 'thaigiam', x: 1.6, z: -2, ry: -Math.PI / 3, male: true, name: 'Tổng quản Lý Đức Toàn', talk: 'thaigiam' }, { model: 'thive', x: -3.6, z: 4.2, ry: Math.PI / 2, male: true, name: 'Thị vệ' }]; }
-  else if (loc === 'hoavien') { garden(o); o.npcs = [{ model: 'cungnu', x: 3, z: -1.2, ry: -1, name: 'Cung nữ Tiểu Thúy', talk: 'dotin' }, { model: 'thive', x: 0, z: 8.6, ry: Math.PI, male: true, name: 'Thị vệ' }]; }
+  else if (loc === 'duongtam') { hall(o, { plaque: '養心殿', screenGold: true }); duongtamProps(o); o.npcs = [{ model: 'hoangthuong', sit: true, male: true, name: 'Hoàng thượng', talk: 'dangcanh' }, { model: 'thaigiam', x: 1.6, z: -2, ry: -Math.PI / 3, male: true, name: 'Tổng quản Lý Đức Toàn', talk: 'thaigiam' }, { model: 'thive', x: -3.6, z: 4.2, ry: Math.PI / 2, male: true, name: 'Thị vệ' }]; }
+  else if (loc === 'hoavien') { garden(o); o.npcs = [{ model: 'cungnu', x: 3, z: -1.2, ry: -1, name: 'Cung nữ Tiểu Thúy', talk: 'dotin' }, { model: 'thive', x: 1.75, z: 9.3, ry: Math.PI, male: true, name: 'Thị vệ' }]; }
   else if (loc === 'phong') { room(o, { big: !!opts.palace, palaceName: opts.palace ? opts.palaceName : null }); o.npcs = [{ model: 'cungnu', x: (o.roomSize.W / 2 - .8), z: -o.roomSize.D / 2 + 1, ry: -2.3, name: 'Cung nữ thân tín', talk: 'cungnu' }]; o.decorable = true; }
   else if (loc === 'tamcung') { bedroom(o); o.npcs = [{ model: 'hoangthuong_dem', x: -.5, z: -.4, ry: .4, male: true, name: 'Hoàng thượng', idle: 'khoanh_tay' }]; }
   else if (loc === 'yentiec') { feastVenue(o, opts.venue !== 'in'); o.npcs = [{ model: 'hoangthuong', sit: true, male: true, name: 'Hoàng thượng' }, ...o.npcSeats.map(s => ({ model: s.model, x: s.x, z: s.z, ry: s.ry, name: s.name, kneel: s.top })), { model: 'thaigiam', x: -1.6, z: -3.6, ry: .6, male: true, name: 'Tổng quản Lý Đức Toàn' }, { model: 'cungnu', x: 1.6, z: -3.6, ry: -.6, name: 'Cung nữ dâng rượu' }]; }

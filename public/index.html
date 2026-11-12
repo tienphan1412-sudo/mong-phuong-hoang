@@ -97,6 +97,9 @@ body.staging #top5 { display:none !important; }
 .bubble::after { content:''; position:absolute; left:50%; bottom:-6px; margin-left:-6px; border:6px solid transparent; border-bottom:0; border-top-color:#fffaf0; }
 .modal { position:fixed; inset:0; background:rgba(10,4,4,.55); display:flex; align-items:center; justify-content:center; z-index:15; }
 .modal .card { width:min(640px,94vw); max-height:88vh; overflow-y:auto; }
+.modal.side { background:transparent; pointer-events:none; justify-content:flex-end; align-items:flex-end; padding:0 12px 74px 0; }
+.modal.side .card { pointer-events:auto; width:min(340px,94vw); padding:10px 12px; }
+.modal.side .card h3 { font-size:14px; } .modal.side canvas { width:260px; height:260px; }
 .modal table { width:100%; border-collapse:collapse; font-size:13px; margin:8px 0; }
 .modal th, .modal td { text-align:left; padding:6px; border-bottom:1px solid rgba(255,255,255,.08); }
 .modal th { color:var(--gold); font-weight:600; }

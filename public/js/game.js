@@ -82,7 +82,7 @@ async function enterScene(loc, players, venue, seatId) {
   const FS = { hoavien: [[1.6, 1.4, 2.6], [2.6, -.4, -2], [-.8, 2.6, 3], [.6, -2.2, .4], [3.2, 2.2, -2.4], [-1.6, 4, 2.2]], tuninh: [[-1.6, 2.4, 2.4], [1.6, 2.4, -2.4], [-2.4, 1.6, 1.6], [2.4, 1.4, -1.6], [-1, 3.2, 3], [1, 3.2, -3]] };
   if (FS[loc]) sceneFei.forEach((f, i) => { const sp = FS[loc][i % FS[loc].length]; o.npcs.push({ model: f.model, x: sp[0], z: sp[1], ry: sp[2], name: '🎭 ' + f.name, talk: 'fei:' + f.id }); });
   if (loc === 'yentiec') { let k = 0; for (const n of o.npcs) { if (n.model === 'hoangthuong' || n.sit) continue; const f = sceneFei[k++]; if (!f) break; n.name = '🎭 ' + f.name; n.model = f.model; n.talk = 'fei:' + f.id; } }
-  o.loc = loc; chairSeat = null;
+  o.loc = loc; chairSeat = null; taiOn = false; vuaStage = null;
   await ready();
   await Promise.all([...o.npcs.map(n => loadModel(n.model)), loadModel(me.outfit), ...(players || []).map(p => loadModel(p.outfit))]).catch(() => {});
   if (tok !== loadToken) return;
@@ -147,8 +147,8 @@ function removeOther(id) { const o = others.get(id); if (!o) return; if (o.c) { 
 // ---------------- di chuyển ----------------
 const ray = new THREE.Raycaster(), ndc = new THREE.Vector2();
 let drag = null;
-canvas.addEventListener('pointerdown', e => { if (specCam?.loc !== 'ngutien') specCam = null; drag = { x: e.clientX, y: e.clientY, yaw: camYaw, moved: false }; });
-addEventListener('pointermove', e => { if (!drag || specCam?.loc === 'ngutien') return; const dx = e.clientX - drag.x; if (Math.abs(dx) > 4) drag.moved = true; camYaw = drag.yaw - dx * 0.006; });
+canvas.addEventListener('pointerdown', e => { if (specCam?.loc !== 'ngutien' && !specCam?.keep) specCam = null; drag = { x: e.clientX, y: e.clientY, yaw: camYaw, moved: false }; });
+addEventListener('pointermove', e => { if (!drag || specCam?.loc === 'ngutien' || specCam?.keep) return; const dx = e.clientX - drag.x; if (Math.abs(dx) > 4) drag.moved = true; camYaw = drag.yaw - dx * 0.006; });
 addEventListener('pointerup', e => { const d = drag; drag = null; if (!d || d.moved || e.target !== canvas) return; clickWorld(e); });
 canvas.addEventListener('wheel', e => { camDist = Math.min(7, Math.max(1.4, camDist + e.deltaY * 0.002)); }, { passive: true });
 function clickWorld(e) {
@@ -219,7 +219,7 @@ renderer.setAnimationLoop(() => {
       let p = selfC.root.position;
       if (seated?.ht?.c) { p = p.clone().add(seated.ht.c.root.position).multiplyScalar(.5); p.y = 0; }
       const want = new THREE.Vector3(p.x + Math.sin(camYaw) * camDist, camH, p.z + Math.cos(camYaw) * camDist);
-      if (['phong', 'tamcung', 'lanhcung', 'ngutien'].includes(world.loc)) { const b = world.bounds, m = .3; want.x = Math.min(b.maxX + m, Math.max(b.minX - m, want.x)); want.z = Math.min(b.maxZ + m, Math.max(b.minZ - m, want.z)); }
+      if (['phong', 'tamcung', 'lanhcung', 'ngutien', 'duongtam', 'tuninh'].includes(world.loc)) { const b = world.bounds, m = .3; want.x = Math.min(b.maxX + m, Math.max(b.minX - m, want.x)); want.z = Math.min(b.maxZ + m, Math.max(b.minZ - m, want.z)); }
       if (!Number.isFinite(camera.position.x + camera.position.y + camera.position.z)) snapCam = true;
       if (!Number.isFinite(want.x + want.y + want.z)) { want.set(0, 1.6, 3); }
       if (snapCam) { camera.position.copy(want); snapCam = false; } else camera.position.lerp(want, Math.min(1, dt * 6)); camera.lookAt(p.x, seated ? (world.bedTop || .4) + .32 : .85, p.z);
@@ -410,8 +410,8 @@ function talk(n) {
 
 // ---------------- hộp thoại ----------------
 let bigOpen = false;
-function modal(html) { bigOpen = false; $('mcard').classList.remove('wide'); $('mcard').innerHTML = html; $('modal').classList.remove('hidden'); }
-function closeModal() { bigOpen = false; $('modal').classList.add('hidden'); }
+function modal(html) { bigOpen = false; $('modal').classList.remove('side'); $('mcard').classList.remove('wide'); $('mcard').innerHTML = html; $('modal').classList.remove('hidden'); }
+function closeModal() { bigOpen = false; $('modal').classList.remove('side'); $('modal').classList.add('hidden'); }
 window._close = closeModal;
 $('modal').addEventListener('click', e => { if (e.target === $('modal')) closeModal(); });
 
@@ -1257,6 +1257,11 @@ function taiStart(c, tai) {
   taiEnd(c); if (c === selfC) taiOn = true;
   const r = c.root, P = r.position.clone(), ry = r.rotation.y, fx = Math.sin(ry), fz = Math.cos(ry);
   c._taiHome = { x: P.x, z: P.z, y: P.y, ry };
+  if (tai === 'maimuc' && world?.anthu) { const A = world.anthu; r.position.set(A.mai.x, A.y, A.mai.z); r.rotation.y = A.mai.ry; c.play('dung_cho');
+    const st = makeInkStick(); world.group.add(st); c._taiProp = st; const hp = new THREE.Vector3();
+    c.post = (cc, t) => { aim(cc.root, cc.B.rArm, cc.B.rFore, v3([-.1, -.6, .8])); aim(cc.root, cc.B.rFore, cc.B.rHand, v3([Math.sin(t * 4) * .35, -.55, .75 + Math.cos(t * 4) * .2])); aim(cc.root, cc.B.lArm, cc.B.lFore, v3([.2, -.65, .7])); aim(cc.root, cc.B.lFore, cc.B.lHand, v3([-.55, -.1, .8])); aim(cc.root, cc.B.neck, cc.B.head, v3([0, .75, .65])); cc.root.updateMatrixWorld(true); cc.B.rHand.getWorldPosition(hp); st.position.set(hp.x, Math.max(A.ink.y, hp.y - .06), hp.z); };
+    return; }
+  if (tai === 'cohau' && world?.goTable) { seatPose(c, world.goTable.seats[0]); c.post = (cc, t) => goReach(cc, t); return; }
   if (tai === 'đàn') {
     const g = new THREE.Group(); world.group.add(g); c._taiProp = g;
     const stool = DECOR.ghedon.make(); stool.position.set(P.x, P.y, P.z); stool.scale.y = .95; g.add(stool);
@@ -2166,6 +2171,7 @@ function goDraw(msg) {
   const turnName = g.turn === 1 ? V.names[0] : V.names[1];
   modal(`<h3>⚫⚪ Cờ vây · ${esc(V.names[0])} (đen) đấu ${esc(V.names[1])} (trắng)</h3>
   <div style="font-size:12.5px;color:var(--muted)">${g.over ? '' : `Lượt: <b style="color:var(--gold2)">${g.turn === 1 ? '⚫' : '⚪'} ${esc(turnName)}</b>${g.turn === V.my ? ' (bổn cung)' : ''} · `}Bắt được: ⚫ ${g.cap[1]} · ⚪ ${g.cap[2]}${msg ? ` · ${esc(msg)}` : ''}</div>
+  ${V.ht && !g.over ? (() => { const e = GOL.score(g), df = e.black - e.white; return `<div style="font-size:12.5px;margin-top:4px">Ước đếm: ⚫ ${e.black} · ⚪ ${e.white} (đã chấp 5.5) → ${df > 10 ? '<b style="color:#ff9b8a">bổn cung đang thắng đậm, người sẽ phật ý</b>' : df > 0 ? '<b style="color:#9be08a">thắng sít sao</b>' : df >= -10 ? '<b style="color:#ffd77a">thua sít sao, đúng ý nhất</b>' : 'đang thua đậm'}</div>`; })() : ''}
   <canvas id="goC" width="${S}" height="${S}" style="display:block;margin:8px auto;border-radius:8px;cursor:pointer;max-width:100%"></canvas>
   <div class="btns">${g.over ? '<button class="gold" id="goX">Đóng</button>' : `<button id="goP" ${g.turn !== V.my ? 'disabled' : ''}>Bỏ lượt</button><button id="goR">Chịu thua</button><button id="goX">Thu nhỏ</button>`}</div>`);
   const cv = $('goC'), x = cv.getContext('2d');
@@ -2177,7 +2183,8 @@ function goDraw(msg) {
   cv.onclick = e => { if (g.over || g.turn !== V.my) return; const r = cv.getBoundingClientRect(), sx = S / r.width; const i = Math.round((e.clientX - r.left) * sx / c) - 1, j = Math.round((e.clientY - r.top) * sx / c) - 1; if (i < 0 || j < 0 || i > 8 || j > 8) return; goMove(j * 9 + i); };
   const P = $('goP'); if (P) P.onclick = () => goMove(-1);
   const Rz = $('goR'); if (Rz) Rz.onclick = () => { if (!confirm('Chịu thua ván này?')) return; if (V.ai) goFinish(false, 'Bổn cung chịu thua.', true); else socket.emit('co', { op: 'move', id: V.id, resign: true }); };
-  $('goX').onclick = () => { closeModal(); if (g.over) GOV = null; };
+  if (V.ht) $('modal').classList.add('side');
+  $('goX').onclick = () => { closeModal(); if (g.over) { GOV = null; if (V.ht) vuaStageOff(); } };
 }
 function goMove(i) {
   const V = GOV; if (!V) return;
@@ -2231,12 +2238,14 @@ function openDay() {
 // =====================================================================
 // THÁNH CHỈ CẬP NHẬT: hiện một lần cho mỗi bản mới
 // =====================================================================
-const UPDATE_VER = 'u2026-11-12c';
+const UPDATE_VER = 'u2026-11-12d';
 const UPDATE_NOTES = [
-  ['🌸 Theo hầu Hoàng thượng dạo vườn', '10:00, 14:00, 16:30 Hoàng thượng dạo Ngự hoa viên 20 phút. Bấm Theo hầu để đi cạnh người, đáp 3 câu hợp tâm trạng được tới 18 sủng ái. Ai hầu khéo nhất buổi được thưởng thêm.'],
-  ['⚫⚪ Hầu cờ · 🖌 Mài mực · 📜 Đối thơ', 'Ở Dưỡng Tâm điện, mỗi việc 1 lần/ngày. Đánh cờ thua sít sao được sủng nhiều nhất, thắng đậm người phật ý. Mài mực xong có thể liếc trộm tấu chương: được tin quý hoặc bị quở.'],
-  ['🐉 Hoàng thượng ngự giá thăm cung', 'Khoảng 10:40, 13:30, 15:40, 19:30 người ghé cung của một phi tần đang online. Có 10 phút về cung nghênh giá; cung bài trí đẹp, có trà, mặc đúng màu được nhiều điểm. Không có mặt thì người phật ý.'],
+  ['🌸 Ngự hoa viên rộng gấp đôi', 'Qua cổng hoa phía nam là vườn mẫu đơn, hồ sen có cầu đá lan can son và đình Vọng Nguyệt trên cao. Đình có đôn ngồi nghỉ, ngắm hồ.'],
+  ['🌸 Theo hầu Hoàng thượng dạo vườn', '10:00, 14:00, 16:30 (20 phút). Hoàng thượng đi một vòng hồ cá → vườn mẫu đơn → cầu hồ sen → đình Vọng Nguyệt rồi quay lại. Theo sau người, tới mỗi cảnh người dừng lại hỏi chuyện hợp cảnh đó, đáp 3 câu hợp tâm trạng được tới 18 sủng ái.'],
+  ['⚫⚪ Hầu cờ · 🖌 Mài mực · 📜 Đối thơ', 'Ở Dưỡng Tâm điện, mỗi việc 1 lần/ngày. Hầu cờ: Hoàng thượng rời ngai sang sập La Hán đánh cờ cùng bổn cung, quân cờ hiện trên bàn thật, có ước đếm để canh thua sít sao (trong 10 mục). Mài mực: đứng bên án thư mài mực trong lúc Hoàng thượng phê tấu chương, xong có thể liếc trộm tấu chương. Đối thơ có thêm nhiều câu mới.'],
+  ['🐉 Hoàng thượng ngự giá thăm cung', 'Khoảng 10:40, 13:30, 15:40, 19:30 người ghé cung một phi tần đang online. Có 10 phút về cung nghênh giá; cung bài trí đẹp, có trà, mặc đúng màu được nhiều điểm. Lỡ dịp cũng không bị phạt.'],
   ['🌕 Ngắm trăng thả hoa đăng', '20:30 tối, ra hồ Ngự hoa viên viết lời ước thả hoa đăng (+2 sủng). Hết giờ Hoàng thượng nhặt một chiếc, đọc to lời ước cho cả cung: người được nhặt +12 sủng ái.'],
+  ['⚖️ Ân sủng có chừng mực', 'Mỗi ngày nhận tối đa 40 sủng ái trọn vẹn từ các hoạt động cùng Hoàng thượng, vượt mức thì chỉ còn 1/3. Người mới vẫn đuổi kịp được.'],
   ['🍽 Giờ ngự thiện', 'Dâng món tự nấu lúc 11–13h hoặc 18–20h được ×1.5 sủng ái, nhưng nấu dở thì cả cung biết. Gây sự nay được 8 lần/ngày.'],
   ['🎉 Ân điển cho hậu cung', 'Mỗi ngày nay có 8 lượt (trước 5), hồi 1 lượt mỗi 30 phút, tích tối đa 20. Hoàng thượng ưu tiên lật thẻ người chơi, phi tần NPC rất hiếm khi được chọn và chỉ khi các nương nương đều đã được sủng hạnh hôm đó.'],
   ['📒 Việc riêng bậc cao', 'Từ Phi trở lên, tại cung riêng: Hiệp lý lục cung và Dạy dỗ người mới mỗi việc 5 lần/ngày (mỗi người chỉ được dạy 1 lần/ngày). Thiết yến nay mỗi ngày 1 lần.'],
@@ -2320,12 +2329,17 @@ function rpick(a) { return a[Math.floor(Math.random() * a.length)]; }
 // =====================================================================
 let vua = {}, vuaHT = null, vuaFollow = false, vuaLan = new Map();
 socket.on('vua', d => { vua = d || {}; if (me && world) { renderActs(); syncVua(); } });
-// đường dạo: đi tới đi lui dọc lối đá, vòng qua bờ hồ
-const WALK_PATH = [[0, 6.5], [0, 1.2], [-1.1, -.6], [-.2, -3.2], [0, -7]];
-const WALK_SEG = WALK_PATH.slice(1).map((p, i) => Math.hypot(p[0] - WALK_PATH[i][0], p[1] - WALK_PATH[i][1])), WALK_LEN = WALK_SEG.reduce((a, b) => a + b, 0);
-function walkPos(t) { // t giây kể từ lúc bắt đầu, tốc độ 0.55 m/s, đi rồi quay lại
-  let d = (t * .55) % (2 * WALK_LEN), back = d > WALK_LEN; if (back) d = 2 * WALK_LEN - d;
-  for (let i = 0; i < WALK_SEG.length; i++) { if (d <= WALK_SEG[i] || i === WALK_SEG.length - 1) { const a = WALK_PATH[i], b = WALK_PATH[i + 1], k = Math.min(1, d / WALK_SEG[i]); const x = a[0] + (b[0] - a[0]) * k, z = a[1] + (b[1] - a[1]) * k; const ry = back ? Math.atan2(a[0] - b[0], a[1] - b[1]) : Math.atan2(b[0] - a[0], b[1] - a[1]); return { x, z, ry }; } d -= WALK_SEG[i]; }
+// đường dạo: hồ cá → vườn mẫu đơn → cầu hồ sen → đình Vọng Nguyệt rồi quay lại, dừng ở mỗi cảnh
+const WALK_PTS = [[0, -7], [0, -2.2], [-1.1, -.8, 'ca', -Math.PI / 2], [0, 1.5], [0, 10.6, 'hoa', Math.PI / 2], [0, 16, 'cau', -Math.PI / 2], [0, 22.6, 'dinh', Math.PI]];
+const WALK_SPD = .55, WALK_STOP = 14, WALK_NAME = { ca: 'hồ cá', hoa: 'vườn mẫu đơn', cau: 'cầu hồ sen', dinh: 'đình Vọng Nguyệt' };
+const WALK_TL = (() => { const tl = [], seq = [...WALK_PTS, ...WALK_PTS.slice(0, -1).reverse()]; let t = 0;
+  seq.forEach((p, i) => { if (p[2]) { tl.push({ t0: t, t1: t + WALK_STOP, stop: p[2], x: p[0], z: p[1], ry: p[3], i }); t += WALK_STOP; }
+    const q = seq[i + 1]; if (!q) return; const d = Math.hypot(q[0] - p[0], q[1] - p[1]); if (d > .01) { tl.push({ t0: t, t1: t + d / WALK_SPD, a: p, b: q, i }); t += d / WALK_SPD; } });
+  return { tl, T: t }; })();
+function walkPos(t) {
+  const n = Math.floor(t / WALK_TL.T), tt = t - n * WALK_TL.T, s = WALK_TL.tl.find(x => tt < x.t1) || WALK_TL.tl[WALK_TL.tl.length - 1];
+  if (s.stop) return { x: s.x, z: s.z, ry: s.ry, stop: s.stop, key: n + ':' + s.i };
+  const k = (tt - s.t0) / (s.t1 - s.t0); return { x: s.a[0] + (s.b[0] - s.a[0]) * k, z: s.a[1] + (s.b[1] - s.a[1]) * k, ry: Math.atan2(s.b[0] - s.a[0], s.b[1] - s.a[1]) };
 }
 function vuaMode() {
   if (!world || !me) return null; const L = world.loc;
@@ -2335,8 +2349,8 @@ function vuaMode() {
   return null;
 }
 function vuaDespawn() {
-  if (vuaHT) { const i = world?.npcs.indexOf(vuaHT.n); if (i >= 0) world.npcs.splice(i, 1); vuaHT.n.label?.element.remove(); vuaHT.c.root.parent?.remove(vuaHT.c.root); if (i >= 0 || vuaHT.w === world) vuaHT.c.dispose(); vuaHT = null; }
-  vuaFollow = false;
+  if (vuaHT) { const H = vuaHT; vuaHT = null; if (H.n && H.c) { const i = world?.npcs.indexOf(H.n) ?? -1; if (i >= 0) world.npcs.splice(i, 1); H.n.label?.element.remove(); H.c.root.parent?.remove(H.c.root); if (i >= 0 || H.w === world) H.c.dispose(); } }
+  if (walkQ) walkFinish(); vuaFollow = false;
 }
 async function syncVua() {
   const mode = vuaMode();
@@ -2350,11 +2364,11 @@ async function syncVua() {
   c.play(mode === 'walk' ? 'di' : 'dung_cho'); w.group.add(c.root);
   const lb = makeLabel('Hoàng thượng', '', true, () => vuaTalk()); c.root.add(lb); c.label = lb;
   const n = { c, name: 'Hoàng thượng', model: 'hoangthuong', label: lb, talk: 'vua' }; w.npcs.push(n); Object.assign(vuaHT, { c, n, loading: false });
-  if (mode === 'walk') FX.push(() => { if (vuaHT?.c !== c) return false; const p = walkPos((Date.now() - vua.walk.start) / 1000); c.root.position.x = p.x; c.root.position.z = p.z; c.root.rotation.y = p.ry; if (c.curName !== 'di') c.play('di'); });
+  if (mode === 'walk') FX.push(() => { if (vuaHT?.c !== c) return false; const p = walkPos((Date.now() - vua.walk.start) / 1000); c.root.position.set(p.x, w.floorAt ? w.floorAt(p.x, p.z) : 0, p.z); c.root.rotation.y = p.ry; const an = p.stop ? 'dung_cho' : 'di'; if (c.curName !== an) c.play(an); vuaHT.pos = p; walkStopCheck(p); });
   if (mode === 'visit') bubble(lb, `${me.name}, trẫm ghé qua thăm nàng.`);
 }
 // theo sau Hoàng thượng khi đang hầu dạo vườn
-setInterval(() => { if (!vuaFollow || !vuaHT?.c || !selfC || seated || chairSeat) return; const h = vuaHT.c.root; const bx = h.position.x - Math.sin(h.rotation.y) * .9 + Math.cos(h.rotation.y) * .55, bz = h.position.z - Math.cos(h.rotation.y) * .9 - Math.sin(h.rotation.y) * .55; if (Math.hypot(bx - selfC.root.position.x, bz - selfC.root.position.z) > .35) selfC.target = clampPos(bx, bz); }, 300);
+setInterval(() => { if (!vuaFollow || !vuaHT?.c || !selfC || seated || chairSeat) return; const h = vuaHT.c.root, p = vuaHT.pos; let bx, bz; if (p?.stop) { bx = h.position.x + Math.sin(h.rotation.y + 1.2) * .8; bz = h.position.z + Math.cos(h.rotation.y + 1.2) * .8; } else { bx = h.position.x - Math.sin(h.rotation.y) * .9; bz = h.position.z - Math.cos(h.rotation.y) * .9; } const dd = Math.hypot(bx - selfC.root.position.x, bz - selfC.root.position.z); if (dd > 6) { const q = clampPos(bx, bz); selfC.root.position.set(q.x, world.floorAt ? world.floorAt(q.x, q.z) : 0, q.z); selfC.target = null; sendMove('dung_cho'); } else if (dd > .35) selfC.target = clampPos(bx, bz); else if (p?.stop && !selfC.target) { const want = Math.atan2(h.position.x - selfC.root.position.x, h.position.z - selfC.root.position.z); if (Math.abs(want - selfC.root.rotation.y) > .3) { selfC.root.rotation.y = want; sendMove('dung_cho'); } } }, 300);
 // hoa đăng trôi trên hồ
 function lanternMesh() {
   const g = new THREE.Group(); const m = lanternMesh.m || (lanternMesh.m = { p: new THREE.MeshStandardMaterial({ color: 0xff8fa8, emissive: 0xff5a3c, emissiveIntensity: .9, side: THREE.DoubleSide }), f: new THREE.MeshBasicMaterial({ color: 0xffe08a }) });
@@ -2378,22 +2392,30 @@ function vuaTalk() {
 }
 // 1) dạo vườn
 function vuaWalkGo() { if (mgOn) return; socket.emit('vua', { op: 'walk' }); }
+let walkQ = null, walkA = {}, walkBusy = false, walkLast = null;
 socket.on('vuaWalk', async qs => {
-  vuaFollow = true; if (selfC) { emote('hanh_le'); }
-  await say('hoangthuong', 'Hoàng thượng', `${esc(me.name)} tới rồi à? Đi dạo cùng trẫm một đoạn.`, [['Thần thiếp xin theo hầu', 0, 'gold']]);
-  const a = [];
-  for (const q of qs) { const i = await say('hoangthuong', 'Hoàng thượng', esc(q.q), q.opts.map((o, k) => [esc(o.t), k, ''])); a.push(i);
-    await say('hoangthuong', 'Hoàng thượng', esc(q.opts[i].r), [['Tiếp', 0]]); }
-  dlgClose(); vuaFollow = false; if (selfC) selfC.target = null; socket.emit('vua', { op: 'walkAns', a });
+  walkQ = qs; walkA = {}; walkLast = null; vuaFollow = true; walkBusy = true; if (selfC) emote('hanh_le');
+  await say('hoangthuong', 'Hoàng thượng', `${esc(me.name)} tới rồi à? Đi dạo cùng trẫm một vòng.<br><small>Theo sau Hoàng thượng. Tới hồ cá, vườn mẫu đơn, cầu hồ sen hay đình Vọng Nguyệt người sẽ dừng lại hỏi chuyện (3 câu).</small>`, [['Thần thiếp xin theo hầu', 0, 'gold']]);
+  dlgClose(); walkBusy = false;
 });
+async function walkStopCheck(p) {
+  if (!walkQ || walkBusy || !p.stop || p.key === walkLast || walkA[p.stop] != null) return;
+  walkLast = p.key; const Q = walkQ[p.stop]; if (!Q) return; walkBusy = true;
+  const i = await say('hoangthuong', `Hoàng thượng · ${WALK_NAME[p.stop]}`, esc(Q.q), Q.opts.map((o, k) => [esc(o.t), k, '']));
+  walkA[p.stop] = i; if (vuaHT?.n?.label) bubble(vuaHT.n.label, Q.opts[i].r);
+  await say('hoangthuong', 'Hoàng thượng', esc(Q.opts[i].r), [[Object.keys(walkA).length >= 3 ? 'Cung tiễn Hoàng thượng' : 'Tiếp tục theo hầu', 0, 'gold']]);
+  dlgClose(); walkBusy = false; if (Object.keys(walkA).length >= 3) walkFinish();
+}
+function walkFinish() { if (!walkQ) return; socket.emit('vua', { op: 'walkAns', a: walkA }); walkQ = null; vuaFollow = false; if (selfC) selfC.target = null; }
 // 2) cờ vây với Hoàng thượng (thua sít sao được nhiều sủng nhất)
 socket.on('vuaCo', async () => {
-  await say('hoangthuong', 'Hoàng thượng', 'Lâu rồi trẫm chưa đánh cờ. Nàng cầm quân đen, đi trước.<br><small>Mẹo: thắng đậm Hoàng thượng phật ý, thua sít sao (dưới 7 mục) mới được sủng nhiều nhất.</small>', [['Thần thiếp xin hầu cờ', 0, 'gold']]); dlgClose();
-  goOpen({ ai: true, my: 1, ht: true, names: [me.name, 'Hoàng thượng'] });
+  vuaStageOn('co');
+  await say('hoangthuong', 'Hoàng thượng', 'Lâu rồi trẫm chưa đánh cờ. Nàng cầm quân đen, đi trước.<br><small>Mẹo: thắng đậm Hoàng thượng phật ý, thua sít sao (trong vòng 10 mục) mới được sủng nhiều nhất. Theo dõi ước đếm ngay dưới bàn cờ.</small>', [['Thần thiếp xin hầu cờ', 0, 'gold']]); dlgClose();
+  goOpen({ K: world?.goTable, ai: true, my: 1, ht: true, names: [me.name, 'Hoàng thượng'] });
 });
 // 3) mài mực hầu bút
 socket.on('vuaMai', () => {
-  if (mgOn) return; if (selfC) { selfC.target = null; selfC.play('chap_tay'); }
+  if (mgOn) return; vuaStageOn('mai');
   let k = 0, dir = 1, raf, taps = 0, good = 0; const N = 6;
   mgOpen(`<div class="mgt">🖌 Mài mực: bấm khi kim vào vùng xanh, mài đều tay (${N} lần)</div><div class="heat"><div class="ok"></div><div class="nd"></div></div><div class="mgs">Lần <b id="mgT">0</b>/${N}</div>`);
   const nd = mgEl.querySelector('.nd'), heat = mgEl.querySelector('.heat'), ok = mgEl.querySelector('.ok'); let zone = .5; const mv = () => { zone = .25 + Math.random() * .5; ok.style.left = (zone - .1) * 100 + '%'; }; mv();
@@ -2402,13 +2424,13 @@ socket.on('vuaMai', () => {
     if (taps >= N) { cancelAnimationFrame(raf); removeEventListener('keydown', key); heat.onpointerdown = null;
       setTimeout(async () => { mgClose(); socket.emit('vua', { op: 'mai', q: good / N });
         const i = await say('hoangthuong', 'Hoàng thượng', '(Hoàng thượng cúi đầu phê tấu chương, một bản tấu đặt lệch mép án thư…)', [['👀 Liếc trộm tấu chương', 1, ''], ['🙇 Lặng lẽ lui ra', 0, 'gold']]);
-        dlgClose(); socket.emit('vua', { op: 'peek', yes: !!i }); }, 700); } };
+        dlgClose(); socket.emit('vua', { op: 'peek', yes: !!i }); setTimeout(vuaStageOff, 1800); }, 700); } };
   const key = e => { if (e.code === 'Space') { e.preventDefault(); tap(); } };
   addEventListener('keydown', key); heat.onpointerdown = tap; raf = requestAnimationFrame(loop);
 });
 // 4) đối thơ ban ngày
 socket.on('vuaTho', async () => {
-  const qs = [...DOI_THO_C].sort(() => Math.random() - .5).slice(0, 3); let ok = 0;
+  const qs = [...DOI_THO_D, ...DOI_THO_D, ...DOI_THO_C].sort(() => Math.random() - .5).slice(0, 3); let ok = 0;
   await say('hoangthuong', 'Hoàng thượng', 'Trẫm vừa nghĩ được mấy câu. Trẫm ra vế trên, nàng đối vế dưới.', [['Thần thiếp xin hầu', 0, 'gold']]);
   for (const [a, b, wrong] of qs) { const opts = [b, ...wrong].sort(() => Math.random() - .5);
     const i = await say('hoangthuong', 'Hoàng thượng', `<i>“${esc(a)}…”</i>`, opts.map((o, k) => [esc(o), k, '']));
@@ -2432,7 +2454,8 @@ function vuaActs(add) {
   if (L === 'hoavien' && vua.walk) add('🌸 Theo hầu Hoàng thượng dạo vườn', `Còn ${vuaLeft(vua.walk.end)} · ${vua.walk.n} người đang hầu · đáp hợp tâm trạng người được nhiều sủng`, vuaWalkGo);
   if (L === 'hoavien' && vua.den) add('🌕 Ngắm trăng cùng Hoàng thượng · thả hoa đăng ước nguyện', vua.den.list.some(x => x.id === me.id) ? 'Đã thả · chờ Hoàng thượng nhặt' : `Còn ${vuaLeft(vua.den.end)} · ${vua.den.list.length} chiếc trên hồ · sủng ái +2, được nhặt +12`, openDen, vua.den.list.some(x => x.id === me.id));
   if (L === 'duongtam') {
-    add('⚫⚪ Hầu cờ Hoàng thượng', VD.co ? 'Hôm nay đã hầu cờ' : 'Mỗi ngày 1 ván · thua sít sao được sủng nhiều nhất', () => socket.emit('vua', { op: 'coStart' }), VD.co);
+    if (GOV?.ht && !GOV.g.over) add('⚫⚪ Trở lại ván cờ', 'Hoàng thượng đang chờ nước đi', () => goDraw());
+    else add('⚫⚪ Hầu cờ Hoàng thượng', VD.co ? 'Hôm nay đã hầu cờ' : 'Mỗi ngày 1 ván · thua sít sao (trong 10 mục) được sủng nhiều nhất', () => socket.emit('vua', { op: 'coStart' }), VD.co);
     add('🖌 Mài mực hầu bút', VD.mai ? 'Hôm nay đã mài mực' : 'Mỗi ngày 1 lần · có thể liếc trộm tấu chương', () => socket.emit('vua', { op: 'maiStart' }), VD.mai);
     add('📜 Đối thơ cùng Hoàng thượng', VD.tho ? 'Hôm nay đã đối thơ' : 'Mỗi ngày 1 lần · đối đúng cả 3 câu được ban thưởng', () => socket.emit('vua', { op: 'thoStart' }), VD.tho);
   }
@@ -2440,3 +2463,49 @@ function vuaActs(add) {
     else add('🐉 Hoàng thượng đang tới cung!', `Mau về cung riêng nghênh giá · còn ${vuaLeft(vua.visit.until)}`, () => socket.emit('goto', 'phong')); }
 }
 setInterval(() => { if (!world || !me) return; const m = vuaMode(); if ((vuaHT?.mode || null) !== m) { syncVua(); renderActs(); } }, 2000);
+// ---- dàn cảnh ở Dưỡng Tâm điện: mài mực bên án thư, hầu cờ trên sập La Hán ----
+function makeInkStick() { const g = new THREE.Group(); const b = new THREE.Mesh(new THREE.BoxGeometry(.022, .1, .034), new THREE.MeshStandardMaterial({ color: 0x151515, roughness: .3 })); b.position.y = .05; g.add(b); const gd = new THREE.Mesh(new THREE.BoxGeometry(.024, .02, .036), new THREE.MeshStandardMaterial({ color: 0xd9a845, metalness: .8, roughness: .3 })); gd.position.y = .08; g.add(gd); return g; }
+function makeBrush() { const g = new THREE.Group(); const h = new THREE.Mesh(new THREE.CylinderGeometry(.006, .007, .2, 8), new THREE.MeshStandardMaterial({ color: 0x5a3a1a, roughness: .5 })); h.position.y = .06; g.add(h); const tip = new THREE.Mesh(new THREE.ConeGeometry(.011, .045, 8), new THREE.MeshStandardMaterial({ color: 0x111111, roughness: .8 })); tip.rotation.x = Math.PI; tip.position.y = -.06; g.add(tip); return g; }
+const goReach = (cc, t) => { if (Math.sin(t * 1.1) < .75) return; aim(cc.root, cc.B.rArm, cc.B.rFore, v3([-.05, -.3, .95])); aim(cc.root, cc.B.rFore, cc.B.rHand, v3([.1, -.5, .85])); };
+let vuaStage = null;
+function vuaStageOn(kind) {
+  vuaStageOff(); if (!world || world.loc !== 'duongtam' || !selfC) return;
+  if (chairSeat) { chairSeat = null; socket.emit('stand'); } if (seated) standUp();
+  const throne = world.npcs.find(n => n.model === 'hoangthuong' && n.sit && n.c), tai = kind === 'mai' ? 'maimuc' : 'cohau';
+  selfC.target = null; taiStart(selfC, tai); socket.emit('emote', 'tai:' + tai);
+  const S = vuaStage = { kind, w: world, throne };
+  if (kind === 'mai') {
+    if (throne) { const br = makeBrush(); world.group.add(br); S.prop = br; const hp = new THREE.Vector3();
+      throne.c.post = (cc, t) => { aim(cc.root, cc.B.rArm, cc.B.rFore, v3([-.05, -.35, .9])); aim(cc.root, cc.B.rFore, cc.B.rHand, v3([.12 + Math.sin(t * 2.3) * .14, -.55, .8])); aim(cc.root, cc.B.neck, cc.B.head, v3([0, .7, .7])); cc.root.updateMatrixWorld(true); cc.B.rHand.getWorldPosition(hp); br.position.copy(hp); br.rotation.set(.35, cc.root.rotation.y, .2); }; }
+    const A = world.anthu; specCam = { loc: 'duongtam', keep: true, pos: new THREE.Vector3(1.75, 1.5, A.z + 2.2), look: new THREE.Vector3(.35, .75, A.z - .15), until: Date.now() + 36e5 };
+  } else {
+    const T = world.goTable; if (throne) { throne.c.root.visible = false; if (throne.label) throne.label.visible = false; }
+    spawn('hoangthuong').then(c => { if (vuaStage !== S || world !== S.w) return c.dispose(); world.group.add(c.root); seatPose(c, T.seats[1]); const lb = makeLabel('Hoàng thượng', '', true); c.root.add(lb); c.label = lb; S.n = { c, name: 'Hoàng thượng', model: 'hoangthuong', label: lb, stage: true }; world.npcs.push(S.n); c.post = (cc, t) => goReach(cc, t + 2.6); });
+    specCam = { loc: 'duongtam', keep: true, pos: new THREE.Vector3(1.25, 1.5, -1.05), look: new THREE.Vector3(2.5, .45, .62), until: Date.now() + 36e5 };
+  }
+}
+function vuaStageOff() {
+  const S = vuaStage; if (!S) return; vuaStage = null;
+  if (S.w !== world) return;
+  if (selfC) { taiEnd(selfC); socket.emit('emote', 'dung_cho'); }
+  if (S.throne?.c) { S.throne.c.post = null; S.throne.c.root.visible = true; if (S.throne.label) S.throne.label.visible = true; }
+  if (S.prop) S.prop.parent?.remove(S.prop);
+  if (S.n) { const i = world.npcs.indexOf(S.n); if (i >= 0) world.npcs.splice(i, 1); S.n.label?.element.remove(); S.n.c.root.parent?.remove(S.n.c.root); S.n.c.dispose(); }
+  if (specCam?.loc === 'duongtam') specCam = null;
+}
+const DOI_THO_D = [
+  ['Lạc hà dữ cô vụ tề phi', 'Thu thủy cộng trường thiên nhất sắc', ['Đào hoa y cựu tiếu đông phong', 'Độc điếu hàn giang tuyết']],
+  ['Nguyệt lạc ô đề sương mãn thiên', 'Giang phong ngư hỏa đối sầu miên', ['Bạch vân thiên tải không du du', 'Vạn kính nhân tung diệt']],
+  ['Cô Tô thành ngoại Hàn San tự', 'Dạ bán chung thanh đáo khách thuyền', ['Thử địa không dư Hoàng Hạc lâu', 'Lộ thượng hành nhân dục đoạn hồn']],
+  ['Không sơn bất kiến nhân', 'Đãn văn nhân ngữ hưởng', ['Độc điếu hàn giang tuyết', 'Hoa lạc tri đa thiểu']],
+  ['Phản cảnh nhập thâm lâm', 'Phục chiếu thanh đài thượng', ['Vạn kính nhân tung diệt', 'Cánh thượng nhất tầng lâu']],
+  ['Hoàng hạc nhất khứ bất phục phản', 'Bạch vân thiên tải không du du', ['Nhất hàng bạch lộ thướng thanh thiên', 'Giang phong ngư hỏa đối sầu miên']],
+  ['Tích nhân dĩ thừa hoàng hạc khứ', 'Thử địa không dư Hoàng Hạc lâu', ['Dạ bán chung thanh đáo khách thuyền', 'Nhân diện đào hoa tương ánh hồng']],
+  ['Thiên sơn điểu phi tuyệt', 'Vạn kính nhân tung diệt', ['Đãn văn nhân ngữ hưởng', 'Đê đầu tư cố hương']],
+  ['Cô chu thoa lạp ông', 'Độc điếu hàn giang tuyết', ['Phục chiếu thanh đài thượng', 'Xứ xứ văn đề điểu']],
+  ['Thanh minh thời tiết vũ phân phân', 'Lộ thượng hành nhân dục đoạn hồn', ['Thu thủy cộng trường thiên nhất sắc', 'Bạch vân thiên tải không du du']],
+  ['Lưỡng cá hoàng ly minh thúy liễu', 'Nhất hàng bạch lộ thướng thanh thiên', ['Thử địa không dư Hoàng Hạc lâu', 'Đào hoa y cựu tiếu đông phong']],
+  ['Khứ niên kim nhật thử môn trung', 'Nhân diện đào hoa tương ánh hồng', ['Lộ thượng hành nhân dục đoạn hồn', 'Giang phong ngư hỏa đối sầu miên']],
+  ['Nhân diện bất tri hà xứ khứ', 'Đào hoa y cựu tiếu đông phong', ['Nhất hàng bạch lộ thướng thanh thiên', 'Dạ bán chung thanh đáo khách thuyền']],
+];
+window.__mph.dbg = () => ({ vuaFollow, walkQ: !!walkQ, walkBusy, pos: selfC && [selfC.root.position.x.toFixed(2), selfC.root.position.z.toFixed(2)], target: selfC?.target, ht: vuaHT?.pos, seated: !!seated, chairSeat: !!chairSeat, taiOn, lying: typeof lying !== 'undefined' && lying });

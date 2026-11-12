@@ -963,15 +963,29 @@ function coEnd(X, G) {
 // ---------- HOÀNG THƯỢNG CÙNG PHI TẦN: dạo vườn, cờ, mài mực, đối thơ, thăm cung, hoa đăng ----------
 // s: điểm theo tâm trạng [vui, mệt, buồn]
 const VUA_WALK = [
-  { q: 'Hoa đào năm nay nở sớm quá.', opts: [{ t: 'Hoa nở sớm vì biết Hoàng thượng sắp tới ngắm.', s: [3, 1, 1], r: 'Nàng khéo miệng thật.' }, { t: 'Thần thiếp hái một nhành cài lên áo cho người nhé?', s: [2, 2, 3], r: 'Ừ, nàng cài đi.' }, { t: 'Hoa nở sớm thì tàn cũng sớm ạ.', s: [-1, 0, -2], r: 'Nàng nói gì mà buồn vậy…' }] },
-  { q: 'Trẫm mỏi chân rồi.', opts: [{ t: 'Thần thiếp đỡ người ra đình nghỉ, sai người dâng trà.', s: [1, 3, 2], r: 'Nàng chu đáo lắm.' }, { t: 'Hoàng thượng còn khỏe lắm, đi thêm một vòng nữa đi ạ!', s: [2, -1, 0], r: 'Nàng muốn trẫm gãy chân à?' }, { t: 'Thần thiếp cũng mỏi chân lắm…', s: [-1, -1, -1], r: 'Hừm.' }] },
-  { q: 'Nhìn đàn cá chép dưới hồ kìa.', opts: [{ t: 'Thần thiếp mang theo bánh, người cho cá ăn cùng thiếp.', s: [3, 2, 2], r: 'Ha ha, chúng tranh nhau kìa!' }, { t: 'Cá chép vượt vũ môn hóa rồng, như Hoàng thượng vậy.', s: [2, 1, 1], r: 'Nịnh vừa thôi.' }, { t: 'Con to kia mà nướng lên chắc ngon lắm ạ.', s: [1, -1, -1], r: 'Nàng… thật là.' }] },
-  { q: 'Triều đình mấy hôm nay nhiều chuyện phiền lòng.', opts: [{ t: 'Thần thiếp không dám bàn chính sự, chỉ mong người bớt lo.', s: [1, 2, 3], r: 'Có nàng ở đây trẫm thấy nhẹ lòng.' }, { t: 'Người kể thần thiếp nghe, thiếp góp ý thử xem.', s: [-1, -2, -1], r: 'Hậu cung không được can dự triều chính.' }, { t: 'Thần thiếp hát một khúc cho người khuây khỏa.', s: [2, 2, 2], r: 'Giọng nàng hay lắm.' }] },
-  { q: 'Gió lên rồi, hơi lạnh.', opts: [{ t: 'Thần thiếp khoác áo choàng cho người.', s: [2, 3, 2], r: 'Ấm rồi.' }, { t: 'Vậy mình về điện thôi ạ.', s: [-1, 1, -1], r: 'Mới ra mà đã đòi về.' }, { t: 'Đứng sát bên người là thần thiếp ấm rồi.', s: [3, 1, 2], r: 'Nàng đó…' }] },
-  { q: 'Nàng thấy các phi tần khác thế nào?', opts: [{ t: 'Các tỷ muội đều hiền thục, sống hòa thuận ạ.', s: [2, 2, 2], r: 'Hậu cung hòa thuận, trẫm yên tâm.' }, { t: 'Có người hay nói xấu sau lưng lắm ạ…', s: [-1, 0, -2], r: 'Trẫm không muốn nghe chuyện thị phi.' }, { t: 'Thần thiếp chỉ để mắt tới Hoàng thượng thôi.', s: [3, 1, 2], r: 'Ha ha.' }] },
-  { q: 'Cảnh đẹp thế này, nàng ngâm một câu thơ đi.', opts: [{ t: '“Xuân miên bất giác hiểu, xứ xứ văn đề điểu…”', s: [2, 2, 2], r: 'Thơ Mạnh Hạo Nhiên, hay.' }, { t: 'Tự làm bốn câu tặng Hoàng thượng.', s: [3, 1, 3], r: 'Nàng tự làm sao? Trẫm sẽ chép lại.' }, { t: 'Thần thiếp không thuộc thơ ạ.', s: [-1, 0, -1], r: 'Vậy về luyện thêm đi.' }] },
-  { q: 'Con chim yến kia hót hay quá.', opts: [{ t: 'Không hay bằng tiếng cười của Hoàng thượng.', s: [3, 0, 2], r: 'Nàng lại nịnh rồi.' }, { t: 'Thần thiếp sai người bắt về nuôi cho người nghe mỗi sáng.', s: [1, 1, 0], r: 'Chim trời nên để nó bay.' }, { t: 'Thần thiếp thấy hơi ồn ạ.', s: [-1, -2, -1], r: '…' }] },
-  { q: 'Lâu rồi trẫm chưa thấy nàng cười.', opts: [{ t: '(Che miệng cười) Gặp người là thần thiếp vui rồi.', s: [3, 2, 3], r: 'Cười lên trông xinh lắm.' }, { t: 'Trong cung nhiều chuyện quá, thần thiếp không cười nổi.', s: [-1, -1, 0], r: 'Ai làm nàng buồn?' }, { t: 'Người kể chuyện vui đi, thần thiếp cười cho.', s: [2, -1, 1], r: 'Trẫm đâu phải con hát.' }] },
+  // hồ cá
+  { at: 'ca', q: 'Nhìn đàn cá chép dưới hồ kìa.', opts: [{ t: 'Thần thiếp mang theo bánh, người cho cá ăn cùng thiếp.', s: [3, 2, 2], r: 'Ha ha, chúng tranh nhau kìa!' }, { t: 'Cá chép vượt vũ môn hóa rồng, như Hoàng thượng vậy.', s: [2, 1, 1], r: 'Nịnh vừa thôi.' }, { t: 'Con to kia mà nướng lên chắc ngon lắm ạ.', s: [1, -1, -1], r: 'Nàng… thật là.' }] },
+  { at: 'ca', q: 'Gió lên rồi, hơi lạnh.', opts: [{ t: 'Thần thiếp khoác áo choàng cho người.', s: [2, 3, 2], r: 'Ấm rồi.' }, { t: 'Vậy mình về điện thôi ạ.', s: [-1, 1, -1], r: 'Mới ra mà đã đòi về.' }, { t: 'Đứng sát bên người là thần thiếp ấm rồi.', s: [3, 1, 2], r: 'Nàng đó…' }] },
+  { at: 'ca', q: 'Con chim yến kia hót hay quá.', opts: [{ t: 'Không hay bằng tiếng cười của Hoàng thượng.', s: [3, 0, 2], r: 'Nàng lại nịnh rồi.' }, { t: 'Thần thiếp sai người bắt về nuôi cho người nghe mỗi sáng.', s: [1, 1, 0], r: 'Chim trời nên để nó bay.' }, { t: 'Thần thiếp thấy hơi ồn ạ.', s: [-1, -2, -1], r: '…' }] },
+  { at: 'ca', q: 'Con cá chép vàng kia cứ bơi theo trẫm.', opts: [{ t: 'Cá cũng biết ai là chân long thiên tử.', s: [3, 1, 1], r: 'Nàng khéo nói thật.' }, { t: 'Chắc nó đói, để thần thiếp rắc ít bánh.', s: [2, 2, 2], r: 'Ừ, rắc đi.' }, { t: 'Bắt về nấu canh dâng người nhé?', s: [0, -1, -2], r: 'Cá chép vàng là điềm lành, không được ăn!' }] },
+  { at: 'ca', q: 'Mặt hồ hôm nay phẳng lặng quá.', opts: [{ t: 'Như lòng thần thiếp mỗi khi ở cạnh người.', s: [2, 2, 3], r: 'Trẫm cũng thấy yên lòng.' }, { t: 'Thần thiếp ném viên sỏi cho vui nhé?', s: [2, -1, -1], r: 'Nàng tinh nghịch quá.' }, { t: 'Hồ lặng thì buồn, thần thiếp không thích.', s: [-1, -1, -2], r: 'Hừm.' }] },
+  // vườn mẫu đơn
+  { at: 'hoa', q: 'Mẫu đơn năm nay nở sớm quá.', opts: [{ t: 'Hoa nở sớm vì biết Hoàng thượng sắp tới ngắm.', s: [3, 1, 1], r: 'Nàng khéo miệng thật.' }, { t: 'Thần thiếp hái một bông cài lên áo cho người nhé?', s: [2, 2, 3], r: 'Ừ, nàng cài đi.' }, { t: 'Hoa nở sớm thì tàn cũng sớm ạ.', s: [-1, 0, -2], r: 'Nàng nói gì mà buồn vậy…' }] },
+  { at: 'hoa', q: 'Trẫm mỏi chân rồi.', opts: [{ t: 'Thần thiếp đỡ người ra đình nghỉ, sai người dâng trà.', s: [1, 3, 2], r: 'Nàng chu đáo lắm.' }, { t: 'Hoàng thượng còn khỏe lắm, đi thêm một vòng nữa đi ạ!', s: [2, -1, 0], r: 'Nàng muốn trẫm gãy chân à?' }, { t: 'Thần thiếp cũng mỏi chân lắm…', s: [-1, -1, -1], r: 'Hừm.' }] },
+  { at: 'hoa', q: 'Lâu rồi trẫm chưa thấy nàng cười.', opts: [{ t: '(Che miệng cười) Gặp người là thần thiếp vui rồi.', s: [3, 2, 3], r: 'Cười lên trông xinh lắm.' }, { t: 'Trong cung nhiều chuyện quá, thần thiếp không cười nổi.', s: [-1, -1, 0], r: 'Ai làm nàng buồn?' }, { t: 'Người kể chuyện vui đi, thần thiếp cười cho.', s: [2, -1, 1], r: 'Trẫm đâu phải con hát.' }] },
+  { at: 'hoa', q: 'Nàng thích hoa gì nhất?', opts: [{ t: 'Hoa nhài, nhỏ mà thơm lâu, như tấm lòng thần thiếp.', s: [3, 2, 3], r: 'Hay, trẫm sẽ sai trồng thêm nhài.' }, { t: 'Mẫu đơn, quốc sắc thiên hương.', s: [2, 1, 1], r: 'Hoa đẹp, người cũng đẹp.' }, { t: 'Thần thiếp không để ý hoa lắm ạ.', s: [-1, -1, -1], r: 'Vậy à…' }] },
+  { at: 'hoa', q: 'Có con ong bay quanh trẫm kìa!', opts: [{ t: 'Thần thiếp đứng chắn cho người!', s: [2, 3, 2], r: 'Nàng dũng cảm đấy.' }, { t: 'Ong thấy người thơm như hoa đó ạ.', s: [3, 0, 1], r: 'Ha ha ha!' }, { t: '(Hét lên, chạy núp sau lưng Hoàng thượng)', s: [1, -2, -1], r: 'Nàng làm trẫm giật mình.' }] },
+  // cầu hồ sen
+  { at: 'cau', q: 'Triều đình mấy hôm nay nhiều chuyện phiền lòng.', opts: [{ t: 'Thần thiếp không dám bàn chính sự, chỉ mong người bớt lo.', s: [1, 2, 3], r: 'Có nàng ở đây trẫm thấy nhẹ lòng.' }, { t: 'Người kể thần thiếp nghe, thiếp góp ý thử xem.', s: [-1, -2, -1], r: 'Hậu cung không được can dự triều chính.' }, { t: 'Thần thiếp hát một khúc cho người khuây khỏa.', s: [2, 2, 2], r: 'Giọng nàng hay lắm.' }] },
+  { at: 'cau', q: 'Nàng thấy các phi tần khác thế nào?', opts: [{ t: 'Các tỷ muội đều hiền thục, sống hòa thuận ạ.', s: [2, 2, 2], r: 'Hậu cung hòa thuận, trẫm yên tâm.' }, { t: 'Có người hay nói xấu sau lưng lắm ạ…', s: [-1, 0, -2], r: 'Trẫm không muốn nghe chuyện thị phi.' }, { t: 'Thần thiếp chỉ để mắt tới Hoàng thượng thôi.', s: [3, 1, 2], r: 'Ha ha.' }] },
+  { at: 'cau', q: 'Sen trong hồ nở rộ rồi.', opts: [{ t: 'Gần bùn mà chẳng hôi tanh mùi bùn, như người quân tử.', s: [2, 2, 3], r: 'Nàng cũng đọc sách nhiều.' }, { t: 'Thần thiếp hái hạt sen nấu chè dâng người.', s: [2, 3, 2], r: 'Trẫm chờ chè của nàng.' }, { t: 'Thần thiếp sợ nước, mình qua cầu nhanh đi ạ.', s: [-1, 0, -1], r: 'Có trẫm ở đây, sợ gì.' }] },
+  { at: 'cau', q: 'Đứng trên cầu nhìn xuống, thấy bóng hai ta dưới nước.', opts: [{ t: 'Bóng soi một đôi, xin người giữ mãi.', s: [3, 1, 3], r: 'Trẫm hứa.' }, { t: 'Bóng thần thiếp trông mập quá…', s: [1, -1, 0], r: 'Ha ha, đâu có.' }, { t: 'Thần thiếp chỉ thấy bóng rồng thôi.', s: [2, 1, 1], r: 'Lại nịnh.' }] },
+  { at: 'cau', q: 'Nếu một ngày trẫm không còn là Hoàng thượng thì sao?', opts: [{ t: 'Thần thiếp vẫn theo người, làm vợ người thường cũng được.', s: [2, 2, 3], r: 'Nàng nói thật lòng chứ?' }, { t: 'Người nói gì vậy, xui lắm ạ!', s: [1, 0, -1], r: 'Trẫm nói đùa thôi.' }, { t: 'Vậy thần thiếp xin về quê.', s: [-2, -2, -2], r: 'Hừ, thì ra là vậy.' }] },
+  // đình Vọng Nguyệt
+  { at: 'dinh', q: 'Cảnh đẹp thế này, nàng ngâm một câu thơ đi.', opts: [{ t: '“Xuân miên bất giác hiểu, xứ xứ văn đề điểu…”', s: [2, 2, 2], r: 'Thơ Mạnh Hạo Nhiên, hay.' }, { t: 'Tự làm bốn câu tặng Hoàng thượng.', s: [3, 1, 3], r: 'Nàng tự làm sao? Trẫm sẽ chép lại.' }, { t: 'Thần thiếp không thuộc thơ ạ.', s: [-1, 0, -1], r: 'Vậy về luyện thêm đi.' }] },
+  { at: 'dinh', q: 'Ngồi nghỉ chân ở đình một lát.', opts: [{ t: 'Thần thiếp xoa bóp vai cho người.', s: [2, 3, 2], r: 'Dễ chịu quá.' }, { t: 'Thần thiếp đàn một khúc cho người nghe.', s: [3, 1, 3], r: 'Tiếng đàn hay lắm.' }, { t: 'Thần thiếp xin về trước, hôm nay mệt quá.', s: [-1, -1, -2], r: 'Vậy nàng về đi.' }] },
+  { at: 'dinh', q: 'Đình này tên Vọng Nguyệt, tối nay trăng sẽ đẹp lắm.', opts: [{ t: 'Tối nay thần thiếp ra thả hoa đăng chờ người.', s: [3, 2, 2], r: 'Trẫm sẽ ra.' }, { t: 'Trăng đẹp sao bằng người.', s: [2, 0, 1], r: 'Nàng lẻo mép quá.' }, { t: 'Thần thiếp hay buồn ngủ sớm lắm ạ.', s: [-1, 0, -1], r: 'Thôi được.' }] },
+  { at: 'dinh', q: 'Nàng vào cung đã lâu, có nhớ nhà không?', opts: [{ t: 'Có người ở đây, nơi này là nhà.', s: [3, 2, 3], r: 'Nàng làm trẫm cảm động.' }, { t: 'Nhớ lắm, thần thiếp muốn xin về thăm.', s: [0, 0, 1], r: 'Để trẫm tính.' }, { t: 'Không nhớ, ở nhà nghèo khổ lắm.', s: [-1, -1, -1], r: 'Hừm.' }] },
 ];
 function VS() { return DB.state.vua || (DB.state.vua = { done: {} }); }
 function vuaPub() {
@@ -983,6 +997,8 @@ function vuaPub() {
 }
 function vuaEmit() { io.emit('vua', vuaPub()); }
 function vuaDay(p) { if (p.vuaDay?.d !== dayKey()) p.vuaDay = { d: dayKey() }; return p.vuaDay; }
+// sủng ái nhận từ Hoàng thượng mỗi ngày: đủ DAY_CAP thì phần vượt chỉ còn 1/3
+function htGain(p, g) { if (g <= 0) { p.sung += g; return g; } const VD = vuaDay(p), used = VD.sg || 0, full = Math.max(0, Math.min(g, C.VUA.DAY_CAP - used)), got = full + Math.round((g - full) / 3); VD.sg = used + g; p.sung += got; return got; }
 const inMeal = () => { const h = vnNow().getUTCHours(); return C.VUA.MEAL.some(([a, b]) => h >= a && h < b); };
 function wpick(list, w) { let tot = list.reduce((a, x) => a + w(x), 0), r = Math.random() * tot; for (const x of list) { r -= w(x); if (r <= 0) return x; } return list[0]; }
 function vuaTick(mins, k) {
@@ -994,7 +1010,7 @@ function vuaTick(mins, k) {
       for (const q of Object.values(DB.players)) if (!q.lanh) notify(q, '🌸 Hoàng thượng dạo Ngự hoa viên', 'Tới Ngự hoa viên theo hầu, đáp khéo được sủng ái.', 'vuawalk'); } });
   if (v.walk && now() > v.walk.end) {
     const e = Object.entries(v.walk.sc).sort((a, b) => b[1] - a[1]);
-    if (e.length >= 2 && e[0][1] > 0) { const w = P(e[0][0]); if (w) { w.sung += 5; news(`🌸 Dạo vườn xong, Hoàng thượng khen ${w.name} hầu chuyện khéo nhất, ban thêm ân sủng.`); toast(w, 'Hầu chuyện khéo nhất buổi dạo vườn: sủng ái +5.', 'good'); push(w); } }
+    if (e.length >= 2 && e[0][1] > 0) { const w = P(e[0][0]); if (w) { htGain(w, 5); news(`🌸 Dạo vườn xong, Hoàng thượng khen ${w.name} hầu chuyện khéo nhất, ban thêm ân sủng.`); toast(w, 'Hầu chuyện khéo nhất buổi dạo vườn: sủng ái +5.', 'good'); push(w); } }
     v.walk = null; ch = true;
   }
   const [dh, dm] = U.DEN_SLOT, dst = dh * 60 + dm, dkey = k + ':den';
@@ -1003,7 +1019,7 @@ function vuaTick(mins, k) {
     for (const q of Object.values(DB.players)) if (!q.lanh) notify(q, '🏮 Thả hoa đăng cùng Hoàng thượng', 'Ra hồ Ngự hoa viên thả hoa đăng ước nguyện.', 'vuaden'); }
   if (v.den && now() > v.den.end) { const L = v.den.list; v.den = null; ch = true;
     if (L.length) { const w = wpick(L, x => 10 + Math.sqrt(Math.max(0, P(x.id)?.sung || 0)) * 2); const p = P(w.id);
-      if (p) { p.sung += 12; addPts(p, 10); push(p); notify(p, '🏮 Hoàng thượng nhặt hoa đăng của bổn cung', w.wish); }
+      if (p) { htGain(p, 12); addPts(p, 10); push(p); notify(p, '🏮 Hoàng thượng nhặt hoa đăng của bổn cung', w.wish); }
       news(`🏮 Hoàng thượng nhặt hoa đăng của ${w.name}, đọc lời ước: “${w.wish}”. Người mỉm cười, sủng ái +12.`); io.emit('denEnd', { id: w.id, name: w.name, wish: w.wish }); } }
   U.VISIT_SLOTS.forEach(([h, m], i) => { const key = k + ':v' + i, st = h * 60 + m;
     if (mins < st || mins >= st + 30 || v.done[key] || v.visit) return;
@@ -1013,7 +1029,7 @@ function vuaTick(mins, k) {
     news(`🐉 Hoàng thượng ngự giá tới cung của ${t.name}.`, 'vua');
     notify(t, '🐉 Hoàng thượng ngự giá tới cung!', `Mau về cung riêng nghênh giá trong ${U.VISIT_MIN} phút.`, 'vuavisit');
     toast(t, `🐉 Hoàng thượng ngự giá tới cung! Mau về cung riêng nghênh giá trong ${U.VISIT_MIN} phút.`, 'good'); });
-  if (v.visit && now() > v.visit.until) { const t = P(v.visit.id); if (t) { t.sung -= 3; news(`🐉 Hoàng thượng tới cung ${t.name} mà chủ nhân không có mặt, phật ý ra về.`); toast(t, 'Hoàng thượng tới cung mà không gặp, phật ý ra về: sủng ái -3.', 'bad'); push(t); } v.visit = null; ch = true; }
+  if (v.visit && now() > v.visit.until) { const t = P(v.visit.id); if (t) { news(`🐉 Hoàng thượng tới cung ${t.name} mà chủ nhân vắng, người để lại một nhành mai rồi về.`); toast(t, 'Hoàng thượng tới cung mà không gặp, để lại một nhành mai rồi về. Lần sau nhớ về kịp nhé.', 'info'); push(t); } v.visit = null; ch = true; }
   if (ch) { vuaEmit(); save(); }
 }
 function vuaSock(sock, getMe) {
@@ -1028,17 +1044,20 @@ function vuaSock(sock, getMe) {
       if (d.k === 'den') v.den = { start: now(), end: now() + (d.min || C.VUA.DEN_MIN) * 60e3, list: [] };
       if (d.k === 'visit') v.visit = { id: t.id, name: t.name, until: now() + C.VUA.VISIT_MIN * 60e3 };
       if (d.k === 'end') { if (v.walk) v.walk.end = 0; if (v.den) v.den.end = 0; }
+      if (d.k === 'reset') { me.vuaDay = null; push(me); }
       vuaEmit(); return;
     }
     if (d.op === 'walk') {
       if (me.loc !== 'hoavien' || !v.walk) return toast(me, 'Hoàng thượng không có ở Ngự hoa viên lúc này.');
       if (v.walk.sc[me.id] != null) return toast(me, 'Bổn cung đã theo hầu lượt dạo này rồi.');
-      v.walk.sc[me.id] = 0; const qs = [...VUA_WALK.keys()].sort(() => Math.random() - .5).slice(0, 3).map(qi => ({ qi, ord: [0, 1, 2].sort(() => Math.random() - .5) }));
-      me._walk = qs; sock.emit('vuaWalk', qs.map(({ qi, ord }) => ({ q: VUA_WALK[qi].q, opts: ord.map(o => ({ t: VUA_WALK[qi].opts[o].t, r: VUA_WALK[qi].opts[o].r })) }))); vuaEmit();
+      v.walk.sc[me.id] = 0; const qs = {};
+      for (const at of ['ca', 'hoa', 'cau', 'dinh']) { const L = [...VUA_WALK.keys()].filter(i => VUA_WALK[i].at === at); qs[at] = { qi: L[rnd(L.length)], ord: [0, 1, 2].sort(() => Math.random() - .5) }; }
+      me._walk = qs; const out = {}; for (const [at, { qi, ord }] of Object.entries(qs)) out[at] = { q: VUA_WALK[qi].q, opts: ord.map(o => ({ t: VUA_WALK[qi].opts[o].t, r: VUA_WALK[qi].opts[o].r })) };
+      sock.emit('vuaWalk', out); vuaEmit();
     } else if (d.op === 'walkAns') {
-      const qs = me._walk; if (!qs || !Array.isArray(d.a)) return; me._walk = null;
-      let tot = 0; qs.forEach(({ qi, ord }, k) => { const o = VUA_WALK[qi].opts[ord[+d.a[k]]]; if (o) tot += o.s[mood]; });
-      const g = Math.max(0, Math.min(18, tot * 2 + 2)); me.sung += g; addPts(me, 6); if (v.walk) v.walk.sc[me.id] = tot; cnt(me, 'vuawalk');
+      const qs = me._walk; if (!qs || !d.a || typeof d.a !== 'object') return; me._walk = null;
+      let tot = 0, n = 0; for (const [at, i] of Object.entries(d.a)) { const Q = qs[at]; if (!Q || n >= 3) continue; const o = VUA_WALK[Q.qi].opts[Q.ord[+i]]; if (o) { tot += o.s[mood]; n++; } }
+      const g = htGain(me, Math.max(0, Math.min(18, tot * 2 + 2))); addPts(me, 6); if (v.walk) v.walk.sc[me.id] = tot; cnt(me, 'vuawalk');
       htSay(tot >= 6 ? `Dạo vườn với ${me.name} thật hợp ý trẫm.` : tot >= 2 ? `Đi dạo cùng ${me.name} cũng vui.` : `${me.name} hôm nay sao vụng về vậy…`);
       toast(me, `Theo hầu Hoàng thượng dạo vườn: sủng ái +${g}, công trạng +6.`, g >= 8 ? 'good' : 'info');
       if (tot >= 6) news(`🌸 ${me.name} theo hầu Hoàng thượng dạo Ngự hoa viên, được khen hầu chuyện hợp ý.`);
@@ -1048,16 +1067,16 @@ function vuaSock(sock, getMe) {
       if (!VD.coOn || VD.co) return; VD.co = 1; const mg = Math.abs(+d.margin || 0), win = !!d.win;
       let g, line;
       if (d.resign) { g = 1; line = 'Chưa đánh đã chịu thua? Lần sau cố lên.'; }
-      else if (!win && mg <= 6.5) { g = 12; line = 'Suýt nữa trẫm thua rồi! Nàng đánh cờ khéo lắm.'; news(`⚫⚪ ${me.name} hầu cờ Hoàng thượng, thua sít sao, được khen đánh cờ có tài.`); }
-      else if (win && mg <= 6.5) { g = 7; line = 'Nàng thắng trẫm à? Được lắm, mai trẫm phục thù.'; news(`⚫⚪ ${me.name} thắng Hoàng thượng một ván cờ sít sao!`); }
+      else if (!win && mg <= 10) { g = 12; line = 'Suýt nữa trẫm thua rồi! Nàng đánh cờ khéo lắm.'; news(`⚫⚪ ${me.name} hầu cờ Hoàng thượng, thua sít sao, được khen đánh cờ có tài.`); }
+      else if (win && mg <= 10) { g = 7; line = 'Nàng thắng trẫm à? Được lắm, mai trẫm phục thù.'; news(`⚫⚪ ${me.name} thắng Hoàng thượng một ván cờ sít sao!`); }
       else if (win) { g = 2; line = '…Nàng thắng đậm quá, chẳng nể trẫm chút nào.'; }
       else { g = 4; line = 'Nàng còn phải luyện thêm nhiều.'; }
-      me.sung += g; addPts(me, 8); cnt(me, 'vuaco'); htSay(line); toast(me, `Hầu cờ Hoàng thượng: sủng ái +${g}, công trạng +8.`, g >= 7 ? 'good' : 'info');
+      g = htGain(me, g); addPts(me, 8); cnt(me, 'vuaco'); htSay(line); toast(me, `Hầu cờ Hoàng thượng: sủng ái +${g}, công trạng +8.`, g >= 7 ? 'good' : 'info');
     } else if (d.op === 'maiStart') {
       if (!atDT()) return; if (VD.mai) return toast(me, 'Hôm nay đã mài mực hầu bút rồi.'); VD.maiOn = 1; sock.emit('vuaMai');
     } else if (d.op === 'mai') {
-      if (!VD.maiOn || VD.mai) return; VD.mai = 1; const q = Math.max(0, Math.min(1, +d.q || 0)); const g = Math.round(3 + 8 * q);
-      me.sung += g; addPts(me, 6); cnt(me, 'vuamai');
+      if (!VD.maiOn || VD.mai) return; VD.mai = 1; const q = Math.max(0, Math.min(1, +d.q || 0)); const g = htGain(me, Math.round(3 + 8 * q));
+      addPts(me, 6); cnt(me, 'vuamai');
       toast(me, `${q > .8 ? 'Mực mài đều, đậm mà không vón.' : q > .4 ? 'Mực mài tạm được.' : 'Mực lúc đặc lúc loãng…'} Sủng ái +${g}.`, q > .4 ? 'good' : 'info');
       htSay(q > .8 ? `Hồng tụ thiêm hương dạ độc thư… có ${me.name} mài mực, trẫm phê tấu chương cũng thấy nhẹ.` : q > .4 ? 'Được rồi, nàng lui ra nghỉ đi.' : 'Mực thế này sao trẫm viết được…');
     } else if (d.op === 'peek') {
@@ -1069,25 +1088,26 @@ function vuaSock(sock, getMe) {
     } else if (d.op === 'thoStart') {
       if (!atDT()) return; if (VD.tho) return toast(me, 'Hôm nay đã đối thơ cùng Hoàng thượng rồi.'); VD.thoOn = 1; sock.emit('vuaTho');
     } else if (d.op === 'tho') {
-      if (!VD.thoOn || VD.tho) return; VD.tho = 1; const ok = Math.max(0, Math.min(3, +d.ok || 0)); const g = [-2, 1, 4, 9][ok];
-      me.sung += g; addPts(me, 3 + ok * 3); cnt(me, 'vuatho');
+      if (!VD.thoOn || VD.tho) return; VD.tho = 1; const ok = Math.max(0, Math.min(3, +d.ok || 0)); const g = htGain(me, [-2, 1, 4, 9][ok]);
+      addPts(me, 3 + ok * 3); cnt(me, 'vuatho');
       htSay(ok === 3 ? `Đối chỉnh lắm! Ban cho ${me.name} cây bút lông tử hào.` : ok === 2 ? 'Đối khá đấy.' : ok === 1 ? 'Còn non tay.' : 'Ha ha ha, nàng đối thế này thì trẫm cười mất.');
       if (ok === 3) news(`📜 ${me.name} đối thơ cùng Hoàng thượng ở Dưỡng Tâm điện, câu nào cũng chỉnh, được ban bút lông tử hào.`);
       toast(me, `Đối thơ đúng ${ok}/3: sủng ái ${g >= 0 ? '+' : ''}${g}.`, ok >= 2 ? 'good' : 'info');
     } else if (d.op === 'den') {
       if (me.loc !== 'hoavien' || !v.den) return toast(me, 'Chưa tới giờ thả hoa đăng.'); if (v.den.list.some(x => x.id === me.id)) return toast(me, 'Đã thả hoa đăng rồi.');
       const wish = String(d.wish || '').replace(/\s+/g, ' ').trim().slice(0, 60) || 'Nguyện Hoàng thượng long thể an khang.';
-      v.den.list.push({ id: me.id, name: me.name, wish }); me.sung += 2; cnt(me, 'vuaden'); toast(me, 'Hoa đăng đã trôi ra hồ. Sủng ái +2, chờ xem Hoàng thượng có nhặt được không…', 'good'); vuaEmit();
+      v.den.list.push({ id: me.id, name: me.name, wish }); htGain(me, 2); cnt(me, 'vuaden'); toast(me, 'Hoa đăng đã trôi ra hồ. Sủng ái +2, chờ xem Hoàng thượng có nhặt được không…', 'good'); vuaEmit();
     } else if (d.op === 'visit') {
       if (!v.visit || v.visit.id !== me.id) return; if (me.loc !== 'phong' || me.visit) return toast(me, 'Về cung riêng để nghênh giá.');
-      const it = new Set((me.decor || []).map(x => x.item)); let sc = 5 + Math.min(8, it.size); const good = [];
+      const it = new Set((me.decor || []).map(x => x.item)); var sc = 5 + Math.min(8, it.size); const good = [];
       if (it.has('lahan') || it.has('banTra')) { sc += 3; good.push('có sẵn trà'); } if (colorMatch(me)) { sc += 4; good.push('áo đúng màu người thích'); }
       if ((me.loyal ?? 50) >= 70) { sc += 2; good.push('cung nữ hầu hạ chu đáo'); } if (it.has('luhuong')) { sc += 1; good.push('trầm hương thơm'); }
-      me.sung += sc; addPts(me, 10); cnt(me, 'vuavisit'); VD.vis = 1; v.visit = null; vuaEmit();
+      sc = htGain(me, sc); addPts(me, 10); cnt(me, 'vuavisit'); VD.vis = 1; v.visit = null; vuaEmit();
       const line = sc >= 18 ? 'Cung của nàng bài trí thanh nhã, trẫm muốn ngồi lại lâu hơn.' : sc >= 11 ? 'Cung nàng cũng ấm cúng lắm.' : 'Cung sao trống trải quá, để trẫm sai Nội vụ phủ đưa thêm đồ.';
       htSay(line); news(`🐉 ${me.name} nghênh giá Hoàng thượng tại cung, ${sc >= 18 ? 'được khen bài trí thanh nhã' : 'Hoàng thượng ngồi dùng trà'}.`);
       toast(me, `Nghênh giá thành công: sủng ái +${sc}, công trạng +10${good.length ? ` (${good.join(', ')})` : ''}.`, 'good');
     }
+    if ((VD.sg || 0) > C.VUA.DAY_CAP && !VD.capN) { VD.capN = 1; setTimeout(() => toast(me, `Hôm nay đã nhận hơn ${C.VUA.DAY_CAP} sủng ái từ Hoàng thượng, từ giờ ân sủng chỉ còn 1/3 tới hết ngày.`, 'info'), 1500); }
     save(); push(me);
   });
 }
@@ -1174,7 +1194,7 @@ function nightTick() {
 // ---------------- vị trí, phòng ----------------
 const LOCS = ['tuninh', 'hoavien', 'duongtam', 'phong', 'tamcung', 'lanhcung', 'yentiec', 'ngutien'];
 // ghế ngồi: loc -> { seatId: playerId }
-const SEATS = {}; const SEAT_IDS = { hoavien: ['hv0', 'hv1', 'hv2'], yentiec: ['f0', 'f1', 'f2', 'f3', 'f4', 'f5', 'f6', 'f7'] };
+const SEATS = {}; const SEAT_IDS = { hoavien: ['hv0', 'hv1', 'hv2', 'hv3', 'hv4'], yentiec: ['f0', 'f1', 'f2', 'f3', 'f4', 'f5', 'f6', 'f7'] };
 function freeSeat(p) { for (const loc in SEATS) for (const k in SEATS[loc]) if (SEATS[loc][k] === p.id) delete SEATS[loc][k]; p.seat = null; }
 function takeSeat(p, id) { const rk = roomOf(p), L = (SEATS[rk] = SEATS[rk] || {}); if (p.loc === 'phong' ? !/^(d\d{1,2}|b0|k\d{1,2}[ab])$/.test(id) : !(SEAT_IDS[p.loc] || []).includes(id)) return false; if (L[id] && L[id] !== p.id && online.has(L[id])) return false; freeSeat(p); L[id] = p.id; p.seat = id; p.anim = 'sit:' + id; return true; }
 function roomOf(p) { return p.loc === 'phong' ? 'phong:' + (p.visit || p.id) : p.loc === 'tamcung' ? 'tamcung:' + p.id : p.loc; }
