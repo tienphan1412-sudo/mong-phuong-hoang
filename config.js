@@ -27,7 +27,7 @@ module.exports = {
     { name: 'Thường tại',     pts: 150,  seats: 0, outfit: 'thuongtai_hong' },
     { name: 'Quý nhân',       pts: 250,  seats: 6, outfit: 'quynhan', extra: ['quynhan_lam'] },
     { name: 'Tần',            pts: 400,  seats: 4, outfit: 'tan', extra: ['tan_tim'] },
-    { name: 'Phi',            pts: 600,  seats: 3, outfit: 'phi' },
+    { name: 'Phi',            pts: 600,  seats: 3, outfit: 'phi', extra: ['phi_lam'] },
     { name: 'Quý phi',        pts: 850,  seats: 2, outfit: 'quyphi', extra: ['quyphi_phuong'] },
     { name: 'Hoàng quý phi',  pts: 1150, seats: 1, outfit: 'hoangquyphi', extra: ['hoangquyphi_kim'] },
   ],
@@ -70,7 +70,7 @@ module.exports = {
     tai: ['đàn', 'múa', 'thơ'],
     mood: ['vui', 'mệt', 'buồn'],
   },
-  OUTFIT_COLOR: { tunu: 'xanh', thuongtai: 'tím', thuongtai_hong: 'hồng', quynhan: 'xanh', quynhan_lam: 'xanh', tan: 'cam', tan_tim: 'tím', phi: 'tím', quyphi: 'đỏ', quyphi_phuong: 'đỏ', hoangquyphi: 'cam', hoangquyphi_kim: 'đỏ', hoanghau: 'vàng', aongu: '' },
+  OUTFIT_COLOR: { tunu: 'xanh', thuongtai: 'tím', thuongtai_hong: 'hồng', quynhan: 'xanh', quynhan_lam: 'xanh', tan: 'cam', tan_tim: 'tím', phi: 'tím', phi_lam: 'xanh', quyphi: 'đỏ', quyphi_phuong: 'đỏ', hoangquyphi: 'cam', hoangquyphi_kim: 'đỏ', hoanghau: 'vàng', aongu: '' },
   // tiệm Nội vụ phủ
   SHOP: {
     sam:   { name: 'Nhân sâm bồi bổ', desc: '+1 lượt (mỗi ngày mua 1 lần)', price: 80 },
