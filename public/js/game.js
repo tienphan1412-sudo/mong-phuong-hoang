@@ -118,7 +118,7 @@ async function enterScene(loc, players, venue, seatId) {
   if (seatId) sitSelfAt(seatId); else sendMove('dung_cho');
   if (sceneLying && o.myBed) { lying = true; lieOn(selfC); }
   if (!window._updChk) { window._updChk = 1; setTimeout(() => showUpdate(), 3000); }
-  snapCam = true; refreshClueMarkers(); if (nb) renderNotebook(); syncFeastHT(); hideLoading();
+  snapCam = true; refreshClueMarkers(); if (nb) renderNotebook(); syncFeastHT(); syncVua(); hideLoading();
   if (loc === 'tamcung' && !me.htTalked) setTimeout(() => { if (world?.loc === 'tamcung') startHtTalk(); }, 2500);
   for (const p of players || []) addOther(p);
   renderMap(); renderActs();
@@ -338,7 +338,7 @@ function renderActs() {
   if (L === 'tuninh' && !me.lanh) add('🔍 Tra án giúp Quế ma ma', me.detDay ? 'Hôm nay đã nhận · mai quay lại' : 'Mỗi ngày 1 vụ · phá đúng được 20 công trạng, 50 bạc · sai không bị phạt', () => socket.emit('npc', { npc: 'mama', op: 'tran' }), me.detDay || me.cases?.length);
   if (L === 'tuninh') { add('🙇 Thỉnh an Thái hậu', me.thinhAn ? 'Hôm nay đã thỉnh an' : 'Miễn phí, mỗi ngày 1 lần · trả lời khéo được thêm điểm', thinhAn, me.thinhAn); if (me.group) for (const m of me.group.members) if (m.id !== me.id && (m.lanh || m.camTuc)) add(`🙏 Cầu tình cho ${esc(m.name)}`, `1 lượt · 50 bạc · ${m.lanh ? 'giúp tiến độ phục vị' : 'giảm 8 giờ cấm túc'}`, () => socket.emit('sis', { op: 'cautinh', who: m.id })); }
   if (L === 'duongtam' && me.goldFish > 0) add(`🐟 Dâng cá chép vàng (${me.goldFish})`, 'Điềm lành · sủng ái +10', () => { emote('cui_chao'); act('dangca'); });
-  if (L === 'duongtam' && me.dish) add(`🍽 Dâng ${me.dish.name} tự tay nấu`, Date.now() - me.dish.t > 2 * 3600e3 ? 'Đã nguội · sủng ái giảm nhiều' : `Còn nóng · ${me.dish.q > .85 ? 'tuyệt hảo' : me.dish.q > .6 ? 'ngon' : 'hơi vụng'}`, () => { emote('cui_chao'); act('dangmon'); });
+  if (L === 'duongtam' && me.dish) add(`🍽 Dâng ${me.dish.name} tự tay nấu`, Date.now() - me.dish.t > 2 * 3600e3 ? 'Đã nguội · sủng ái giảm nhiều' : `Còn nóng · ${me.dish.q > .85 ? 'tuyệt hảo' : me.dish.q > .6 ? 'ngon' : 'hơi vụng'}${me.meal ? ' · đúng giờ ngự thiện ×1.5' : ' · giờ ngự thiện 11-13h, 18-20h được ×1.5'}`, () => { emote('cui_chao'); act('dangmon'); });
   if (L === 'ngutien') { if (me.dish) add(`🍽 ${me.dish.name} đã xong`, 'Mang lên Dưỡng Tâm điện dâng Hoàng thượng', () => socket.emit('goto', 'duongtam')); else add('📖 Bí kíp nhà bếp · nấu món', `1 lượt · 40 bạc · còn ${3 - (me.cookN || 0)} lần hôm nay`, () => openBiKip(), cooking); }
   if (L === 'duongtam') add('🍲 Dâng canh Hoàng thượng', '1 lượt · 30 bạc · nấu đúng món người thèm được sủng nhiều', gameCanh);
   if (L === 'yentiec') { if (!feast?.mine) add('🎎 Dâng tiết mục', 'Đàn, múa quạt, múa lụa, kiếm vũ, ngâm thơ, hát', performFeast); add('🍶 Kính rượu', 'Kính Hoàng thượng hoặc các tỷ muội trong tiệc', openRuou); add('💃 Ra múa cùng mọi người', 'Đủ người cùng múa thì Hoàng thượng thưởng', danceTogether); add('🍶 Tửu lệnh', 'Mỗi 4 phút một câu: gõ vế sau thành ngữ vào chat, ai nhanh nhất thắng', () => toast('Chờ Tửu lệnh hiện ở trên màn hình rồi gõ đáp án vào ô chat.')); add('🚪 Rời yến tiệc', '', () => socket.emit('goto', 'hoavien')); }
@@ -365,6 +365,7 @@ function renderActs() {
   if (L === 'tuninh' && me.hhVote) add('👑 Bầu phượng ấn', me.hhVote.mine ? 'Đã tiến cử · có thể đổi' : 'Tiến cử người xứng làm Hoàng hậu', openVote);
   const B = me.big; if (B && !B.done && !me.lanh && ['hoavien', 'tuninh', 'duongtam'].includes(L)) add('📜 Tra đại án ở đây', B.invToday.length >= 2 ? 'Hôm nay đã tra đủ 2 lần · mai quay lại' : B.invToday.includes(L) ? 'Hôm nay đã tra ở đây · thử nơi khác' : `1 lượt · còn ${2 - B.invToday.length} lần hôm nay · mỗi người nhận manh mối khác nhau`, () => socket.emit('big', { op: 'inv' }), B.invToday.includes(L) || B.invToday.length >= 2);
   const F = me.fest; if (F && !F.done && !me.lanh) { if (L === 'phong') add('🧵 Thêu gấm cho đại lễ', F.today.theu ? 'Hôm nay đã thêu' : '1 lượt · mỗi ngày 1 lần · thêu khéo được nhiều điểm', () => gameRhythm('múa', q => socket.emit('fest', { op: 'theu', q })), F.today.theu); if (L === 'tuninh') add('📿 Chép kinh cho đại lễ', F.today.kinh ? 'Hôm nay đã chép' : '1 lượt · mỗi ngày 1 lần · +15 điểm đại lễ', () => socket.emit('fest', { op: 'kinh' }), F.today.kinh); }
+  vuaActs(add);
   if (me.isHH) add('👑 Quyền Hoàng hậu', 'Ân xá · phạt cấm túc · thiết yến', openHH);
   renderMenu();
 }
@@ -395,6 +396,7 @@ function talk(n) {
   if (String(n.talk).startsWith('fei:')) return socket.emit('fei', { op: 'talk', id: n.talk.slice(4) });
   if (n.talk === 'ngutru') { bubble(n.label, me.dish ? `${me.dish.name} xong rồi, chủ tử mau mang lên Dưỡng Tâm điện kẻo nguội!` : 'Chủ tử muốn tự tay nấu món dâng Hoàng thượng? Nô tài chuẩn bị bếp ngay!'); if (!me.dish && !cooking) setTimeout(() => openBiKip(), 900); return; }
   if (n.talk === 'thinhan') { if (world.loc === 'tuninh') thinhAn(); }
+  else if (n.talk === 'vua') vuaTalk();
   else if (n.talk === 'dangcanh') gameCanh();
   else if (n.talk === 'dotin') act('dotin');
   else if (n.talk === 'lanh') gameLanh();
@@ -1418,6 +1420,8 @@ function tickNotice() {
   const ev = [];
   for (const [h, m, when] of sched.latThe) ev.push({ t: dayStart + (h * 60 + m) * 60e3, icon: '🏮', text: `${when} Hoàng thượng lật thẻ bài`, hint: me.lanh ? '' : 'Mặc đúng màu áo người thích, dâng hương mê điệp để dễ được chọn' });
   for (const [h, m, venue] of sched.feast) ev.push({ t: dayStart + (h * 60 + m) * 60e3, icon: '🎎', text: `Yến tiệc ${venue === 'in' ? 'trong điện' : 'ngoài trời'}`, hint: 'Chuẩn bị tiết mục đàn, múa hoặc thơ' });
+  if (sched.vua && !me.lanh) { for (const [h, m] of sched.vua.WALK_SLOTS) ev.push({ t: dayStart + (h * 60 + m) * 60e3, icon: '🌸', text: 'Hoàng thượng dạo Ngự hoa viên', hint: 'Tới Ngự hoa viên theo hầu, đáp hợp tâm trạng người' });
+    const [dh, dm] = sched.vua.DEN_SLOT; ev.push({ t: dayStart + (dh * 60 + dm) * 60e3, icon: '🏮', text: 'Ngắm trăng thả hoa đăng cùng Hoàng thượng', hint: 'Ra hồ Ngự hoa viên viết lời ước' }); }
   const lead = (sched.lead || 15) * 60e3;
   const up = ev.filter(e => e.t > nowVN && e.t - nowVN <= lead).sort((a, b) => a.t - b.t);
   if (!up.length || stage) { noticeEl.classList.add('hidden'); return; }
@@ -1741,7 +1745,7 @@ function renderTL() {
   tlEl.innerHTML = `<div class="tt">🍶 TỬU LỆNH · còn <b>${Math.max(0, Math.ceil((tl.end - Date.now()) / 1000))}</b> giây</div><div class="tq">${esc(tl.q)} <span>…?</span></div><div class="th">Gõ vế còn lại vào ô chat rồi Enter. Ai nhanh nhất được Hoàng thượng thưởng rượu!</div>`;
 }
 setInterval(() => { if (tl) renderTL(); }, 1000);
-window.__mph = { tt(to, act) { socket.emit('tt', { to, act }); }, fei() { return sceneFei.map(f => f.id); }, kang() { openKang(world.kangs[0]); }, get renderer() { return renderer; }, get cam() { return camera.position.toArray(); }, get others() { return others; }, get selfC() { return selfC; }, get camYaw() { return camYaw; } };
+window.__mph = { emit(...a) { socket.emit(...a); }, tt(to, act) { socket.emit('tt', { to, act }); }, fei() { return sceneFei.map(f => f.id); }, kang() { openKang(world.kangs[0]); }, get renderer() { return renderer; }, get cam() { return camera.position.toArray(); }, get others() { return others; }, get selfC() { return selfC; }, get camYaw() { return camYaw; } };
 
 // =====================================================================
 // PHÁO HOA, PHẢN ỨNG KHÁN GIẢ, ĐOÀN CA VŨ GIÁO PHƯỜNG
@@ -2172,7 +2176,7 @@ function goDraw(msg) {
   if (V.last != null && V.last >= 0) { x.strokeStyle = '#d23a2a'; x.lineWidth = 2; x.beginPath(); x.arc(c + (V.last % 9) * c, c + ((V.last / 9) | 0) * c, c * .2, 0, 7); x.stroke(); }
   cv.onclick = e => { if (g.over || g.turn !== V.my) return; const r = cv.getBoundingClientRect(), sx = S / r.width; const i = Math.round((e.clientX - r.left) * sx / c) - 1, j = Math.round((e.clientY - r.top) * sx / c) - 1; if (i < 0 || j < 0 || i > 8 || j > 8) return; goMove(j * 9 + i); };
   const P = $('goP'); if (P) P.onclick = () => goMove(-1);
-  const Rz = $('goR'); if (Rz) Rz.onclick = () => { if (!confirm('Chịu thua ván này?')) return; if (V.ai) goFinish(false, 'Bổn cung chịu thua.'); else socket.emit('co', { op: 'move', id: V.id, resign: true }); };
+  const Rz = $('goR'); if (Rz) Rz.onclick = () => { if (!confirm('Chịu thua ván này?')) return; if (V.ai) goFinish(false, 'Bổn cung chịu thua.', true); else socket.emit('co', { op: 'move', id: V.id, resign: true }); };
   $('goX').onclick = () => { closeModal(); if (g.over) GOV = null; };
 }
 function goMove(i) {
@@ -2181,9 +2185,9 @@ function goMove(i) {
   if (GOL.play(V.g, i) === null) return toast('Không đặt được ở đây (tự sát hoặc cướp ko).');
   V.last = i; goStones(V.K, V.g); if (V.g.over) return goEndAI(); goDraw(i < 0 ? 'Bổn cung bỏ lượt' : ''); setTimeout(goAI, 500 + Math.random() * 500);
 }
-function goAI() { const V = GOV; if (!V?.ai || V.g.over) return; const m = GOL.aiMove(V.g); GOL.play(V.g, m); V.last = m; goStones(V.K, V.g); if (V.g.over) return goEndAI(); goDraw(m < 0 ? 'Cung nữ bỏ lượt' : ''); }
+function goAI() { const V = GOV; if (!V?.ai || V.g.over) return; const m = GOL.aiMove(V.g); GOL.play(V.g, m); V.last = m; goStones(V.K, V.g); if (V.g.over) return goEndAI(); goDraw(m < 0 ? `${V.names[1]} bỏ lượt` : ''); }
 function goEndAI() { const s = GOL.score(GOV.g); goFinish(s.winner === GOV.my, `Đếm đất: đen ${s.black}, trắng ${s.white} (chấp 5.5).`); }
-function goFinish(win, text) { const V = GOV; V.g.over = true; socket.emit('co', { op: 'ai', win }); goDraw(text + (win ? ' Bổn cung thắng!' : ' Cung nữ thắng.')); if (win) fireworksSmall(); }
+function goFinish(win, text, resign) { const V = GOV; V.g.over = true; if (V.ht) { const s = GOL.score(V.g); socket.emit('vua', { op: 'coEnd', win, resign: !!resign, margin: Math.abs(s.black - s.white) }); } else socket.emit('co', { op: 'ai', win }); goDraw(text + (win ? ' Bổn cung thắng!' : ` ${V.names[1]} thắng.`)); if (win) fireworksSmall(); }
 function fireworksSmall() { if (selfC) { const p = selfC.root.position; burst(p.x, 1.1, p.z, 50, .8, [0xffd77a, 0xffffff], 1.4, .3, .06); } }
 socket.on('coStart', d => {
   const K = world?.kangs?.find(k => k.i === d.k), my = d.black.id === me.id ? 1 : d.white.id === me.id ? 2 : 0;
@@ -2227,8 +2231,13 @@ function openDay() {
 // =====================================================================
 // THÁNH CHỈ CẬP NHẬT: hiện một lần cho mỗi bản mới
 // =====================================================================
-const UPDATE_VER = 'u2026-11-12b';
+const UPDATE_VER = 'u2026-11-12c';
 const UPDATE_NOTES = [
+  ['🌸 Theo hầu Hoàng thượng dạo vườn', '10:00, 14:00, 16:30 Hoàng thượng dạo Ngự hoa viên 20 phút. Bấm Theo hầu để đi cạnh người, đáp 3 câu hợp tâm trạng được tới 18 sủng ái. Ai hầu khéo nhất buổi được thưởng thêm.'],
+  ['⚫⚪ Hầu cờ · 🖌 Mài mực · 📜 Đối thơ', 'Ở Dưỡng Tâm điện, mỗi việc 1 lần/ngày. Đánh cờ thua sít sao được sủng nhiều nhất, thắng đậm người phật ý. Mài mực xong có thể liếc trộm tấu chương: được tin quý hoặc bị quở.'],
+  ['🐉 Hoàng thượng ngự giá thăm cung', 'Khoảng 10:40, 13:30, 15:40, 19:30 người ghé cung của một phi tần đang online. Có 10 phút về cung nghênh giá; cung bài trí đẹp, có trà, mặc đúng màu được nhiều điểm. Không có mặt thì người phật ý.'],
+  ['🌕 Ngắm trăng thả hoa đăng', '20:30 tối, ra hồ Ngự hoa viên viết lời ước thả hoa đăng (+2 sủng). Hết giờ Hoàng thượng nhặt một chiếc, đọc to lời ước cho cả cung: người được nhặt +12 sủng ái.'],
+  ['🍽 Giờ ngự thiện', 'Dâng món tự nấu lúc 11–13h hoặc 18–20h được ×1.5 sủng ái, nhưng nấu dở thì cả cung biết. Gây sự nay được 8 lần/ngày.'],
   ['🎉 Ân điển cho hậu cung', 'Mỗi ngày nay có 8 lượt (trước 5), hồi 1 lượt mỗi 30 phút, tích tối đa 20. Hoàng thượng ưu tiên lật thẻ người chơi, phi tần NPC rất hiếm khi được chọn và chỉ khi các nương nương đều đã được sủng hạnh hôm đó.'],
   ['📒 Việc riêng bậc cao', 'Từ Phi trở lên, tại cung riêng: Hiệp lý lục cung và Dạy dỗ người mới mỗi việc 5 lần/ngày (mỗi người chỉ được dạy 1 lần/ngày). Thiết yến nay mỗi ngày 1 lần.'],
   ['🎭 Hậu cung có thêm 6 phi tần', 'Tuệ Quý phi, Mẫn Phi, Uyển Tần, Lệ Tần, Hân Quý nhân, Mai Thường tại cũng tranh ghế, tranh lật thẻ. Gặp họ ở Ngự hoa viên, Từ Ninh cung, yến tiệc, bấm vào tên để trò chuyện: có người nói khích, có người lấy lòng. Thân thì được mách sở thích Hoàng thượng.'],
@@ -2305,3 +2314,129 @@ function playTT(d) {
 }
 socket.on('tt', d => playTT(d));
 function rpick(a) { return a[Math.floor(Math.random() * a.length)]; }
+
+// =====================================================================
+// HOÀNG THƯỢNG CÙNG PHI TẦN: dạo vườn, cờ, mài mực, đối thơ, thăm cung, hoa đăng
+// =====================================================================
+let vua = {}, vuaHT = null, vuaFollow = false, vuaLan = new Map();
+socket.on('vua', d => { vua = d || {}; if (me && world) { renderActs(); syncVua(); } });
+// đường dạo: đi tới đi lui dọc lối đá, vòng qua bờ hồ
+const WALK_PATH = [[0, 6.5], [0, 1.2], [-1.1, -.6], [-.2, -3.2], [0, -7]];
+const WALK_SEG = WALK_PATH.slice(1).map((p, i) => Math.hypot(p[0] - WALK_PATH[i][0], p[1] - WALK_PATH[i][1])), WALK_LEN = WALK_SEG.reduce((a, b) => a + b, 0);
+function walkPos(t) { // t giây kể từ lúc bắt đầu, tốc độ 0.55 m/s, đi rồi quay lại
+  let d = (t * .55) % (2 * WALK_LEN), back = d > WALK_LEN; if (back) d = 2 * WALK_LEN - d;
+  for (let i = 0; i < WALK_SEG.length; i++) { if (d <= WALK_SEG[i] || i === WALK_SEG.length - 1) { const a = WALK_PATH[i], b = WALK_PATH[i + 1], k = Math.min(1, d / WALK_SEG[i]); const x = a[0] + (b[0] - a[0]) * k, z = a[1] + (b[1] - a[1]) * k; const ry = back ? Math.atan2(a[0] - b[0], a[1] - b[1]) : Math.atan2(b[0] - a[0], b[1] - a[1]); return { x, z, ry }; } d -= WALK_SEG[i]; }
+}
+function vuaMode() {
+  if (!world || !me) return null; const L = world.loc;
+  if (L === 'hoavien' && vua.walk && Date.now() < vua.walk.end) return 'walk';
+  if (L === 'hoavien' && vua.den && Date.now() < vua.den.end) return 'den';
+  if (L === 'phong' && !me.visit && vua.visit?.id === me.id && Date.now() < vua.visit.until) return 'visit';
+  return null;
+}
+function vuaDespawn() {
+  if (vuaHT) { const i = world?.npcs.indexOf(vuaHT.n); if (i >= 0) world.npcs.splice(i, 1); vuaHT.n.label?.element.remove(); vuaHT.c.root.parent?.remove(vuaHT.c.root); if (i >= 0 || vuaHT.w === world) vuaHT.c.dispose(); vuaHT = null; }
+  vuaFollow = false;
+}
+async function syncVua() {
+  const mode = vuaMode();
+  if (vuaHT && (vuaHT.w !== world || vuaHT.mode !== mode)) vuaDespawn();
+  syncLanterns();
+  if (!mode || vuaHT) return;
+  const w = world; vuaHT = { w, mode, loading: true, c: null, n: null };
+  const c = await spawn('hoangthuong'); if (world !== w || vuaHT?.w !== w || vuaHT.mode !== mode) { c.dispose(); return; }
+  if (mode === 'den') { c.root.position.set(-1.25, 0, -.4); c.root.rotation.y = -Math.PI / 2 - .3; }
+  else if (mode === 'visit') { c.root.position.set(0, 0, .6); c.root.rotation.y = Math.PI; }
+  c.play(mode === 'walk' ? 'di' : 'dung_cho'); w.group.add(c.root);
+  const lb = makeLabel('Hoàng thượng', '', true, () => vuaTalk()); c.root.add(lb); c.label = lb;
+  const n = { c, name: 'Hoàng thượng', model: 'hoangthuong', label: lb, talk: 'vua' }; w.npcs.push(n); Object.assign(vuaHT, { c, n, loading: false });
+  if (mode === 'walk') FX.push(() => { if (vuaHT?.c !== c) return false; const p = walkPos((Date.now() - vua.walk.start) / 1000); c.root.position.x = p.x; c.root.position.z = p.z; c.root.rotation.y = p.ry; if (c.curName !== 'di') c.play('di'); });
+  if (mode === 'visit') bubble(lb, `${me.name}, trẫm ghé qua thăm nàng.`);
+}
+// theo sau Hoàng thượng khi đang hầu dạo vườn
+setInterval(() => { if (!vuaFollow || !vuaHT?.c || !selfC || seated || chairSeat) return; const h = vuaHT.c.root; const bx = h.position.x - Math.sin(h.rotation.y) * .9 + Math.cos(h.rotation.y) * .55, bz = h.position.z - Math.cos(h.rotation.y) * .9 - Math.sin(h.rotation.y) * .55; if (Math.hypot(bx - selfC.root.position.x, bz - selfC.root.position.z) > .35) selfC.target = clampPos(bx, bz); }, 300);
+// hoa đăng trôi trên hồ
+function lanternMesh() {
+  const g = new THREE.Group(); const m = lanternMesh.m || (lanternMesh.m = { p: new THREE.MeshStandardMaterial({ color: 0xff8fa8, emissive: 0xff5a3c, emissiveIntensity: .9, side: THREE.DoubleSide }), f: new THREE.MeshBasicMaterial({ color: 0xffe08a }) });
+  for (let k = 0; k < 6; k++) { const pt = new THREE.Mesh(new THREE.ConeGeometry(.07, .12, 4, 1, true), m.p); pt.rotation.z = .5; pt.rotation.y = k / 6 * Math.PI * 2; pt.position.set(Math.cos(k / 6 * Math.PI * 2) * .05, .05, Math.sin(k / 6 * Math.PI * 2) * .05); g.add(pt); }
+  const fl = new THREE.Mesh(new THREE.SphereGeometry(.025, 8, 6), m.f); fl.position.y = .08; g.add(fl); return g;
+}
+function syncLanterns() {
+  const want = world?.loc === 'hoavien' && vua.den ? vua.den.list : [];
+  for (const [id, o] of vuaLan) if (o.w !== world || !want.some(x => x.id === id)) { o.g.parent?.remove(o.g); vuaLan.delete(id); }
+  for (const x of want) { if (vuaLan.has(x.id)) continue; const g = lanternMesh(); let h = 0; for (const ch of x.id) h = (h * 31 + ch.charCodeAt(0)) >>> 0;
+    const a0 = (h % 360) / 57.3, r = .8 + (h % 17) / 10, sp = .05 + (h % 7) / 100; g.position.set(-4.5 + Math.cos(a0) * r, .05, -1 + Math.sin(a0) * r); world.group.add(g);
+    const lb = makeLabel('', '', true); lb.element.innerHTML = `<div style="font-size:10px;color:#ffe9b0;max-width:110px;white-space:normal;text-align:center">🏮 ${esc(x.name)}</div>`; lb.position.set(0, .3, 0); g.add(lb);
+    const o = { g, w: world }; vuaLan.set(x.id, o); let t = h % 100;
+    FX.push(dt => { if (!g.parent) { lb.element.remove(); return false; } t += dt; const a = a0 + t * sp; g.position.x = -4.5 + Math.cos(a) * r; g.position.z = -1 + Math.sin(a) * r; g.position.y = .04 + Math.sin(t * 1.7) * .012; g.rotation.y = t * .3; }); }
+}
+socket.on('denEnd', d => { const o = vuaLan.get(d.id); if (o && world?.loc === 'hoavien') { const p = o.g.position; burst(p.x, .3, p.z, 60, .9, [0xffd77a, 0xff8fa8, 0xffffff], 1.6, .4, .06); }
+  showScroll('🏮 Lời ước được Hoàng thượng nhặt', `<b>${esc(d.name)}</b>:<br><i>“${esc(d.wish)}”</i>`, [['Đóng', hideCut]]); });
+function vuaTalk() {
+  const m = vuaMode();
+  if (m === 'walk') return vuaWalkGo(); if (m === 'den') return openDen(); if (m === 'visit') return socket.emit('vua', { op: 'visit' });
+}
+// 1) dạo vườn
+function vuaWalkGo() { if (mgOn) return; socket.emit('vua', { op: 'walk' }); }
+socket.on('vuaWalk', async qs => {
+  vuaFollow = true; if (selfC) { emote('hanh_le'); }
+  await say('hoangthuong', 'Hoàng thượng', `${esc(me.name)} tới rồi à? Đi dạo cùng trẫm một đoạn.`, [['Thần thiếp xin theo hầu', 0, 'gold']]);
+  const a = [];
+  for (const q of qs) { const i = await say('hoangthuong', 'Hoàng thượng', esc(q.q), q.opts.map((o, k) => [esc(o.t), k, ''])); a.push(i);
+    await say('hoangthuong', 'Hoàng thượng', esc(q.opts[i].r), [['Tiếp', 0]]); }
+  dlgClose(); vuaFollow = false; if (selfC) selfC.target = null; socket.emit('vua', { op: 'walkAns', a });
+});
+// 2) cờ vây với Hoàng thượng (thua sít sao được nhiều sủng nhất)
+socket.on('vuaCo', async () => {
+  await say('hoangthuong', 'Hoàng thượng', 'Lâu rồi trẫm chưa đánh cờ. Nàng cầm quân đen, đi trước.<br><small>Mẹo: thắng đậm Hoàng thượng phật ý, thua sít sao (dưới 7 mục) mới được sủng nhiều nhất.</small>', [['Thần thiếp xin hầu cờ', 0, 'gold']]); dlgClose();
+  goOpen({ ai: true, my: 1, ht: true, names: [me.name, 'Hoàng thượng'] });
+});
+// 3) mài mực hầu bút
+socket.on('vuaMai', () => {
+  if (mgOn) return; if (selfC) { selfC.target = null; selfC.play('chap_tay'); }
+  let k = 0, dir = 1, raf, taps = 0, good = 0; const N = 6;
+  mgOpen(`<div class="mgt">🖌 Mài mực: bấm khi kim vào vùng xanh, mài đều tay (${N} lần)</div><div class="heat"><div class="ok"></div><div class="nd"></div></div><div class="mgs">Lần <b id="mgT">0</b>/${N}</div>`);
+  const nd = mgEl.querySelector('.nd'), heat = mgEl.querySelector('.heat'), ok = mgEl.querySelector('.ok'); let zone = .5; const mv = () => { zone = .25 + Math.random() * .5; ok.style.left = (zone - .1) * 100 + '%'; }; mv();
+  const loop = () => { k += dir * .016 * (1 + taps * .18); if (k > 1) { k = 1; dir = -1; } if (k < 0) { k = 0; dir = 1; } nd.style.left = k * 100 + '%'; raf = requestAnimationFrame(loop); };
+  const tap = () => { taps++; if (Math.abs(k - zone) < .1) { good++; heat.classList.add('good'); } else heat.classList.add('bad'); setTimeout(() => heat.classList.remove('good', 'bad'), 200); $('mgT').textContent = taps; mv();
+    if (taps >= N) { cancelAnimationFrame(raf); removeEventListener('keydown', key); heat.onpointerdown = null;
+      setTimeout(async () => { mgClose(); socket.emit('vua', { op: 'mai', q: good / N });
+        const i = await say('hoangthuong', 'Hoàng thượng', '(Hoàng thượng cúi đầu phê tấu chương, một bản tấu đặt lệch mép án thư…)', [['👀 Liếc trộm tấu chương', 1, ''], ['🙇 Lặng lẽ lui ra', 0, 'gold']]);
+        dlgClose(); socket.emit('vua', { op: 'peek', yes: !!i }); }, 700); } };
+  const key = e => { if (e.code === 'Space') { e.preventDefault(); tap(); } };
+  addEventListener('keydown', key); heat.onpointerdown = tap; raf = requestAnimationFrame(loop);
+});
+// 4) đối thơ ban ngày
+socket.on('vuaTho', async () => {
+  const qs = [...DOI_THO_C].sort(() => Math.random() - .5).slice(0, 3); let ok = 0;
+  await say('hoangthuong', 'Hoàng thượng', 'Trẫm vừa nghĩ được mấy câu. Trẫm ra vế trên, nàng đối vế dưới.', [['Thần thiếp xin hầu', 0, 'gold']]);
+  for (const [a, b, wrong] of qs) { const opts = [b, ...wrong].sort(() => Math.random() - .5);
+    const i = await say('hoangthuong', 'Hoàng thượng', `<i>“${esc(a)}…”</i>`, opts.map((o, k) => [esc(o), k, '']));
+    if (opts[i] === b) ok++; else toast(`Câu đúng là: “${b}”`); }
+  dlgClose(); socket.emit('vua', { op: 'tho', ok });
+});
+// 6) hoa đăng
+function openDen() {
+  if (vua.den?.list.some(x => x.id === me.id)) return toast('Bổn cung đã thả hoa đăng rồi.');
+  const SUG = ['Nguyện Hoàng thượng long thể an khang.', 'Mong được ở bên người đến bạc đầu.', 'Cầu cho phụ mẫu ở nhà bình an.', 'Nguyện hậu cung hòa thuận, tỷ muội yêu thương.'];
+  modal(`<button class="close" onclick="window._close()">✕</button><h3>🏮 Thả hoa đăng</h3><div style="color:var(--muted);font-size:12.5px">Viết lời ước (tối đa 60 chữ). Hết giờ, Hoàng thượng sẽ nhặt một chiếc hoa đăng và đọc to lời ước cho cả hậu cung nghe.</div>
+  <input id="denW" maxlength="60" placeholder="Lời ước…" style="width:100%;margin:10px 0;padding:8px;border-radius:8px">
+  <div class="btns" style="flex-wrap:wrap">${SUG.map((s, i) => `<button data-s="${i}" style="font-size:12px">${esc(s)}</button>`).join('')}</div>
+  <div class="btns"><button class="gold" id="denOk">Thả hoa đăng</button></div>`);
+  $('mcard').querySelectorAll('[data-s]').forEach(b => b.onclick = () => { $('denW').value = SUG[+b.dataset.s]; });
+  $('denOk').onclick = () => { socket.emit('vua', { op: 'den', wish: $('denW').value }); closeModal(); if (selfC) { selfC.target = clampPos(-1.6, -1); setTimeout(() => emote('quy'), 1500); } };
+}
+const vuaLeft = t => { const l = Math.max(0, t - Date.now()); return `${Math.floor(l / 60e3)}:${String(Math.floor(l % 60e3 / 1000)).padStart(2, '0')}`; };
+function vuaActs(add) {
+  const L = world.loc, VD = me.vuaDay || {}; if (me.lanh) return;
+  if (L === 'hoavien' && vua.walk) add('🌸 Theo hầu Hoàng thượng dạo vườn', `Còn ${vuaLeft(vua.walk.end)} · ${vua.walk.n} người đang hầu · đáp hợp tâm trạng người được nhiều sủng`, vuaWalkGo);
+  if (L === 'hoavien' && vua.den) add('🌕 Ngắm trăng cùng Hoàng thượng · thả hoa đăng ước nguyện', vua.den.list.some(x => x.id === me.id) ? 'Đã thả · chờ Hoàng thượng nhặt' : `Còn ${vuaLeft(vua.den.end)} · ${vua.den.list.length} chiếc trên hồ · sủng ái +2, được nhặt +12`, openDen, vua.den.list.some(x => x.id === me.id));
+  if (L === 'duongtam') {
+    add('⚫⚪ Hầu cờ Hoàng thượng', VD.co ? 'Hôm nay đã hầu cờ' : 'Mỗi ngày 1 ván · thua sít sao được sủng nhiều nhất', () => socket.emit('vua', { op: 'coStart' }), VD.co);
+    add('🖌 Mài mực hầu bút', VD.mai ? 'Hôm nay đã mài mực' : 'Mỗi ngày 1 lần · có thể liếc trộm tấu chương', () => socket.emit('vua', { op: 'maiStart' }), VD.mai);
+    add('📜 Đối thơ cùng Hoàng thượng', VD.tho ? 'Hôm nay đã đối thơ' : 'Mỗi ngày 1 lần · đối đúng cả 3 câu được ban thưởng', () => socket.emit('vua', { op: 'thoStart' }), VD.tho);
+  }
+  if (vua.visit?.id === me.id) { if (L === 'phong' && !me.visit) add('🐉 Nghênh giá Hoàng thượng', `Còn ${vuaLeft(vua.visit.until)} · cung bài trí đẹp, có trà, mặc đúng màu được thêm điểm`, () => socket.emit('vua', { op: 'visit' }));
+    else add('🐉 Hoàng thượng đang tới cung!', `Mau về cung riêng nghênh giá · còn ${vuaLeft(vua.visit.until)}`, () => socket.emit('goto', 'phong')); }
+}
+setInterval(() => { if (!world || !me) return; const m = vuaMode(); if ((vuaHT?.mode || null) !== m) { syncVua(); renderActs(); } }, 2000);

@@ -164,6 +164,13 @@ module.exports = {
   ],
   NPC_LATTHE: 0.05,             // tỉ lệ Hoàng thượng lật thẻ phi tần NPC thay vì người chơi
   HIGH_RANK_SLOW: 0.7,         // từ Phi trở lên: công trạng nhận được x0.7
+  // Hoàng thượng cùng phi tần
+  VUA: {
+    WALK_SLOTS: [[10, 0], [14, 0], [16, 30]], WALK_MIN: 20,   // dạo Ngự hoa viên
+    DEN_SLOT: [20, 30], DEN_MIN: 25,                           // ngắm trăng thả hoa đăng
+    VISIT_SLOTS: [[10, 40], [13, 30], [15, 40], [19, 30]], VISIT_MIN: 10, // ngự giá thăm cung
+    MEAL: [[11, 13], [18, 20]],                                // giờ ngự thiện: dâng món ×1.5
+  },
   CC_PER_DAY: 5,               // việc riêng từ Phi trở lên: mỗi việc 5 lần/ngày
   HAMHAI: { silver: 80, turns: 1, ok: 0.6 },
   HH_MIN_RANK: 5,              // từ Tần trở lên được ứng cử Hoàng hậu

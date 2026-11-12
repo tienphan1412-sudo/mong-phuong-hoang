@@ -151,7 +151,7 @@ function selfView(p) {
     big: bigView(p), fest: festView(p), night: nightView(p), diary: (p.diary || []).slice(0, 30), tinvat: p.tinvat || {}, keoDay: p.keoDay === dayKey(),
     dish: p.dish ? { name: p.dish.name, q: p.dish.q, t: p.dish.t, dish: p.dish.dish } : null, cookN: p.cookDay?.d === dayKey() ? p.cookDay.n : 0,
     quest: questView(p), jewels: p.jewels || [], mcDay: p.mcDay === dayKey(),
-    relDayMach: !!(p.relDay || {})['thaiy:mach'], detDay: p.detDay === dayKey(),
+    relDayMach: !!(p.relDay || {})['thaiy:mach'], vuaDay: p.vuaDay?.d === dayKey() ? { co: !!p.vuaDay.co, mai: !!p.vuaDay.mai, tho: !!p.vuaDay.tho, peek: !!p.vuaDay.peek } : {}, meal: inMeal(), detDay: p.detDay === dayKey(),
   };
 }
 function push(p) { checkAch(p); checkQuest(p); const s = sockOf(p.id); if (s) s.emit('me', selfView(p)); }
@@ -960,6 +960,137 @@ function coEnd(X, G) {
   for (const [q, w] of [[W, 1], [L, 0]]) { q.coDay = q.coDay?.d === dayKey() ? q.coDay : { d: dayKey(), n: 0 }; if (q.coDay.n < 5) { q.coDay.n++; addPts(q, w ? 10 : 4); if (w) q.sung += 2; } cnt(q, 'co'); if (w) cnt(q, 'coWin'); push(q); }
   if (X.g.moves > 30) news(`⚫⚪ ${W.name} thắng ${L.name} một ván cờ vây.`); save();
 }
+// ---------- HOÀNG THƯỢNG CÙNG PHI TẦN: dạo vườn, cờ, mài mực, đối thơ, thăm cung, hoa đăng ----------
+// s: điểm theo tâm trạng [vui, mệt, buồn]
+const VUA_WALK = [
+  { q: 'Hoa đào năm nay nở sớm quá.', opts: [{ t: 'Hoa nở sớm vì biết Hoàng thượng sắp tới ngắm.', s: [3, 1, 1], r: 'Nàng khéo miệng thật.' }, { t: 'Thần thiếp hái một nhành cài lên áo cho người nhé?', s: [2, 2, 3], r: 'Ừ, nàng cài đi.' }, { t: 'Hoa nở sớm thì tàn cũng sớm ạ.', s: [-1, 0, -2], r: 'Nàng nói gì mà buồn vậy…' }] },
+  { q: 'Trẫm mỏi chân rồi.', opts: [{ t: 'Thần thiếp đỡ người ra đình nghỉ, sai người dâng trà.', s: [1, 3, 2], r: 'Nàng chu đáo lắm.' }, { t: 'Hoàng thượng còn khỏe lắm, đi thêm một vòng nữa đi ạ!', s: [2, -1, 0], r: 'Nàng muốn trẫm gãy chân à?' }, { t: 'Thần thiếp cũng mỏi chân lắm…', s: [-1, -1, -1], r: 'Hừm.' }] },
+  { q: 'Nhìn đàn cá chép dưới hồ kìa.', opts: [{ t: 'Thần thiếp mang theo bánh, người cho cá ăn cùng thiếp.', s: [3, 2, 2], r: 'Ha ha, chúng tranh nhau kìa!' }, { t: 'Cá chép vượt vũ môn hóa rồng, như Hoàng thượng vậy.', s: [2, 1, 1], r: 'Nịnh vừa thôi.' }, { t: 'Con to kia mà nướng lên chắc ngon lắm ạ.', s: [1, -1, -1], r: 'Nàng… thật là.' }] },
+  { q: 'Triều đình mấy hôm nay nhiều chuyện phiền lòng.', opts: [{ t: 'Thần thiếp không dám bàn chính sự, chỉ mong người bớt lo.', s: [1, 2, 3], r: 'Có nàng ở đây trẫm thấy nhẹ lòng.' }, { t: 'Người kể thần thiếp nghe, thiếp góp ý thử xem.', s: [-1, -2, -1], r: 'Hậu cung không được can dự triều chính.' }, { t: 'Thần thiếp hát một khúc cho người khuây khỏa.', s: [2, 2, 2], r: 'Giọng nàng hay lắm.' }] },
+  { q: 'Gió lên rồi, hơi lạnh.', opts: [{ t: 'Thần thiếp khoác áo choàng cho người.', s: [2, 3, 2], r: 'Ấm rồi.' }, { t: 'Vậy mình về điện thôi ạ.', s: [-1, 1, -1], r: 'Mới ra mà đã đòi về.' }, { t: 'Đứng sát bên người là thần thiếp ấm rồi.', s: [3, 1, 2], r: 'Nàng đó…' }] },
+  { q: 'Nàng thấy các phi tần khác thế nào?', opts: [{ t: 'Các tỷ muội đều hiền thục, sống hòa thuận ạ.', s: [2, 2, 2], r: 'Hậu cung hòa thuận, trẫm yên tâm.' }, { t: 'Có người hay nói xấu sau lưng lắm ạ…', s: [-1, 0, -2], r: 'Trẫm không muốn nghe chuyện thị phi.' }, { t: 'Thần thiếp chỉ để mắt tới Hoàng thượng thôi.', s: [3, 1, 2], r: 'Ha ha.' }] },
+  { q: 'Cảnh đẹp thế này, nàng ngâm một câu thơ đi.', opts: [{ t: '“Xuân miên bất giác hiểu, xứ xứ văn đề điểu…”', s: [2, 2, 2], r: 'Thơ Mạnh Hạo Nhiên, hay.' }, { t: 'Tự làm bốn câu tặng Hoàng thượng.', s: [3, 1, 3], r: 'Nàng tự làm sao? Trẫm sẽ chép lại.' }, { t: 'Thần thiếp không thuộc thơ ạ.', s: [-1, 0, -1], r: 'Vậy về luyện thêm đi.' }] },
+  { q: 'Con chim yến kia hót hay quá.', opts: [{ t: 'Không hay bằng tiếng cười của Hoàng thượng.', s: [3, 0, 2], r: 'Nàng lại nịnh rồi.' }, { t: 'Thần thiếp sai người bắt về nuôi cho người nghe mỗi sáng.', s: [1, 1, 0], r: 'Chim trời nên để nó bay.' }, { t: 'Thần thiếp thấy hơi ồn ạ.', s: [-1, -2, -1], r: '…' }] },
+  { q: 'Lâu rồi trẫm chưa thấy nàng cười.', opts: [{ t: '(Che miệng cười) Gặp người là thần thiếp vui rồi.', s: [3, 2, 3], r: 'Cười lên trông xinh lắm.' }, { t: 'Trong cung nhiều chuyện quá, thần thiếp không cười nổi.', s: [-1, -1, 0], r: 'Ai làm nàng buồn?' }, { t: 'Người kể chuyện vui đi, thần thiếp cười cho.', s: [2, -1, 1], r: 'Trẫm đâu phải con hát.' }] },
+];
+function VS() { return DB.state.vua || (DB.state.vua = { done: {} }); }
+function vuaPub() {
+  const v = VS(); return {
+    walk: v.walk ? { start: v.walk.start, end: v.walk.end, n: Object.keys(v.walk.sc).length } : null,
+    den: v.den ? { start: v.den.start, end: v.den.end, list: v.den.list.map(x => ({ id: x.id, name: x.name, wish: x.wish })) } : null,
+    visit: v.visit ? { id: v.visit.id, name: v.visit.name, until: v.visit.until } : null,
+  };
+}
+function vuaEmit() { io.emit('vua', vuaPub()); }
+function vuaDay(p) { if (p.vuaDay?.d !== dayKey()) p.vuaDay = { d: dayKey() }; return p.vuaDay; }
+const inMeal = () => { const h = vnNow().getUTCHours(); return C.VUA.MEAL.some(([a, b]) => h >= a && h < b); };
+function wpick(list, w) { let tot = list.reduce((a, x) => a + w(x), 0), r = Math.random() * tot; for (const x of list) { r -= w(x); if (r <= 0) return x; } return list[0]; }
+function vuaTick(mins, k) {
+  const v = VS(), U = C.VUA; v.done = v.done || {}; let ch = false;
+  for (const kk of Object.keys(v.done)) if (!kk.startsWith(k)) delete v.done[kk];
+  U.WALK_SLOTS.forEach(([h, m], i) => { const key = k + ':w' + i, st = h * 60 + m;
+    if (mins >= st && mins < st + U.WALK_MIN && !v.done[key] && !v.walk) { v.done[key] = 1; v.walk = { start: now(), end: now() + (U.WALK_MIN - (mins - st)) * 60e3, sc: {} }; ch = true;
+      news('🌸 Hoàng thượng ngự giá Ngự hoa viên dạo chơi. Các phi tần mau tới theo hầu!', 'vua');
+      for (const q of Object.values(DB.players)) if (!q.lanh) notify(q, '🌸 Hoàng thượng dạo Ngự hoa viên', 'Tới Ngự hoa viên theo hầu, đáp khéo được sủng ái.', 'vuawalk'); } });
+  if (v.walk && now() > v.walk.end) {
+    const e = Object.entries(v.walk.sc).sort((a, b) => b[1] - a[1]);
+    if (e.length >= 2 && e[0][1] > 0) { const w = P(e[0][0]); if (w) { w.sung += 5; news(`🌸 Dạo vườn xong, Hoàng thượng khen ${w.name} hầu chuyện khéo nhất, ban thêm ân sủng.`); toast(w, 'Hầu chuyện khéo nhất buổi dạo vườn: sủng ái +5.', 'good'); push(w); } }
+    v.walk = null; ch = true;
+  }
+  const [dh, dm] = U.DEN_SLOT, dst = dh * 60 + dm, dkey = k + ':den';
+  if (mins >= dst && mins < dst + U.DEN_MIN && !v.done[dkey] && !v.den) { v.done[dkey] = 1; v.den = { start: now(), end: now() + (U.DEN_MIN - (mins - dst)) * 60e3, list: [] }; ch = true;
+    news('🏮 Trăng lên, Hoàng thượng ra hồ Ngự hoa viên ngắm trăng. Ai thả hoa đăng, người sẽ nhặt một chiếc đọc lời ước.', 'vua');
+    for (const q of Object.values(DB.players)) if (!q.lanh) notify(q, '🏮 Thả hoa đăng cùng Hoàng thượng', 'Ra hồ Ngự hoa viên thả hoa đăng ước nguyện.', 'vuaden'); }
+  if (v.den && now() > v.den.end) { const L = v.den.list; v.den = null; ch = true;
+    if (L.length) { const w = wpick(L, x => 10 + Math.sqrt(Math.max(0, P(x.id)?.sung || 0)) * 2); const p = P(w.id);
+      if (p) { p.sung += 12; addPts(p, 10); push(p); notify(p, '🏮 Hoàng thượng nhặt hoa đăng của bổn cung', w.wish); }
+      news(`🏮 Hoàng thượng nhặt hoa đăng của ${w.name}, đọc lời ước: “${w.wish}”. Người mỉm cười, sủng ái +12.`); io.emit('denEnd', { id: w.id, name: w.name, wish: w.wish }); } }
+  U.VISIT_SLOTS.forEach(([h, m], i) => { const key = k + ':v' + i, st = h * 60 + m;
+    if (mins < st || mins >= st + 30 || v.done[key] || v.visit) return;
+    const pool = Object.values(DB.players).filter(p => online.has(p.id) && !p.lanh && p.loc !== 'tamcung' && !(p.sick && p.sickUntil > now()) && vuaDay(p).vis == null);
+    if (!pool.length) return; v.done[key] = 1;
+    const t = wpick(pool, p => 10 + Math.max(0, p.sung)); vuaDay(t).vis = 0; v.visit = { id: t.id, name: t.name, until: now() + U.VISIT_MIN * 60e3 }; ch = true;
+    news(`🐉 Hoàng thượng ngự giá tới cung của ${t.name}.`, 'vua');
+    notify(t, '🐉 Hoàng thượng ngự giá tới cung!', `Mau về cung riêng nghênh giá trong ${U.VISIT_MIN} phút.`, 'vuavisit');
+    toast(t, `🐉 Hoàng thượng ngự giá tới cung! Mau về cung riêng nghênh giá trong ${U.VISIT_MIN} phút.`, 'good'); });
+  if (v.visit && now() > v.visit.until) { const t = P(v.visit.id); if (t) { t.sung -= 3; news(`🐉 Hoàng thượng tới cung ${t.name} mà chủ nhân không có mặt, phật ý ra về.`); toast(t, 'Hoàng thượng tới cung mà không gặp, phật ý ra về: sủng ái -3.', 'bad'); push(t); } v.visit = null; ch = true; }
+  if (ch) { vuaEmit(); save(); }
+}
+function vuaSock(sock, getMe) {
+  sock.emit('vua', vuaPub());
+  sock.on('vua', d => {
+    const me = getMe(); if (!me || !d || me.lanh) return; const v = VS(), VD = vuaDay(me), mood = ht().mood;
+    const htSay = text => io.to(roomOf(me)).emit('chat', { id: null, name: '🐉 Hoàng thượng', text });
+    const atDT = () => me.loc === 'duongtam' || (toast(me, 'Phải tới Dưỡng Tâm điện.'), false);
+    if (d.op === 'force' && me.admin) { // quản trị: gọi Hoàng thượng ra ngay để thử
+      const t = P(d.who) || me;
+      if (d.k === 'walk') v.walk = { start: now(), end: now() + C.VUA.WALK_MIN * 60e3, sc: {} };
+      if (d.k === 'den') v.den = { start: now(), end: now() + (d.min || C.VUA.DEN_MIN) * 60e3, list: [] };
+      if (d.k === 'visit') v.visit = { id: t.id, name: t.name, until: now() + C.VUA.VISIT_MIN * 60e3 };
+      if (d.k === 'end') { if (v.walk) v.walk.end = 0; if (v.den) v.den.end = 0; }
+      vuaEmit(); return;
+    }
+    if (d.op === 'walk') {
+      if (me.loc !== 'hoavien' || !v.walk) return toast(me, 'Hoàng thượng không có ở Ngự hoa viên lúc này.');
+      if (v.walk.sc[me.id] != null) return toast(me, 'Bổn cung đã theo hầu lượt dạo này rồi.');
+      v.walk.sc[me.id] = 0; const qs = [...VUA_WALK.keys()].sort(() => Math.random() - .5).slice(0, 3).map(qi => ({ qi, ord: [0, 1, 2].sort(() => Math.random() - .5) }));
+      me._walk = qs; sock.emit('vuaWalk', qs.map(({ qi, ord }) => ({ q: VUA_WALK[qi].q, opts: ord.map(o => ({ t: VUA_WALK[qi].opts[o].t, r: VUA_WALK[qi].opts[o].r })) }))); vuaEmit();
+    } else if (d.op === 'walkAns') {
+      const qs = me._walk; if (!qs || !Array.isArray(d.a)) return; me._walk = null;
+      let tot = 0; qs.forEach(({ qi, ord }, k) => { const o = VUA_WALK[qi].opts[ord[+d.a[k]]]; if (o) tot += o.s[mood]; });
+      const g = Math.max(0, Math.min(18, tot * 2 + 2)); me.sung += g; addPts(me, 6); if (v.walk) v.walk.sc[me.id] = tot; cnt(me, 'vuawalk');
+      htSay(tot >= 6 ? `Dạo vườn với ${me.name} thật hợp ý trẫm.` : tot >= 2 ? `Đi dạo cùng ${me.name} cũng vui.` : `${me.name} hôm nay sao vụng về vậy…`);
+      toast(me, `Theo hầu Hoàng thượng dạo vườn: sủng ái +${g}, công trạng +6.`, g >= 8 ? 'good' : 'info');
+      if (tot >= 6) news(`🌸 ${me.name} theo hầu Hoàng thượng dạo Ngự hoa viên, được khen hầu chuyện hợp ý.`);
+    } else if (d.op === 'coStart') {
+      if (!atDT()) return; if (VD.co) return toast(me, 'Hôm nay đã hầu cờ Hoàng thượng rồi.'); VD.coOn = 1; sock.emit('vuaCo');
+    } else if (d.op === 'coEnd') {
+      if (!VD.coOn || VD.co) return; VD.co = 1; const mg = Math.abs(+d.margin || 0), win = !!d.win;
+      let g, line;
+      if (d.resign) { g = 1; line = 'Chưa đánh đã chịu thua? Lần sau cố lên.'; }
+      else if (!win && mg <= 6.5) { g = 12; line = 'Suýt nữa trẫm thua rồi! Nàng đánh cờ khéo lắm.'; news(`⚫⚪ ${me.name} hầu cờ Hoàng thượng, thua sít sao, được khen đánh cờ có tài.`); }
+      else if (win && mg <= 6.5) { g = 7; line = 'Nàng thắng trẫm à? Được lắm, mai trẫm phục thù.'; news(`⚫⚪ ${me.name} thắng Hoàng thượng một ván cờ sít sao!`); }
+      else if (win) { g = 2; line = '…Nàng thắng đậm quá, chẳng nể trẫm chút nào.'; }
+      else { g = 4; line = 'Nàng còn phải luyện thêm nhiều.'; }
+      me.sung += g; addPts(me, 8); cnt(me, 'vuaco'); htSay(line); toast(me, `Hầu cờ Hoàng thượng: sủng ái +${g}, công trạng +8.`, g >= 7 ? 'good' : 'info');
+    } else if (d.op === 'maiStart') {
+      if (!atDT()) return; if (VD.mai) return toast(me, 'Hôm nay đã mài mực hầu bút rồi.'); VD.maiOn = 1; sock.emit('vuaMai');
+    } else if (d.op === 'mai') {
+      if (!VD.maiOn || VD.mai) return; VD.mai = 1; const q = Math.max(0, Math.min(1, +d.q || 0)); const g = Math.round(3 + 8 * q);
+      me.sung += g; addPts(me, 6); cnt(me, 'vuamai');
+      toast(me, `${q > .8 ? 'Mực mài đều, đậm mà không vón.' : q > .4 ? 'Mực mài tạm được.' : 'Mực lúc đặc lúc loãng…'} Sủng ái +${g}.`, q > .4 ? 'good' : 'info');
+      htSay(q > .8 ? `Hồng tụ thiêm hương dạ độc thư… có ${me.name} mài mực, trẫm phê tấu chương cũng thấy nhẹ.` : q > .4 ? 'Được rồi, nàng lui ra nghỉ đi.' : 'Mực thế này sao trẫm viết được…');
+    } else if (d.op === 'peek') {
+      if (!VD.mai || VD.peek) return; VD.peek = 1; if (!d.yes) return;
+      if (Math.random() < .55) {
+        if (Math.random() < .5) { htKnown(me).keys = ['canh', 'mau', 'tai', 'mood']; toast(me, 'Liếc được tờ ghi chú của Kính sự phòng: biết hết sở thích hôm nay của Hoàng thượng (xem trong Sở thích Hoàng thượng).', 'good'); }
+        else { me.silver += 60; toast(me, 'Liếc thấy tấu chương thăng chức cho người nhà, báo tin sớm về phủ: gia tộc gửi biếu 60 bạc.', 'good'); }
+      } else { me.sung -= 6; htSay(`${me.name}! Hậu cung không được can dự triều chính!`); news(`📜 ${me.name} liếc trộm tấu chương bị Hoàng thượng bắt gặp, bị quở trách.`); toast(me, 'Bị bắt gặp liếc trộm tấu chương: sủng ái -6.', 'bad'); }
+    } else if (d.op === 'thoStart') {
+      if (!atDT()) return; if (VD.tho) return toast(me, 'Hôm nay đã đối thơ cùng Hoàng thượng rồi.'); VD.thoOn = 1; sock.emit('vuaTho');
+    } else if (d.op === 'tho') {
+      if (!VD.thoOn || VD.tho) return; VD.tho = 1; const ok = Math.max(0, Math.min(3, +d.ok || 0)); const g = [-2, 1, 4, 9][ok];
+      me.sung += g; addPts(me, 3 + ok * 3); cnt(me, 'vuatho');
+      htSay(ok === 3 ? `Đối chỉnh lắm! Ban cho ${me.name} cây bút lông tử hào.` : ok === 2 ? 'Đối khá đấy.' : ok === 1 ? 'Còn non tay.' : 'Ha ha ha, nàng đối thế này thì trẫm cười mất.');
+      if (ok === 3) news(`📜 ${me.name} đối thơ cùng Hoàng thượng ở Dưỡng Tâm điện, câu nào cũng chỉnh, được ban bút lông tử hào.`);
+      toast(me, `Đối thơ đúng ${ok}/3: sủng ái ${g >= 0 ? '+' : ''}${g}.`, ok >= 2 ? 'good' : 'info');
+    } else if (d.op === 'den') {
+      if (me.loc !== 'hoavien' || !v.den) return toast(me, 'Chưa tới giờ thả hoa đăng.'); if (v.den.list.some(x => x.id === me.id)) return toast(me, 'Đã thả hoa đăng rồi.');
+      const wish = String(d.wish || '').replace(/\s+/g, ' ').trim().slice(0, 60) || 'Nguyện Hoàng thượng long thể an khang.';
+      v.den.list.push({ id: me.id, name: me.name, wish }); me.sung += 2; cnt(me, 'vuaden'); toast(me, 'Hoa đăng đã trôi ra hồ. Sủng ái +2, chờ xem Hoàng thượng có nhặt được không…', 'good'); vuaEmit();
+    } else if (d.op === 'visit') {
+      if (!v.visit || v.visit.id !== me.id) return; if (me.loc !== 'phong' || me.visit) return toast(me, 'Về cung riêng để nghênh giá.');
+      const it = new Set((me.decor || []).map(x => x.item)); let sc = 5 + Math.min(8, it.size); const good = [];
+      if (it.has('lahan') || it.has('banTra')) { sc += 3; good.push('có sẵn trà'); } if (colorMatch(me)) { sc += 4; good.push('áo đúng màu người thích'); }
+      if ((me.loyal ?? 50) >= 70) { sc += 2; good.push('cung nữ hầu hạ chu đáo'); } if (it.has('luhuong')) { sc += 1; good.push('trầm hương thơm'); }
+      me.sung += sc; addPts(me, 10); cnt(me, 'vuavisit'); VD.vis = 1; v.visit = null; vuaEmit();
+      const line = sc >= 18 ? 'Cung của nàng bài trí thanh nhã, trẫm muốn ngồi lại lâu hơn.' : sc >= 11 ? 'Cung nàng cũng ấm cúng lắm.' : 'Cung sao trống trải quá, để trẫm sai Nội vụ phủ đưa thêm đồ.';
+      htSay(line); news(`🐉 ${me.name} nghênh giá Hoàng thượng tại cung, ${sc >= 18 ? 'được khen bài trí thanh nhã' : 'Hoàng thượng ngồi dùng trà'}.`);
+      toast(me, `Nghênh giá thành công: sủng ái +${sc}, công trạng +10${good.length ? ` (${good.join(', ')})` : ''}.`, 'good');
+    }
+    save(); push(me);
+  });
+}
 // ---------- THỊ TẨM: chuẩn bị, tâm sự, tâu chuyện, tín vật, tranh sủng, đối thơ, nhật ký ----------
 // mood index: 0 vui, 1 mệt, 2 buồn
 const PREP = {
@@ -1021,6 +1152,7 @@ function nightTick() {
   DB.state.latDone = DB.state.latDone || {};
   C.LAT_THE_SLOTS.forEach(([h, m, when], i) => { const key = k + ':' + i; if (mins >= h * 60 + m && mins < h * 60 + m + 60 && !DB.state.latDone[key]) { DB.state.latDone[key] = 1; latThe(when); } });
   feastTick(mins, k);
+  vuaTick(mins, k);
   // vắng mặt: từ Tần trở lên
   for (const p of Object.values(DB.players)) {
     if (p.lanh || p.rank < C.PALACE_RANK) continue;
@@ -1074,7 +1206,7 @@ io.on('connection', sock => {
     sock.emit('auth', { token: p.token });
     sock.emit('newsAll', DB.state.news.slice(0, 30));
     sock.emit('feast', feastView());
-    sock.emit('schedule', { latThe: C.LAT_THE_SLOTS, feast: C.FEAST_SLOTS, tz: C.TZ_OFFSET_H ?? 7, lead: C.NOTICE_LEAD_MIN });
+    sock.emit('schedule', { latThe: C.LAT_THE_SLOTS, feast: C.FEAST_SLOTS, vua: C.VUA, tz: C.TZ_OFFSET_H ?? 7, lead: C.NOTICE_LEAD_MIN });
     for (const c of Object.values(DB.state.cases)) if (c.victim === p.id && c.status === 'open' && !c.deadline) {
       c.deadline = now() + caseHoursFor(p, c.hours) * 3600e3;
       setTimeout(() => sock.emit('cutscene', { type: 'phatgiac', caseId: c.id, method: c.method, methodName: c.methodName, crime: c.crime, hours: caseHoursFor(p, c.hours), mama: rel(p, 'mama') }), 2500);
@@ -1275,11 +1407,12 @@ io.on('connection', sock => {
     } else if (a === 'dangmon') {
       if (me.loc !== 'duongtam') return toast(me, 'Phải đến Dưỡng Tâm điện.'); const D = me.dish; if (!D) return toast(me, 'Chưa có món nào.');
       const cold = now() - D.t > C.COOK.hotHours * 3600e3, fav = D.name === C.HT.canh[ht().canh];
-      let sung = Math.round((5 + 9 * D.q + (fav ? 8 : 0) + (D.dish === 'dĩa' ? 2 : 0)) * (cold ? .4 : 1)); me.sung += sung; addPts(me, cold ? 4 : 12); me.dish = null;
+      const meal = !cold && inMeal(); let sung = Math.round((5 + 9 * D.q + (fav ? 8 : 0) + (D.dish === 'dĩa' ? 2 : 0)) * (cold ? .4 : 1) * (meal ? 1.5 : 1)); me.sung += sung; addPts(me, cold ? 4 : 12); me.dish = null;
       const line = cold ? 'Món này nguội rồi… thôi, nàng có lòng là được.' : fav ? `Đúng món trẫm đang thèm! ${D.name} do chính tay nàng nấu sao? Ngon lắm!` : D.q > .85 ? `${D.name} tuyệt hảo, ngự trù cũng không bằng nàng.` : D.q > .6 ? `${D.name} khá ngon.` : `Hơi ${pick(['mặn', 'nhạt', 'khét'])}… nhưng trẫm vẫn ăn hết.`;
       const s = sockOf(me.id); if (s) s.emit('npcSay', { who: 'Hoàng thượng', text: line });
-      if (!cold && (fav || D.q > .85)) news(`🍽 ${me.name} tự tay nấu ${D.name} dâng Hoàng thượng, được khen hết lời.`);
-      toast(me, `Dâng ${D.name}${cold ? ' (đã nguội)' : ''}: sủng ái +${sung}.`, cold ? 'info' : 'good');
+      if (!cold && (fav || D.q > .85)) news(`🍽 ${me.name} tự tay nấu ${D.name} dâng Hoàng thượng${meal ? ' đúng giờ ngự thiện' : ''}, được khen hết lời.`);
+      else if (meal && D.q < .5) news(`🍽 ${me.name} dâng ${D.name} giờ ngự thiện, Hoàng thượng nếm một miếng rồi đặt đũa xuống…`);
+      toast(me, `Dâng ${D.name}${cold ? ' (đã nguội)' : meal ? ' đúng giờ ngự thiện (×1.5)' : ''}: sủng ái +${sung}.`, cold ? 'info' : 'good');
     } else if (a === 'event') {
       const e = curEvent(); if (!e.loc) return;
       if (me.loc !== e.loc) return toast(me, 'Không đúng chỗ cho sự kiện này.');
@@ -1665,6 +1798,7 @@ io.on('connection', sock => {
     io.to(roomOf(me)).emit('tt', { from: 'p:' + me.id, to, act, back, fname: me.name, tname });
     save(); push(me); if (t) push(t);
   });
+  vuaSock(sock, () => me);
   sock.on('caocap', d => {
     if (!me || !d || me.lanh || me.rank < 6) return toast(me, 'Từ Phi trở lên mới được giao việc này.');
     me.ccDay = me.ccDay?.d === dayKey() ? me.ccDay : { d: dayKey() }; const C2 = me.ccDay;
