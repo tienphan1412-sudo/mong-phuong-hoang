@@ -97,7 +97,7 @@ const caseHoursFor = (v, h) => h + (rel(v, 'mama') >= 30 ? 6 : rel(v, 'mama') <=
 const GROUP_MAX = 4;
 const grp = p => p.sis && DB.state.groups?.[p.sis];
 const sisters = (a, b) => a.sis && a.sis === b.sis;
-function groupView(g) { if (!g) return null; return { id: g.id, name: g.name, fund: g.fund, goal: g.goal, members: g.members.map(id => { const q = P(id); return q && { id, name: q.name, rankName: C.RANKS[q.rank].name, online: online.has(id), loc: q.loc, lanh: !!q.lanh, camTuc: (q.camTucUntil || 0) > now() }; }).filter(Boolean) }; }
+function groupView(g) { if (!g) return null; return { id: g.id, name: g.name, fund: g.fund, goal: g.goal, members: g.members.map(id => { const q = P(id); return q && { id, name: q.name, rankName: C.RANKS[q.rank].name, online: seenOn(id), loc: q.loc, lanh: !!q.lanh, camTuc: (q.camTucUntil || 0) > now() }; }).filter(Boolean) }; }
 function pushGroup(g) { if (!g) return; for (const id of g.members) { const q = P(id); if (q) push(q); } }
 function freshDay(p) {
   const k = dayKey();
@@ -158,6 +158,7 @@ function push(p) { checkAch(p); checkQuest(p); const s = sockOf(p.id); if (s) s.
 function toast(p, text, kind = 'info') { const s = sockOf(p.id); if (s) s.emit('toast', { text, kind }); }
 // chế độ thử của quản trị: mọi tin, thông báo sinh ra từ lệnh thử chỉ hiện cho quản trị
 let MUTE = 0;
+const seenOn = id => online.has(id) && !P(id)?.admin; // quản trị online thì người khác không thấy chấm xanh
 function quiet(on, fn) { if (!on) return fn(); MUTE++; try { return fn(); } finally { MUTE--; } }
 const isAdm = id => !!P(id)?.admin;
 function emitSplit(ev, pub, test) { if (!test) return io.emit(ev, pub); for (const [id, s] of online) s.emit(ev, isAdm(id) ? pub : null); }
@@ -1437,7 +1438,7 @@ io.on('connection', sock => {
       setTimeout(() => sock.emit('cutscene', { type: 'phatgiac', caseId: c.id, method: c.method, methodName: c.methodName, crime: c.crime, hours: caseHoursFor(p, c.hours), mama: rel(p, 'mama') }), 2500);
     }
     push(p);
-    if (p.sick) { p.sick = false; news(`${p.name} đã khỏi bệnh, trở lại hầu hạ.`); }
+    if (p.sick) { p.sick = false; if (!p.admin) news(`${p.name} đã khỏi bệnh, trở lại hầu hạ.`); }
     const back = p.lanh ? 'lanhcung' : (p.camTucUntil || 0) > now() ? 'phong' : (p.loc === 'tamcung' && p.tamCungUntil > now() ? 'tamcung' : (p.loc && p.loc !== 'tamcung' && !(p.loc === 'yentiec' && !(DB.state.feast && !DB.state.feast.done)) ? p.loc : 'hoavien'));
     if (p.outfit === 'aongu' && back !== 'tamcung' && back !== 'phong') p.outfit = p.lanh ? 'tunu' : C.RANKS[p.rank].outfit;
     enter(p, back, sock);
@@ -2127,7 +2128,7 @@ io.on('connection', sock => {
   });
   sock.on('roster', () => {
     if (!me) return;
-    const list = Object.values(DB.players).map(p => ({ id: p.id, inTam: !!night(p) && p.loc === 'tamcung' && online.has(p.id), thai: !!p.thai?.known, kids: (p.children || []).length, camTuc: (p.camTucUntil || 0) > now(), lanh: !!p.lanh, name: p.name + (p.sick ? ' (cáo bệnh)' : '') + ((p.camTucUntil || 0) > now() ? ' (cấm túc)' : ''), rank: p.rank, rankName: rankName(p), online: online.has(p.id), sung: p.sung, canTarget: !p.lanh && p.rank >= C.FIGHT_RANK && !((p.protectUntil || 0) > now()) }));
+    const list = Object.values(DB.players).map(p => ({ id: p.id, inTam: !!night(p) && p.loc === 'tamcung' && online.has(p.id), thai: !!p.thai?.known, kids: (p.children || []).length, camTuc: (p.camTucUntil || 0) > now(), lanh: !!p.lanh, name: p.name + (p.sick ? ' (cáo bệnh)' : '') + ((p.camTucUntil || 0) > now() ? ' (cấm túc)' : ''), rank: p.rank, rankName: rankName(p), online: seenOn(p.id), sung: p.sung, canTarget: !p.lanh && p.rank >= C.FIGHT_RANK && !((p.protectUntil || 0) > now()) }));
     list.sort((a, b) => (b.rankName === 'Hoàng hậu') - (a.rankName === 'Hoàng hậu') || b.rank - a.rank || b.sung - a.sung);
     const seats = C.RANKS.map((r, i) => ({ name: r.name, seats: r.seats, used: seatCount(i) }));
     sock.emit('roster', { npcs: NPCF().map(n => ({ id: n.id, name: n.name, short: n.short, rankName: npcRank(n), sung: n.sung, pts: n.pts })).sort((a, b) => b.pts - a.pts), list, seats, methods: C.METHODS, thaiMethods: C.THAI_METHODS, hh: DB.state.hh ? title(P(DB.state.hh.id) || { name: '?', rank: 0 }) : null });
@@ -2204,7 +2205,7 @@ function top5() {
   return [...Object.values(DB.players).filter(p => !p.lanh), ...NPCF().map(n => ({ ...n, npc: true }))]
     .sort((a, b) => (!b.npc && isHH(b)) - (!a.npc && isHH(a)) || b.rank - a.rank || b.pts - a.pts || b.sung - a.sung)
     .slice(0, 5)
-    .map(p => p.npc ? { id: p.id, name: '🎭 ' + p.name, rankName: npcRank(p), pts: p.pts, online: false, npc: true, trend: p.trend && now() - p.trend.t < H ? p.trend.dir : 0 } : ({ id: p.id, name: p.name + (p.sick ? ' 🤒' : ''), rankName: rankName(p), pts: p.pts, online: online.has(p.id), trend: p.trend && now() - p.trend.t < H ? p.trend.dir : 0 }));
+    .map(p => p.npc ? { id: p.id, name: '🎭 ' + p.name, rankName: npcRank(p), pts: p.pts, online: false, npc: true, trend: p.trend && now() - p.trend.t < H ? p.trend.dir : 0 } : ({ id: p.id, name: p.name + (p.sick ? ' 🤒' : ''), rankName: rankName(p), pts: p.pts, online: seenOn(p.id), trend: p.trend && now() - p.trend.t < H ? p.trend.dir : 0 }));
 }
 let lastTop = '';
 setInterval(() => { const t = JSON.stringify(top5()); if (t !== lastTop) { lastTop = t; io.emit('top5', JSON.parse(t)); } }, 2000);
