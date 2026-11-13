@@ -2263,8 +2263,6 @@ const UPDATE_VER = 'u2026-11-13g';
 const UPDATE_NOTES = [
   ['👑 Ngôi Hoàng hậu trả lại cho người chơi', 'Tài khoản quản trị không còn tính vào xếp hạng, không giữ ghế, không giữ phượng ấn. Ngôi Hoàng hậu bỏ trống, Thái hậu sẽ mở kỳ bầu phượng ấn cho các phi tần từ bậc Tần trở lên.'],
   ['🎯 Nhiệm vụ tân thủ có nút "Làm ngay"', 'Bấm là được đưa tới đúng nơi, việc cần làm sáng lên ở bảng bên phải. Người mới không còn lạc trong cung.'],
-  ['📈 Đường thăng tiến dài hơi hơn', 'Mốc công trạng mới: Quan nữ tử 50, Đáp ứng 150, Thường tại 300, Quý nhân 600, Tần 1.100, Phi 1.800, Quý phi 3.000, Hoàng quý phi 4.500. Từ Quý nhân trở xuống vẫn được x1.3 công trạng. Ai đã lên chức giữ nguyên chức.'],
-  ['⏳ Lượt hồi chậm lại', 'Cứ 60 phút hồi 1 lượt, tích tối đa 10 (trước 30 phút, tối đa 20). Mỗi ngày vẫn có 8 lượt đầu ngày.'],
   ['🏯 Game đổi tên: Phượng Khởi Thâm Cung', 'Link mới: phuong-khoi-tham-cung.onrender.com. Link cũ vẫn tự chuyển sang, tài khoản giữ nguyên.'],
   ['🪑 Ghế hậu cung theo lệ nhà Thanh', 'Quý nhân trở xuống không giới hạn ghế, ai đủ công trạng là lên và được tham gia cung đấu. Ghế cao giữ đúng lệ: 6 Tần, 4 Phi, 2 Quý phi, 1 Hoàng quý phi.'],
   ['⏳ Ghế cao không được bỏ trống', 'Từ Tần trở lên vắng 2 ngày thì cáo bệnh, vắng 4 ngày phải nhường ghế cho người đang chờ (về lại Quý nhân, quay lại đủ công trạng thì lên lại).'],
