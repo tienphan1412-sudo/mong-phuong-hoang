@@ -8,8 +8,8 @@ module.exports = {
   FISH_PAID: 15,                // mỗi ngày bán được 15 con cá lấy bạc
   NOTICE_LEAD_MIN: 15,         // báo trước sự kiện bao nhiêu phút               // yến tiệc kéo dài (phút)
   TURNS_PER_DAY: 8,           // lượt đầu ngày
-  TURN_REGEN_MIN: 30,         // cứ 30 phút hồi 1 lượt
-  TURN_CAP: 20,               // hồi tối đa tới 20 lượt
+  TURN_REGEN_MIN: 45,         // cứ 45 phút hồi 1 lượt
+  TURN_CAP: 14,               // hồi tối đa tới 14 lượt
   TASK_TURNS: 2,              // làm đủ 3 nhiệm vụ ngày được thêm 2 lượt
   CASE_HOURS: 24,              // thời hạn điều tra trước khi xử án
   PROTECT_HOURS: 24,           // bảo hộ sau khi bị giáng cấp
@@ -27,10 +27,10 @@ module.exports = {
     { name: 'Đáp ứng',        pts: 80,   seats: 0, outfit: 'thuongtai' },
     { name: 'Thường tại',     pts: 150,  seats: 0, outfit: 'thuongtai_hong' },
     { name: 'Quý nhân',       pts: 250,  seats: 0, outfit: 'quynhan', extra: ['quynhan_lam'] },
-    { name: 'Tần',            pts: 400,  seats: 6, outfit: 'tan', extra: ['tan_tim'] },
-    { name: 'Phi',            pts: 600,  seats: 4, outfit: 'phi', extra: ['phi_lam'] },
-    { name: 'Quý phi',        pts: 1300,  seats: 2, outfit: 'quyphi', extra: ['quyphi_phuong'] },
-    { name: 'Hoàng quý phi',  pts: 2000, seats: 1, outfit: 'hoangquyphi', extra: ['hoangquyphi_kim'] },
+    { name: 'Tần',            pts: 900,  seats: 6, outfit: 'tan', extra: ['tan_tim'] },
+    { name: 'Phi',            pts: 1600,  seats: 4, outfit: 'phi', extra: ['phi_lam'] },
+    { name: 'Quý phi',        pts: 2800,  seats: 2, outfit: 'quyphi', extra: ['quyphi_phuong'] },
+    { name: 'Hoàng quý phi',  pts: 4500, seats: 1, outfit: 'hoangquyphi', extra: ['hoangquyphi_kim'] },
   ],
   FIGHT_RANK: 4,               // từ Quý nhân mới được hãm hại / bị hãm hại
   PALACE_RANK: 5,              // từ Tần được ban cung riêng
@@ -98,7 +98,7 @@ module.exports = {
     { name: 'Cá chép hấp gừng', nl: ['cá chép', 'gừng', 'hành'], cut: ['gừng', 'hành'], vessel: 'xửng', dish: 'dĩa' },
   ],
   MUACHUOC_PRICE: 80,          // mua chuộc cung nữ nhà người khác để dò bí mật
-  CATCHUP_RANK: 3,             // từ Thường tại trở xuống: công trạng nhận được x1.3
+  CATCHUP_RANK: 4,             // từ Quý nhân trở xuống: công trạng nhận được x1.3 (người mới bắt kịp)
   NEWBIE_DAYS: 3,              // 3 ngày đầu mỗi ngày thêm 2 lượt
   DECOR_PRICE: { denlong: 60, binhsu: 80, luhuong: 100, tham: 40, giuong: 200, lahan: 350 }, // món không có tên ở đây là miễn phí
   LAT_THE: { pts: 25, sung: 20, turns: 2 },

@@ -172,7 +172,7 @@ function selfView(p) {
   return {
     ...publicView(p), path: p.path, pathName: C.PATHS[p.path].name, origin: C.ORIGINS[p.origin].name,
     mailUnread: (p.mail || []).filter(m => !m.read).length, pushOn: !!p.pushSubs?.length,
-    pts: p.pts, nextPts: C.RANKS[p.rank + 1]?.pts ?? null, silver: p.silver, turns: (regen(p), p.turns), turnCap: C.TURN_CAP, nextTurn: p.turns >= C.TURN_CAP ? null : p.turnAt + C.TURN_REGEN_MIN * 60e3, sung: p.sung, haiLong: p.haiLong,
+    created: p.created || 0, pts: p.pts, nextPts: C.RANKS[p.rank + 1]?.pts ?? null, silver: p.silver, turns: (regen(p), p.turns), turnCap: C.TURN_CAP, nextTurn: p.turns >= C.TURN_CAP ? null : p.turnAt + C.TURN_REGEN_MIN * 60e3, sung: p.sung, haiLong: p.haiLong,
     stats: p.stats, tasks: p.tasks, thinhAn: p.thinhAn, waiting: p.waiting || false, lanh: p.lanh || null,
     outfits: allowedOutfits(p), decor: p.decor || [], hasPalace: p.rank >= C.PALACE_RANK, cases: open,
     protectedUntil: p.protectUntil || 0, admin: !!p.admin, hamDay: p.hamDay === dayKey(), canFight: !p.lanh && p.rank >= C.FIGHT_RANK,
@@ -213,7 +213,9 @@ function news(text, kind = 'tin') {
 }
 function seatCount(r) { return Object.values(DB.players).filter(p => !p.lanh && p.rank === r).length + NPCF().filter(n => n.rank === r).length; }
 // ---------------- phi tần NPC ----------------
-function NPCF() { if (!DB.state.npcFei) DB.state.npcFei = C.NPC_FEI.map(n => ({ ...n })); if (!DB.state.npcFeiV2) { DB.state.npcFeiV2 = 1; for (const n of DB.state.npcFei) { const c = C.NPC_FEI.find(x => x.id === n.id); if (c) { n.tinh = c.tinh; n.short = c.short; } } } return DB.state.npcFei; }
+function NPCF() { if (!DB.state.npcFei) DB.state.npcFei = C.NPC_FEI.map(n => ({ ...n }));
+  // mốc công trạng từ Tần trở lên được nâng: kéo điểm NPC theo cùng tỉ lệ để việc vượt mặt giành ghế vẫn công bằng
+  if (!DB.state.npcFeiV3) { DB.state.npcFeiV3 = 1; const OLD = { 5: 400, 6: 600, 7: 1300, 8: 2000 }; for (const n of DB.state.npcFei) if (OLD[n.rank]) n.pts = C.RANKS[n.rank].pts + Math.max(0, n.pts - OLD[n.rank]) * 2; } if (!DB.state.npcFeiV2) { DB.state.npcFeiV2 = 1; for (const n of DB.state.npcFei) { const c = C.NPC_FEI.find(x => x.id === n.id); if (c) { n.tinh = c.tinh; n.short = c.short; } } } return DB.state.npcFei; }
 const npcRank = n => C.RANKS[n.rank].name;
 function npcDemote(n, why) { if (n.rank <= 1) return; n.rank--; n.pts = C.RANKS[n.rank].pts + rnd(30); n.name = n.name.split(' ')[0] + ' ' + npcRank(n); n.trend = { dir: -1, t: now() }; news(`📉 ${n.short} bị giáng xuống ${npcRank(n)}${why ? ' vì ' + why : ''}.`, 'phat'); }
 function npcPromote(n) { const nx = C.RANKS[n.rank + 1]; if (!nx || n.pts < nx.pts) return; if (nx.seats && seatCount(n.rank + 1) >= nx.seats) return; n.rank++; n.name = n.name.split(' ')[0] + ' ' + npcRank(n); n.trend = { dir: 1, t: now() }; news(`Thánh chỉ: ${n.short} được tấn phong ${npcRank(n)}.`, 'phong'); }
@@ -613,20 +615,20 @@ function checkAch(p) {
 
 // ---------------- nhiệm vụ tân thủ ----------------
 const QUESTS = [
-  { t: 'Thỉnh an Thái hậu ở Từ Ninh cung', need: 1, cur: p => p.cnt?.thinhan || 0, r: { silver: 30 } },
-  { t: 'Câu 3 con cá ở hồ Ngự hoa viên', need: 3, cur: p => p.cnt?.fish || 0, r: { silver: 20 } },
-  { t: 'Luyện tài nghệ ở phòng riêng', need: 1, cur: p => p.cnt?.luyen || 0, r: { turns: 1 } },
-  { t: 'Bấm vào tên Quế ma ma để trò chuyện', need: 1, cur: p => p.cnt?.npctalk || 0, r: { silver: 20 } },
-  { t: 'Dò tin sở thích Hoàng thượng ở Ngự hoa viên', need: 1, cur: p => p.cnt?.dotin || 0, r: { turns: 1 } },
-  { t: 'Dâng canh ở Dưỡng Tâm điện', need: 1, cur: p => p.cnt?.dangcanh || 0, r: { silver: 40 } },
-  { t: 'Tặng quà cho một phi tần (Hậu cung ở thanh dưới)', need: 1, cur: p => p.cnt?.tangqua || 0, r: { silver: 30 } },
-  { t: 'Nhận tra án giúp Quế ma ma và phá được án', need: 1, cur: p => p.cnt?.det || 0, r: { silver: 50 } },
-  { t: 'Kết nghĩa tỷ muội với một người', need: 1, cur: p => p.sis ? 1 : 0, r: { silver: 50 } },
+  { t: 'Thỉnh an Thái hậu ở Từ Ninh cung', need: 1, cur: p => p.cnt?.thinhan || 0, r: { silver: 30 }, go: 'tuninh', hl: 'Thỉnh an' },
+  { t: 'Câu 3 con cá ở hồ Ngự hoa viên', need: 3, cur: p => p.cnt?.fish || 0, r: { silver: 20 }, go: 'hoavien', hl: 'Câu cá' },
+  { t: 'Luyện tài nghệ ở phòng riêng', need: 1, cur: p => p.cnt?.luyen || 0, r: { turns: 1 }, go: 'phong', hl: 'Luyện tài nghệ' },
+  { t: 'Bấm vào tên Quế ma ma để trò chuyện', need: 1, cur: p => p.cnt?.npctalk || 0, r: { silver: 20 }, go: 'tuninh', tip: 'Bấm vào chữ vàng "Quế ma ma" trên đầu bà ấy' },
+  { t: 'Dò tin sở thích Hoàng thượng ở Ngự hoa viên', need: 1, cur: p => p.cnt?.dotin || 0, r: { turns: 1 }, go: 'hoavien', hl: 'Dò tin' },
+  { t: 'Dâng canh ở Dưỡng Tâm điện', need: 1, cur: p => p.cnt?.dangcanh || 0, r: { silver: 40 }, go: 'duongtam', hl: 'Dâng canh' },
+  { t: 'Tặng quà cho một phi tần (Hậu cung ở thanh dưới)', need: 1, cur: p => p.cnt?.tangqua || 0, r: { silver: 30 }, ui: 'roster' },
+  { t: 'Nhận tra án giúp Quế ma ma và phá được án', need: 1, cur: p => p.cnt?.det || 0, r: { silver: 50 }, go: 'tuninh', hl: 'tra án' },
+  { t: 'Kết nghĩa tỷ muội với một người', need: 1, cur: p => p.sis ? 1 : 0, r: { silver: 50 }, ui: 'roster' },
   { t: 'Lên Đáp ứng', need: 2, cur: p => p.rank, r: { silver: 100 } },
-  { t: 'Dâng tiết mục ở một buổi yến tiệc', need: 1, cur: p => p.cnt?.feast || 0, r: { turns: 2 } },
+  { t: 'Dâng tiết mục ở một buổi yến tiệc', need: 1, cur: p => p.cnt?.feast || 0, r: { turns: 2 }, go: 'hoavien', hl: 'yến tiệc', tip: 'Yến tiệc mở lúc 9h, 11h, 15h, 17h. Xem giờ ở nút 🗓 Hôm nay' },
   { t: 'Lên Thường tại', need: 3, cur: p => p.rank, r: { silver: 150, sung: 10 } },
 ];
-function questView(p) { const i = p.qi || 0, q = QUESTS[i]; return q ? { i, n: QUESTS.length, t: q.t, cur: Math.min(q.need, q.cur(p)), need: q.need, r: q.r } : null; }
+function questView(p) { const i = p.qi || 0, q = QUESTS[i]; return q ? { i, n: QUESTS.length, t: q.t, cur: Math.min(q.need, q.cur(p)), need: q.need, r: q.r, go: q.go || null, hl: q.hl || null, ui: q.ui || null, tip: q.tip || null } : null; }
 function checkQuest(p) {
   if (p.qi == null && p.rank >= 3) p.qi = QUESTS.length;
   p.qi = p.qi || 0;

@@ -289,6 +289,9 @@ body.staging #notice { display:none !important; }
 body.staging #menubar, body.mgopen #menubar { display:none !important; }
 #hQuest { margin-top:6px; padding-top:5px; border-top:1px solid rgba(255,255,255,.08); font-size:11.5px; color:#f3e2b4; max-width:250px; line-height:1.35; }
 #hQuest b { color:var(--gold2); }
+#hQuest .qgo { margin-left:4px; padding:2px 8px; font-size:11px; border-radius:10px; background:linear-gradient(#f3d27a,#c9973a); color:#3a1a05; border:0; font-weight:700; cursor:pointer; animation:qpulse 1.6s ease-in-out infinite; }
+#acts button.qhl { box-shadow:0 0 0 2px #f3d27a, 0 0 14px rgba(243,210,122,.7); animation:qpulse 1.6s ease-in-out infinite; }
+@keyframes qpulse { 50% { filter:brightness(1.25); } }
 .today { background:rgba(255,255,255,.04); border:1px solid var(--line); border-radius:10px; padding:8px 11px; margin-top:8px; font-size:13px; line-height:1.5; }
 .today b { color:var(--gold2); } .today > b:first-child { display:block; margin-bottom:2px; } .today small { color:var(--muted); }
 .mails { max-height:60vh; overflow-y:auto; margin-top:8px; display:flex; flex-direction:column; gap:8px; }

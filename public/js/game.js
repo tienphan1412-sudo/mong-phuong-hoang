@@ -315,9 +315,12 @@ function renderHud() {
   const lo = me.nextPts ? (me.pts / me.nextPts) : 1; $('hBar').style.width = Math.min(100, lo * 100) + '%';
   $('hPts').textContent = me.nextPts ? `Công trạng ${me.pts}/${me.nextPts}` : `Công trạng ${me.pts}`;
   let qd = $('hQuest'); if (!qd) { qd = document.createElement('div'); qd.id = 'hQuest'; $('who').appendChild(qd); }
-  qd.innerHTML = me.quest ? `🎯 <b>${me.quest.i + 1}/${me.quest.n}</b> ${esc(me.quest.t)}${me.quest.need > 1 && me.quest.need < 50 && !/^Lên/.test(me.quest.t) ? ` (${me.quest.cur}/${me.quest.need})` : ''}` : ''; qd.style.display = me.quest ? '' : 'none';
+  qd.innerHTML = me.quest ? `🎯 <b>${me.quest.i + 1}/${me.quest.n}</b> ${esc(me.quest.t)}${me.quest.need > 1 && me.quest.need < 50 && !/^Lên/.test(me.quest.t) ? ` (${me.quest.cur}/${me.quest.need})` : ''}${me.quest.go || me.quest.ui ? ' <button class="qgo">👉 Làm ngay</button>' : ''}` : ''; qd.style.display = me.quest ? '' : 'none';
+  const qb = qd.querySelector('.qgo'); if (qb) qb.onclick = e => { e.stopPropagation(); questGo(); };
+  // bảng xếp hạng luôn nằm ngay dưới khung tên, không che dòng nhiệm vụ; người mới đang làm nhiệm vụ tân thủ thì thu gọn bảng xếp hạng
+  requestAnimationFrame(() => { const w = $('who'), t5 = $('top5'); if (!w || !t5) return; t5.style.top = Math.round(w.getBoundingClientRect().bottom + 8) + 'px'; if (me.quest && !t5.dataset.user) t5.classList.add('min'); });
   const t = me.tasks || {};
-  $('stats').innerHTML = `<span class="pill">💰 Bạc <b>${me.silver}</b></span><span class="pill" title="Cứ 30 phút hồi 1 lượt (tối đa ${me.turnCap}). Làm đủ 3 nhiệm vụ ngày, dự yến tiệc, được lật thẻ cũng được thêm lượt.">⏳ Lượt <b>${me.turns}</b>${me.nextTurn ? ` <small id="turnT" style="opacity:.75"></small>` : ''}</span><span class="pill">💗 Sủng ái <b>${me.sung}</b></span><span class="pill">🍵 Thái hậu <b>${me.haiLong}</b></span><span class="pill" title="Nhiệm vụ ngày: thỉnh an, luyện tài nghệ, dò tin. Làm đủ 3 được thêm lượt và công trạng.">📋 ${t.thinhan ? '✅' : '⬜'}${t.luyen ? '✅' : '⬜'}${t.dotin ? '✅' : '⬜'}</span>${me.camTuc ? `<span class="pill" style="border-color:#c0503a">🔒 Cấm túc còn ${Math.max(1, Math.ceil((me.camTuc - Date.now()) / 3600e3))} giờ</span>` : ''}${me.thai ? `<span class="pill" style="border-color:#f3a6c8" title="Mỗi ngày uống thuốc an thai ở chỗ Thái y (Từ Ninh cung). Uống đủ 2 ngày trở lên thì sinh thuận.">🤰 Long thai · còn ${Math.max(0, Math.ceil((me.thai.due - Date.now()) / 3600e3))} giờ · an thai ${me.thai.antai ? '✅' : '⬜'}</span>` : ''}${me.isHH ? '<button class="pill" id="hhBtn" style="border-color:#e8c25a">👑 Hoàng hậu</button>' : ''}${me.hhVote ? `<button class="pill" id="voteBtn" style="border-color:#e8c25a">👑 Bầu phượng ấn · còn ${Math.max(1, Math.ceil((me.hhVote.end - Date.now()) / 3600e3))} giờ</button>` : ''}${me.big ? `<button class="pill" id="bigBtn" style="border-color:#c0503a">📜 Đại án${me.big.done ? ' · kết quả' : ` · ${me.big.mine.length} manh mối`}</button>` : ''}${me.fest && !me.fest.done ? `<button class="pill" id="festBtn" style="border-color:#e8c25a">🏮 Đại lễ <b id="festPct">${Math.min(100, Math.floor(me.fest.pts / me.fest.goal * 100))}%</b></button>` : ''}<button class="pill" id="todayBtn">🗓 Hôm nay</button>${htPill()}${feast ? `<span class="pill feast">🎎 Yến tiệc · <b id="feastT"></b> · ${feast.n} tiết mục</span>` : ''}${me.cases.length ? `<button class="pill" id="caseBtn" style="border-color:#c0503a">${me.cases[0].det ? '🔍 Đang tra án' : '⚖️ Vụ án đang mở'}${me.cases.length > 1 ? ` (${me.cases.length})` : ''}</button>` : ''}`;
+  $('stats').innerHTML = `<span class="pill">💰 Bạc <b>${me.silver}</b></span><span class="pill" title="Cứ 45 phút hồi 1 lượt (tối đa ${me.turnCap}). Làm đủ 3 nhiệm vụ ngày, dự yến tiệc, được lật thẻ cũng được thêm lượt.">⏳ Lượt <b>${me.turns}</b>${me.nextTurn ? ` <small id="turnT" style="opacity:.75"></small>` : ''}</span><span class="pill">💗 Sủng ái <b>${me.sung}</b></span><span class="pill">🍵 Thái hậu <b>${me.haiLong}</b></span><span class="pill" title="Nhiệm vụ ngày: thỉnh an, luyện tài nghệ, dò tin. Làm đủ 3 được thêm lượt và công trạng.">📋 ${t.thinhan ? '✅' : '⬜'}${t.luyen ? '✅' : '⬜'}${t.dotin ? '✅' : '⬜'}</span>${me.camTuc ? `<span class="pill" style="border-color:#c0503a">🔒 Cấm túc còn ${Math.max(1, Math.ceil((me.camTuc - Date.now()) / 3600e3))} giờ</span>` : ''}${me.thai ? `<span class="pill" style="border-color:#f3a6c8" title="Mỗi ngày uống thuốc an thai ở chỗ Thái y (Từ Ninh cung). Uống đủ 2 ngày trở lên thì sinh thuận.">🤰 Long thai · còn ${Math.max(0, Math.ceil((me.thai.due - Date.now()) / 3600e3))} giờ · an thai ${me.thai.antai ? '✅' : '⬜'}</span>` : ''}${me.isHH ? '<button class="pill" id="hhBtn" style="border-color:#e8c25a">👑 Hoàng hậu</button>' : ''}${me.hhVote ? `<button class="pill" id="voteBtn" style="border-color:#e8c25a">👑 Bầu phượng ấn · còn ${Math.max(1, Math.ceil((me.hhVote.end - Date.now()) / 3600e3))} giờ</button>` : ''}${me.big ? `<button class="pill" id="bigBtn" style="border-color:#c0503a">📜 Đại án${me.big.done ? ' · kết quả' : ` · ${me.big.mine.length} manh mối`}</button>` : ''}${me.fest && !me.fest.done ? `<button class="pill" id="festBtn" style="border-color:#e8c25a">🏮 Đại lễ <b id="festPct">${Math.min(100, Math.floor(me.fest.pts / me.fest.goal * 100))}%</b></button>` : ''}<button class="pill" id="todayBtn">🗓 Hôm nay</button>${htPill()}${feast ? `<span class="pill feast">🎎 Yến tiệc · <b id="feastT"></b> · ${feast.n} tiết mục</span>` : ''}${me.cases.length ? `<button class="pill" id="caseBtn" style="border-color:#c0503a">${me.cases[0].det ? '🔍 Đang tra án' : '⚖️ Vụ án đang mở'}${me.cases.length > 1 ? ` (${me.cases.length})` : ''}</button>` : ''}`;
   const cb = $('caseBtn'); if (cb) cb.onclick = () => openCase(me.cases[0].id);
   const tb = $('todayBtn'); if (tb) tb.onclick = openToday; const bb = $('bigBtn'); if (bb) bb.onclick = openBig; const fb = $('festBtn'); if (fb) fb.onclick = openFest;
   const hb = $('hhBtn'); if (hb) hb.onclick = openHH; const vb = $('voteBtn'); if (vb) vb.onclick = openVote;
@@ -333,6 +336,14 @@ function renderMap() {
   if (!me.lanh && !me.camTuc && me.children?.length) list.splice(list.indexOf('phong'), 0, 'acaso');
   if (sinhSt && !me.lanh && !me.camTuc) list.unshift('sansinh');
   for (const l of list) { const b = document.createElement('button'); b.textContent = l === 'sansinh' ? `🏮 ${sinhSt.cung} (chuyển dạ)` : l === 'phong' && me.hasPalace ? 'Cung riêng' : LOCNAMES[l]; b.classList.toggle('on', world?.loc === l); b.onclick = () => socket.emit('goto', l); m.appendChild(b); }
+}
+// nút "Làm ngay" của nhiệm vụ tân thủ: đưa tới đúng chỗ, làm sáng đúng việc cần bấm
+function questGo() {
+  const q = me?.quest; if (!q) return;
+  if (q.ui === 'roster') { toast('Chọn một phi tần trong danh sách rồi bấm Tặng quà / Kết nghĩa.'); return openRoster(); }
+  if (q.go && world?.loc !== q.go) socket.emit('goto', q.go);
+  else renderActs();
+  toast(q.tip || (q.hl ? `Bấm vào việc đang sáng ở bảng bên phải: ${q.hl}` : q.t));
 }
 function act(type, extra = {}) { socket.emit('action', { type, ...extra }); }
 function renderActs() {
@@ -615,7 +626,7 @@ function holdEdict(c, m) {
 // ---------------- hướng dẫn người chơi mới ----------------
 const TOUR = [
   { el: '#who', title: 'Thân phận của bổn cung', text: 'Tên, chức vị, thanh <b>công trạng</b>. Đầy thanh sẽ được tấn phong lên bậc tiếp theo, từ Tú nữ tới Hoàng quý phi, rồi tranh ngôi Hoàng hậu.<br><br>Dòng <b>🎯</b> bên dưới là nhiệm vụ tân thủ: làm theo là biết cách chơi, xong mỗi bước có thưởng.' },
-  { el: '#stats', title: 'Bạc, lượt, sủng ái', text: '<b>Lượt</b> dùng cho đa số việc, cứ 30 phút hồi 1. Bấm <b>🗓 Hôm nay</b> để xem sự kiện tuần, giờ lật thẻ, giờ yến tiệc và sở thích Hoàng thượng.' },
+  { el: '#stats', title: 'Bạc, lượt, sủng ái', text: '<b>Lượt</b> dùng cho đa số việc, cứ 45 phút hồi 1. Bấm <b>🗓 Hôm nay</b> để xem sự kiện tuần, giờ lật thẻ, giờ yến tiệc và sở thích Hoàng thượng.' },
   { el: '#map', title: 'Đi lại trong cung', text: 'Ngự hoa viên, Từ Ninh cung (Thái hậu), Dưỡng Tâm điện (Hoàng thượng), phòng riêng.' },
   { el: '#acts', title: 'Việc làm ở nơi đang đứng', text: 'Mỗi nơi có việc riêng. Câu cá ở hồ không tốn lượt, hết lượt vẫn chơi được.' },
   { el: 'center', title: 'Di chuyển và nói chuyện', text: '<b>Bấm xuống đất</b> để đi. Kéo chuột để xoay, lăn chuột để phóng to. Bấm vào <b>tên NPC màu vàng</b> (Thái hậu, Quế ma ma, Thái y…) để trò chuyện, biếu quà, nhận tra án.' },
@@ -708,7 +719,7 @@ function standUp(keepCam) {
 
 // ---------------- bảng xếp hạng top 5 ----------------
 let lastTopIds = [];
-$('top5').querySelector('.t').onclick = () => $('top5').classList.toggle('min');
+$('top5').querySelector('.t').onclick = () => { $('top5').dataset.user = 1; $('top5').classList.toggle('min'); };
 if (innerWidth < 760) $('top5').classList.add('min');
 socket.on('top5', list => {
   const ol = $('top5list'); ol.innerHTML = '';
@@ -2248,8 +2259,11 @@ function openDay() {
 // =====================================================================
 // THÁNH CHỈ CẬP NHẬT: hiện một lần cho mỗi bản mới
 // =====================================================================
-const UPDATE_VER = 'u2026-11-13d';
+const UPDATE_VER = 'u2026-11-13e';
 const UPDATE_NOTES = [
+  ['🎯 Nhiệm vụ tân thủ có nút "Làm ngay"', 'Bấm là được đưa tới đúng nơi, việc cần làm sáng lên ở bảng bên phải. Người mới không còn lạc trong cung.'],
+  ['📈 Đường thăng tiến dài hơi hơn', 'Từ Tú nữ tới Quý nhân vẫn nhanh như cũ (người mới còn được x1.3 công trạng tới hết Quý nhân). Từ Tần trở lên cần nhiều công trạng hơn: Tần 900, Phi 1.600, Quý phi 2.800, Hoàng quý phi 4.500. Ai đã lên chức giữ nguyên chức.'],
+  ['⏳ Lượt hồi chậm lại', 'Cứ 45 phút hồi 1 lượt, tích tối đa 14 (trước 30 phút, tối đa 20). Mỗi ngày vẫn có 8 lượt đầu ngày.'],
   ['🏯 Game đổi tên: Phượng Khởi Thâm Cung', 'Link mới: phuong-khoi-tham-cung.onrender.com. Link cũ vẫn tự chuyển sang, tài khoản giữ nguyên.'],
   ['🪑 Ghế hậu cung theo lệ nhà Thanh', 'Quý nhân trở xuống không giới hạn ghế, ai đủ công trạng là lên và được tham gia cung đấu. Ghế cao giữ đúng lệ: 6 Tần, 4 Phi, 2 Quý phi, 1 Hoàng quý phi.'],
   ['⏳ Ghế cao không được bỏ trống', 'Từ Tần trở lên vắng 2 ngày thì cáo bệnh, vắng 4 ngày phải nhường ghế cho người đang chờ (về lại Quý nhân, quay lại đủ công trạng thì lên lại).'],
@@ -2299,6 +2313,8 @@ const UPDATE_NOTES = [
 ];
 function showUpdate(force) {
   try { if (!force && localStorage.getItem('mph_upd_' + me.id) === UPDATE_VER) return; } catch {}
+  // acc mới tạo trong ngày: không bật bảng "Có gì mới" (toàn so sánh luật cũ), để người mới tập trung làm nhiệm vụ tân thủ
+  if (!force && me.created && Date.now() - me.created < 864e5) { try { localStorage.setItem('mph_upd_' + me.id, UPDATE_VER); } catch {} return; }
   if (!force && (tourOn || !$('modal').classList.contains('hidden'))) return setTimeout(() => showUpdate(), 4000);
   modal(`<button class="close" onclick="window._close()">✕</button>
   <div class="updhead"><div class="ut">聖旨</div><h3>Thánh chỉ · Hậu cung có biến</h3><small>Cập nhật ngày 12/11 · phụng thiên thừa vận, Hoàng đế chiếu viết…</small></div>
@@ -2951,8 +2967,10 @@ socket.on('sinhTen', async d => {
 // thu gọn bảng việc bên phải
 let actsOpen = false; try { actsOpen = localStorage.getItem('mph_acts') === '1'; } catch {}
 const _renderActs = renderActs;
-renderActs = function () { _renderActs(); const a = $('acts'); if (!a) return; const bs = [...a.querySelectorAll(':scope > button')]; const SHOW = 4; if (bs.length <= SHOW + 1) return;
-  const urgent = b => /😭|🏮|🐉|🌸|🙏|🌿|chuyển dạ|trình bài|Nghênh giá/.test(b.textContent); bs.filter(urgent).reverse().forEach(b => a.insertBefore(b, a.querySelector(':scope > button')));
+renderActs = function () { _renderActs(); const a = $('acts'); if (!a) return; const bs = [...a.querySelectorAll(':scope > button')]; const SHOW = 4;
+  const hl = me?.quest?.hl; if (hl) bs.forEach(b => { if (b.textContent.toLowerCase().includes(hl.toLowerCase())) b.classList.add('qhl'); });
+  if (bs.length <= SHOW + 1) return;
+  const urgent = b => b.classList.contains('qhl') || /😭|🏮|🐉|🌸|🙏|🌿|chuyển dạ|trình bài|Nghênh giá/.test(b.textContent); bs.filter(urgent).reverse().forEach(b => a.insertBefore(b, a.querySelector(':scope > button')));
   const all = [...a.querySelectorAll(':scope > button')]; if (!actsOpen) all.slice(SHOW).forEach(b => b.style.display = 'none');
   const t = document.createElement('button'); t.className = 'more'; t.innerHTML = actsOpen ? '▴ Thu gọn' : `▾ Xem thêm ${all.length - SHOW} việc`; t.onclick = () => { actsOpen = !actsOpen; try { localStorage.setItem('mph_acts', actsOpen ? '1' : '0'); } catch {} renderActs(); }; a.appendChild(t); };
 window.__mph.me = () => ({ carry: me.carry, follow: me.follow, kidPub: me.kidPub, kids: (me.children||[]).map(k => [k.name, k.stage, k.ward]) });
