@@ -309,10 +309,11 @@ addEventListener('pointerdown', e => { const n = $('news'); if (n && !n.classLis
 socket.on('toast', t => toast(t.text, t.kind));
 socket.on('npcSay', d => { const n = world?.npcs.find(x => x.name === d.who); if (d.long) { say(n?.model || 'aongu', d.who, esc(d.text), [['Đa tạ', 0, 'gold']]).then(dlgClose); return; } if (n?.label) bubble(n.label, d.text); else toast(`${d.who}: ${d.text}`); });
 function toast(text, kind = 'info') {
+  { const core = String(text).replace(/^[^\p{L}\d]+/u, '').trim(); const box = $('toasts'); if ([...box.querySelectorAll('.toast')].some(t => t.dataset.core === core)) return; var _core = core; }
   const d = document.createElement('div'); d.className = 'toast ' + kind; d.textContent = text;
   const long = /🎁|🏮|lật thẻ/.test(text);
   if (long) { d.classList.add('sticky'); const x = document.createElement('button'); x.className = 'tx'; x.textContent = '✕'; x.title = 'Đóng'; x.onclick = () => d.remove(); d.appendChild(x); }
-  if (!long) d.onclick = () => d.remove(); $('toasts').appendChild(d); setTimeout(() => d.remove(), long ? 5 * 60e3 : kind === 'bad' ? 10000 : 5200);
+  d.dataset.core = _core; if (!long) d.onclick = () => d.remove(); $('toasts').appendChild(d); if (document.body.classList.contains('mob')) { const ts = [...$('toasts').querySelectorAll('.toast')]; while (ts.length > 3) ts.shift().remove(); } setTimeout(() => d.remove(), long ? 5 * 60e3 : kind === 'bad' ? 10000 : 5200);
 }
 
 // ---------------- HUD, bản đồ, hành động ----------------
