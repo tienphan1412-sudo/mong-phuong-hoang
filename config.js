@@ -185,6 +185,7 @@ module.exports = {
   HH_VOTE_HOURS: 24,           // thời gian tiến cử
   HH_DAILY: { silver: 500, turns: 5 },  // cộng thẳng vào lượt, vượt mức tối đa vẫn được
   HH_USES: 3,                  // mỗi quyền Hoàng hậu dùng 3 lần/ngày
+  HH_LANH_PER_DAY: 1,          // riêng quyền đày vào lãnh cung: 1 lần/ngày
   HH_THINHAN: [6, 12],         // giờ lục cung tới thỉnh an Hoàng hậu (giờ VN)
   LOGIN_REWARD: [20, 30, 40, 50, 60, 80, 200], // bạc điểm danh ngày 1..7 (ngày 7 thêm 1 lượt, 10 sủng ái)
   KEEPALIVE_HOURS: [7, 24],    // giờ VN giữ server thức (ngoài giờ này server được ngủ để tiết kiệm giờ miễn phí của Render)

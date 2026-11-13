@@ -1581,12 +1581,13 @@ function openVote() {
 let hhMode = null;
 function openHH() {
   if (!me.isHH) return; const d = me.hhDay || {}, N = me.hhUses || 3;
-  const btn = (op, title, sub) => { const u = d[op] || 0, out = u >= N; return `<button data-h="${op}" ${out ? 'disabled' : ''}>${title}<small style="display:block;color:var(--muted)">${sub} · hôm nay ${u}/${N} lần</small></button>`; };
+  const btn = (op, title, sub, lim = N) => { const u = d[op] || 0, out = u >= lim; return `<button data-h="${op}" ${out ? 'disabled' : ''}>${title}<small style="display:block;color:var(--muted)">${sub} · hôm nay ${u}/${lim} lần</small></button>`; };
   modal(`<button class="close" onclick="window._close()">✕</button><h3>👑 Quyền Hoàng hậu</h3>
   <div style="color:var(--muted);font-size:12.5px">Mỗi quyền dùng ${N} lần mỗi ngày. Mỗi ngày được thêm 500 bạc và 5 lượt. Sáng ${me.hhThinhan?.[0] ?? 6}h–${me.hhThinhan?.[1] ?? 12}h lục cung tới cung Hoàng hậu thỉnh an. Hoàng hậu bị giáng cấp hay vào lãnh cung thì mất phượng ấn.</div>
   <div class="btns" style="flex-direction:column;align-items:stretch">
     ${btn('anxa', '🕊 Ân xá', 'Cho một người ra khỏi cấm túc hoặc lãnh cung')}
     ${btn('phat', '🔒 Phạt cấm túc 6 giờ', 'Không phạt được người mang long thai hay đang được bảo hộ')}
+    ${btn('daylanh', '❄️ Đày vào lãnh cung', 'Đày một phi tần vào lãnh cung, có ghi tội danh. Thái hậu sẽ cho là nặng tay (hài lòng -5)', 1)}
     ${btn('thuong', '💰 Ban thưởng bạc', 'Ban 100 bạc từ quỹ cung và 5 công trạng cho một phi tần')}
     ${btn('trangsuc', '💍 Ban trang sức', 'Bổn cung bỏ bạc mua một món trang sức người đó chưa có để ban tặng')}
     ${btn('hoso', '📜 Xem hồ sơ vụ án', 'Xem các vụ án đang mở, mỗi vụ lộ ra 1 đặc điểm của kẻ gây án')}
@@ -1601,10 +1602,10 @@ socket.on('hhHoso', L => {
 });
 socket.on('roster', r => {
   if (!hhMode) return; const op = hhMode; hhMode = null;
-  const NM = { anxa: ['🕊 Ân xá cho ai?', 'Ân xá', 'Không có ai đang bị phạt.'], phat: ['🔒 Phạt ai cấm túc?', 'Phạt', 'Không có ai để phạt.'], thuong: ['💰 Ban thưởng 100 bạc cho ai?', 'Ban thưởng', 'Chưa có ai.'], trangsuc: ['💍 Ban trang sức cho ai?', 'Ban tặng', 'Chưa có ai.'] }[op];
-  const list = r.list.filter(p => p.id !== me.id && (op === 'anxa' ? (p.lanh || p.camTuc) : op === 'phat' ? (!p.lanh && !p.camTuc && !p.thai) : !p.lanh));
+  const NM = { anxa: ['🕊 Ân xá cho ai?', 'Ân xá', 'Không có ai đang bị phạt.'], phat: ['🔒 Phạt ai cấm túc?', 'Phạt', 'Không có ai để phạt.'], thuong: ['💰 Ban thưởng 100 bạc cho ai?', 'Ban thưởng', 'Chưa có ai.'], trangsuc: ['💍 Ban trang sức cho ai?', 'Ban tặng', 'Chưa có ai.'], daylanh: ['❄️ Đày ai vào lãnh cung?', 'Đày', 'Không có ai để xử.'] }[op];
+  const list = r.list.filter(p => p.id !== me.id && (op === 'anxa' ? (p.lanh || p.camTuc) : op === 'phat' || op === 'daylanh' ? (!p.lanh && !p.camTuc && !p.thai) : !p.lanh));
   modal(`<button class="close" onclick="window._close()">✕</button><h3>${NM[0]}</h3>
-  ${op === 'phat' ? '<label>Lý do (cả cung sẽ đọc trên bảng tin)</label><input id="hhWhy" maxlength="40" placeholder="thất lễ với bổn cung">' : ''}
+  ${op === 'phat' || op === 'daylanh' ? `<label>${op === 'daylanh' ? 'Tội danh' : 'Lý do'} (cả cung sẽ đọc trên bảng tin)</label><input id="hhWhy" maxlength="40" placeholder="${op === 'daylanh' ? 'phạm thượng, bất kính với Hoàng hậu' : 'thất lễ với bổn cung'}">` : ''}
   <table>${list.map(p => `<tr><td>${esc(p.name)}</td><td>${esc(p.rankName)}</td><td><button data-p="${p.id}">${NM[1]}</button></td></tr>`).join('') || `<tr><td>${NM[2]}</td></tr>`}</table>`);
   $('mcard').querySelectorAll('[data-p]').forEach(b => b.onclick = () => { socket.emit('hh', { op, who: b.dataset.p, why: $('hhWhy')?.value || '' }); closeModal(); });
 });

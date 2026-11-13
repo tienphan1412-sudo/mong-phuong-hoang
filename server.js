@@ -2219,7 +2219,8 @@ io.on('connection', sock => {
       const hs = sockOf(h.id); if (hs) toast(h, `${me.name} tới thỉnh an Hoàng hậu.`, 'good'); push(me); save(); return;
     }
     if (!isHH(me)) return toast(me, 'Chỉ Hoàng hậu mới có quyền này.', 'bad');
-    if ((me.hhDay[op] || 0) >= C.HH_USES) return toast(me, `Hôm nay đã dùng quyền này đủ ${C.HH_USES} lần rồi.`);
+    const lim = op === 'daylanh' ? C.HH_LANH_PER_DAY : C.HH_USES;
+    if ((me.hhDay[op] || 0) >= lim) return toast(me, `Hôm nay đã dùng quyền này đủ ${lim} lần rồi.`);
     const used = () => { me.hhDay[op] = (me.hhDay[op] || 0) + 1; };
     const t = d.who && P(d.who);
     if (op === 'anxa') {
@@ -2236,6 +2237,13 @@ io.on('connection', sock => {
       news(`👑 Hoàng hậu ${me.name} phạt ${t.name} cấm túc 6 giờ vì ${String(d.why || 'thất lễ').slice(0, 40)}.`, 'phat');
       const sk = sockOf(t.id); if (sk) { toast(t, `Hoàng hậu phạt bổn cung cấm túc 6 giờ.`, 'bad'); if (t.loc !== 'phong') enter(t, 'phong', sk); }
       push(t);
+    } else if (op === 'daylanh') { // đày một phi tần vào lãnh cung
+      if (!t || t.id === me.id || t.lanh || t.admin) return;
+      if (t.thai?.known) return toast(me, 'Không thể đày người đang mang long thai.', 'bad');
+      if ((t.protectUntil || 0) > now()) return toast(me, 'Người này đang được bảo hộ, chưa thể xử.', 'bad');
+      used(); const why = String(d.why || 'phạm thượng, bất kính với Hoàng hậu').slice(0, 40);
+      sendToLanhCung(t, `bị Hoàng hậu ${me.name} xử tội ${why}`, null); relAdd(me, 'thaihau', -5, 'xử phạt hậu cung quá nặng tay');
+      toast(me, `Đã đày ${t.name} vào lãnh cung. Thái hậu cho rằng Hoàng hậu quá nặng tay: hài lòng -5.`, 'bad');
     } else if (op === 'thuong') { // ban thưởng 100 bạc từ quỹ cung
       if (!t || t.id === me.id) return; used(); t.silver += 100; addPts(t, 5); relAdd(me, 'thaihau', 1, 'ban ân cho hậu cung');
       news(`👑 Hoàng hậu ${me.name} ban thưởng ${t.name} 100 lượng bạc.`, 'an'); notify(t, '👑 Hoàng hậu ban thưởng', 'Hoàng hậu ban cho bổn cung 100 lượng bạc.', 'an'); toast(t, '👑 Hoàng hậu ban thưởng 100 bạc, công trạng +5.', 'good'); push(t);
