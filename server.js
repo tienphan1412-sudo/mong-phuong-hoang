@@ -172,7 +172,7 @@ function selfView(p) {
   return {
     ...publicView(p), path: p.path, pathName: C.PATHS[p.path].name, origin: C.ORIGINS[p.origin].name,
     mailUnread: (p.mail || []).filter(m => !m.read).length, pushOn: !!p.pushSubs?.length,
-    created: p.created || 0, pts: p.pts, nextPts: C.RANKS[p.rank + 1]?.pts ?? null, silver: p.silver, turns: (regen(p), p.turns), turnCap: C.TURN_CAP, nextTurn: p.turns >= C.TURN_CAP ? null : p.turnAt + C.TURN_REGEN_MIN * 60e3, sung: p.sung, haiLong: p.haiLong,
+    created: p.created || 0, pts: p.pts, nextPts: p.rank + 1 < C.RANKS.length ? RP(p, p.rank + 1) : null, silver: p.silver, turns: (regen(p), p.turns), turnCap: C.TURN_CAP, nextTurn: p.turns >= C.TURN_CAP ? null : p.turnAt + C.TURN_REGEN_MIN * 60e3, sung: p.sung, haiLong: p.haiLong,
     stats: p.stats, tasks: p.tasks, thinhAn: p.thinhAn, waiting: p.waiting || false, lanh: p.lanh || null,
     outfits: allowedOutfits(p), decor: p.decor || [], hasPalace: p.rank >= C.PALACE_RANK, cases: open,
     protectedUntil: p.protectUntil || 0, admin: !!p.admin, hamDay: p.hamDay === dayKey(), canFight: !p.lanh && p.rank >= C.FIGHT_RANK,
@@ -252,10 +252,15 @@ function npcDaily() {
 }
 
 // ---------------- thăng cấp ----------------
+// mốc công trạng riêng cho vài tài khoản (p.moc = { cấp: điểm }), còn lại theo config
+const RP = (p, r) => p?.moc?.[r] ?? C.RANKS[r].pts;
+// 4 tài khoản của chủ game: mốc riêng Tần 500, Phi 900, Quý phi 2.000, Hoàng quý phi 3.000
+const MOC_RIENG = { names: ['An An', 'Nhược Hy', 'Tạ Nguyệt Khanh', 'Tiểu Mỹ An'], moc: { 5: 500, 6: 900, 7: 2000, 8: 3000 } };
+function applyMocRieng() { for (const p of Object.values(DB.players)) if (MOC_RIENG.names.includes(p.name) && JSON.stringify(p.moc) !== JSON.stringify(MOC_RIENG.moc)) { p.moc = { ...MOC_RIENG.moc }; console.log('mốc riêng:', p.name); } }
 function tryPromote(p) {
   if (p.lanh) return;
   let changed = false;
-  while (p.rank < C.RANKS.length - 1 && p.pts >= C.RANKS[p.rank + 1].pts) {
+  while (p.rank < C.RANKS.length - 1 && p.pts >= RP(p, p.rank + 1)) {
     const next = C.RANKS[p.rank + 1];
     if (next.seats && seatCount(p.rank + 1) >= next.seats) { const weak = NPCF().filter(n => n.rank === p.rank + 1 && n.pts < p.pts).sort((a, b) => a.pts - b.pts)[0]; if (weak) { npcDemote(weak, `bị ${p.name} vượt mặt, phải nhường ghế`); continue; } }
     if (next.seats && seatCount(p.rank + 1) >= next.seats) { if (!p.waiting) toast(p, `Đủ công trạng lên ${next.name} nhưng hết ghế. Chờ có người rời ghế.`); p.waiting = true; break; }
@@ -281,7 +286,7 @@ function demote(p, steps, reason) {
   p.waiting = false;
   if (!allowedOutfits(p).includes(p.outfit)) p.outfit = C.RANKS[p.rank].outfit;
   p.protectUntil = now() + C.PROTECT_HOURS * 3600e3;
-  p.pts = Math.min(p.pts, C.RANKS[p.rank].pts + 20);
+  p.pts = Math.min(p.pts, RP(p, p.rank) + 20);
   news(`${p.name} bị giáng từ ${C.RANKS[before].name} xuống ${C.RANKS[p.rank].name} vì ${reason}.`, 'phat');
   toast(p, `Bổn cung bị giáng xuống ${C.RANKS[p.rank].name}. Được bảo hộ ${C.PROTECT_HOURS} giờ.`, 'bad'); notify(p, '⬇️ Bị giáng cấp', `Bổn cung bị giáng xuống ${C.RANKS[p.rank].name} vì ${reason}.`, 'phat');
   push(p); freeSeatCheck();
@@ -305,7 +310,7 @@ function phucVi(p, toRank, how) {
   delete p.lanh;
   let r = Math.min(toRank, from);
   while (r > 2 && C.RANKS[r].seats && seatCount(r) >= C.RANKS[r].seats) r--;
-  p.rank = r; p.outfit = C.RANKS[r].outfit; p.pts = Math.max(p.pts, C.RANKS[r].pts); p.trend = { dir: 1, t: now() };
+  p.rank = r; p.outfit = C.RANKS[r].outfit; p.pts = Math.max(p.pts, RP(p, r)); p.trend = { dir: 1, t: now() };
   p.loc = 'phong';
   news(`${p.name} được phục vị ${C.RANKS[r].name} ${how}.`, 'phong');
   const s = sockOf(p.id); if (s) s.emit('cutscene', { type: 'phucvi', rank: r, rankName: C.RANKS[r].name, outfit: p.outfit, name: p.name });
@@ -2287,6 +2292,7 @@ io.on('connection', s => s.emit('top5', top5()));
 
 const PORT = process.env.PORT || 3000;
 loadDB().then(() => {
+  applyMocRieng(); for (const p of Object.values(DB.players)) if (p.moc) tryPromote(p); save();
   vapid(); if (DB.state.updNews !== 'u2026-11-12') { DB.state.updNews = 'u2026-11-12'; news('📜 Thánh chỉ: hậu cung có biến lớn! Thêm 6 phi tần mới tranh ghế, Ngự thiện phòng, cờ vây, thị tẩm mới… Xem chi tiết ở 📖 Hướng dẫn → Có gì mới.', 'phong'); } save();
   setInterval(nightTick, 5e3);
   const url = process.env.RENDER_EXTERNAL_URL;
