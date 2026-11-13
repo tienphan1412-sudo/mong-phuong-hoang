@@ -211,7 +211,7 @@ function news(text, kind = 'tin') {
   DB.state.news.unshift(n); DB.state.news = DB.state.news.slice(0, 60);
   io.emit('news', n); save();
 }
-function seatCount(r) { return Object.values(DB.players).filter(p => !p.lanh && p.rank === r).length + NPCF().filter(n => n.rank === r).length; }
+function seatCount(r) { return Object.values(DB.players).filter(p => !p.lanh && !p.admin && p.rank === r).length + NPCF().filter(n => n.rank === r).length; }
 // ---------------- phi tần NPC ----------------
 function NPCF() { if (!DB.state.npcFei) DB.state.npcFei = C.NPC_FEI.map(n => ({ ...n }));
   // mốc công trạng từ Tần trở lên được nâng: kéo điểm NPC theo cùng tỉ lệ để việc vượt mặt giành ghế vẫn công bằng
@@ -239,7 +239,7 @@ function feiPresent(loc) {
 const feiView = n => ({ id: n.id, name: n.name, short: n.short, model: n.model || C.RANKS[n.rank].outfit, tinh: n.tinh });
 function grudgeTick() {
   for (const n of NPCF()) for (const [pid, at] of Object.entries(n.grudge || {})) {
-    if (now() < at) continue; const p = P(pid); delete n.grudge[pid]; if (!p || p.lanh || p.rank < C.FIGHT_RANK) continue;
+    if (now() < at) continue; const p = P(pid); delete n.grudge[pid]; if (!p || p.lanh || p.admin || p.rank < C.FIGHT_RANK) continue;
     if ((p.protectUntil || 0) > now() || Object.values(DB.state.cases).some(c => c.victim === p.id && c.status === 'open')) { n.grudge[pid] = now() + 6 * 3600e3; continue; }
     createCase(p, null, { fei: n }); news(`🗡 Trong cung có kẻ vẫn chưa quên mối thù với ${p.name}…`);
   }
@@ -401,7 +401,7 @@ function thaiOne(p) {
 }
 
 // ---------------- Hoàng hậu ----------------
-function hhEligible() { return Object.values(DB.players).filter(p => !p.lanh && p.rank >= C.HH_MIN_RANK && !((p.camTucUntil || 0) > now())); }
+function hhEligible() { return Object.values(DB.players).filter(p => !p.lanh && !p.admin && p.rank >= C.HH_MIN_RANK && !((p.camTucUntil || 0) > now())); }
 function hhScore(p, v) {
   const votes = Object.values(v.votes).filter(x => x === p.id).length;
   return { votes, total: Math.round(votes * 15 + p.haiLong + rel(p, 'thaihau') / 2 + p.sung / 3 + (p.children || []).length * 25 + (DB.state.thaitu?.mother === p.id ? 60 : 0) + p.pts / 20) };
@@ -444,6 +444,10 @@ function loseHH(p, reason) {
   DB.state.hhNext = Math.min(DB.state.hhNext || Infinity, now() + 864e5);
 }
 function hhTick() {
+  // tài khoản quản trị không giữ phượng ấn, không ứng cử: nhường ngôi cho kỳ bầu chọn của người chơi
+  const hq = DB.state.hh && P(DB.state.hh.id);
+  if (hq?.admin) { DB.state.hh = null; if (hq.outfit === 'hoanghau') hq.outfit = C.RANKS[hq.rank].outfit; DB.state.hhNext = now() + 3600e3; news('👑 Ngôi Hoàng hậu đang bỏ trống. Một canh giờ nữa Thái hậu sẽ truyền chỉ bầu phượng ấn, các phi tần từ bậc Tần trở lên chuẩn bị ứng cử.', 'phong'); push(hq); save(); }
+  if (DB.state.hhVote) { const vv = DB.state.hhVote; vv.cands = vv.cands.filter(id => !P(id)?.admin); }
   const v = DB.state.hhVote;
   if (v && now() >= v.end) endHHVote();
   else if (!v && now() >= (DB.state.hhNext || 0) && hhEligible().length) startHHVote();
@@ -872,7 +876,7 @@ function checkDeadlines() {
 
 // ---------------- lật thẻ ----------------
 function latThe(when = 'Đêm nay') {
-  const pool = Object.values(DB.players).filter(p => !p.lanh && !p.thai?.known && !(p.sick && p.sickUntil > now()) && !((p.camTucUntil || 0) > now()) && p.rank >= 1 && (online.has(p.id) || now() - (p.lastSeen || p.created || 0) < 3 * 864e5));
+  const pool = Object.values(DB.players).filter(p => !p.lanh && !p.admin && !p.thai?.known && !(p.sick && p.sickUntil > now()) && !((p.camTucUntil || 0) > now()) && p.rank >= 1 && (online.has(p.id) || now() - (p.lastSeen || p.created || 0) < 3 * 864e5));
   if (!pool.length) return null;
   if (Math.random() < C.NPC_LATTHE && !pool.some(p => online.has(p.id) && !(p.picked1 > 0))) { const ns = NPCF().filter(n => n.rank >= 3); const n = ns.sort((a, b) => b.sung * Math.random() - a.sung * Math.random())[0];
     if (n) { n.sung += 5; n.pts += 15; npcPromote(n); news(`${when} Hoàng thượng lật thẻ bài của ${n.name}.`, 'latthe'); io.emit('latthe', { id: n.id, name: n.name, when }); for (const p of pool) { p.notPicked = (p.notPicked || 0) + 1; } return null; } }
@@ -1281,7 +1285,7 @@ function vuaTick(mins, k) {
       news(`🏮 Hoàng thượng nhặt hoa đăng của ${w.name}, đọc lời ước: “${w.wish}”. Người mỉm cười, sủng ái +12.`); io.emit('denEnd', { id: w.id, name: w.name, wish: w.wish }); } });
   U.VISIT_SLOTS.forEach(([h, m], i) => { const key = k + ':v' + i, st = h * 60 + m;
     if (mins < st || mins >= st + 30 || v.done[key] || v.visit) return;
-    const pool = Object.values(DB.players).filter(p => online.has(p.id) && !p.lanh && p.loc !== 'tamcung' && !(p.sick && p.sickUntil > now()) && vuaDay(p).vis == null);
+    const pool = Object.values(DB.players).filter(p => online.has(p.id) && !p.lanh && !p.admin && p.loc !== 'tamcung' && !(p.sick && p.sickUntil > now()) && vuaDay(p).vis == null);
     if (!pool.length) return; v.done[key] = 1;
     const t = wpick(pool, p => 10 + Math.max(0, p.sung)); vuaDay(t).vis = 0; v.visit = { id: t.id, name: t.name, until: now() + U.VISIT_MIN * 60e3 }; ch = true;
     news(`🐉 Hoàng thượng ngự giá tới cung của ${t.name}.`, 'vua');
@@ -1646,6 +1650,7 @@ io.on('connection', sock => {
     } else if (a === 'ratay') {
       if (me.rank < C.FIGHT_RANK) return toast(me, `Từ ${C.RANKS[C.FIGHT_RANK].name} mới được ra tay.`, 'bad');
       const t = P(d.target);
+      if (t?.admin && !me.admin) return toast(me, 'Không thể ra tay với người này.', 'bad');
       if (!t || t.id === me.id || t.lanh || t.rank < C.FIGHT_RANK) return toast(me, `Chỉ nhắm được người từ ${C.RANKS[C.FIGHT_RANK].name} trở lên.`, 'bad');
       if (sisters(me, t)) return toast(me, 'Đã kết nghĩa tỷ muội, sao nỡ ra tay.', 'bad');
       if (t.sick && t.sickUntil > now()) return toast(me, 'Người này đang cáo bệnh đóng cửa cung.', 'bad');
@@ -2188,7 +2193,7 @@ io.on('connection', sock => {
   });
   sock.on('roster', () => {
     if (!me) return;
-    const list = Object.values(DB.players).map(p => ({ id: p.id, inTam: !!night(p) && p.loc === 'tamcung' && online.has(p.id), thai: !!p.thai?.known, kids: (p.children || []).length, camTuc: (p.camTucUntil || 0) > now(), lanh: !!p.lanh, name: p.name + (p.sick ? ' (cáo bệnh)' : '') + ((p.camTucUntil || 0) > now() ? ' (cấm túc)' : ''), rank: p.rank, rankName: rankName(p), online: seenOn(p.id), sung: p.sung, canTarget: !p.lanh && p.rank >= C.FIGHT_RANK && !((p.protectUntil || 0) > now()) }));
+    const list = Object.values(DB.players).map(p => ({ id: p.id, inTam: !!night(p) && p.loc === 'tamcung' && online.has(p.id), thai: !!p.thai?.known, kids: (p.children || []).length, camTuc: (p.camTucUntil || 0) > now(), lanh: !!p.lanh, name: p.name + (p.sick ? ' (cáo bệnh)' : '') + ((p.camTucUntil || 0) > now() ? ' (cấm túc)' : ''), rank: p.rank, rankName: rankName(p), online: seenOn(p.id), sung: p.sung, canTarget: !p.lanh && !p.admin && p.rank >= C.FIGHT_RANK && !((p.protectUntil || 0) > now()) }));
     list.sort((a, b) => (b.rankName === 'Hoàng hậu') - (a.rankName === 'Hoàng hậu') || b.rank - a.rank || b.sung - a.sung);
     const seats = C.RANKS.map((r, i) => ({ name: r.name, seats: r.seats, used: seatCount(i) }));
     sock.emit('roster', { npcs: NPCF().map(n => ({ id: n.id, name: n.name, short: n.short, rankName: npcRank(n), sung: n.sung, pts: n.pts })).sort((a, b) => b.pts - a.pts), list, seats, methods: C.METHODS, thaiMethods: C.THAI_METHODS, hh: DB.state.hh ? title(P(DB.state.hh.id) || { name: '?', rank: 0 }) : null });
@@ -2270,7 +2275,7 @@ function adminRaw(p, text) {
 // ---------- bảng xếp hạng top 5 ----------
 function top5() {
   const H = 24 * 3600e3;
-  return [...Object.values(DB.players).filter(p => !p.lanh), ...NPCF().map(n => ({ ...n, npc: true }))]
+  return [...Object.values(DB.players).filter(p => !p.lanh && !p.admin), ...NPCF().map(n => ({ ...n, npc: true }))]
     .sort((a, b) => (!b.npc && isHH(b)) - (!a.npc && isHH(a)) || b.rank - a.rank || b.pts - a.pts || b.sung - a.sung)
     .slice(0, 5)
     .map(p => p.npc ? { id: p.id, name: '🎭 ' + p.name, rankName: npcRank(p), pts: p.pts, online: false, npc: true, trend: p.trend && now() - p.trend.t < H ? p.trend.dir : 0 } : ({ id: p.id, name: p.name + (p.sick ? ' 🤒' : ''), rankName: rankName(p), pts: p.pts, online: seenOn(p.id), trend: p.trend && now() - p.trend.t < H ? p.trend.dir : 0 }));

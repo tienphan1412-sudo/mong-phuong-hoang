@@ -2259,8 +2259,9 @@ function openDay() {
 // =====================================================================
 // THÁNH CHỈ CẬP NHẬT: hiện một lần cho mỗi bản mới
 // =====================================================================
-const UPDATE_VER = 'u2026-11-13e';
+const UPDATE_VER = 'u2026-11-13f';
 const UPDATE_NOTES = [
+  ['👑 Ngôi Hoàng hậu trả lại cho người chơi', 'Tài khoản quản trị không còn tính vào xếp hạng, không giữ ghế, không giữ phượng ấn. Ngôi Hoàng hậu bỏ trống, Thái hậu sẽ mở kỳ bầu phượng ấn cho các phi tần từ bậc Tần trở lên.'],
   ['🎯 Nhiệm vụ tân thủ có nút "Làm ngay"', 'Bấm là được đưa tới đúng nơi, việc cần làm sáng lên ở bảng bên phải. Người mới không còn lạc trong cung.'],
   ['📈 Đường thăng tiến dài hơi hơn', 'Từ Tú nữ tới Quý nhân vẫn nhanh như cũ (người mới còn được x1.3 công trạng tới hết Quý nhân). Từ Tần trở lên cần nhiều công trạng hơn: Tần 900, Phi 1.600, Quý phi 2.800, Hoàng quý phi 4.500. Ai đã lên chức giữ nguyên chức.'],
   ['⏳ Lượt hồi chậm lại', 'Cứ 45 phút hồi 1 lượt, tích tối đa 14 (trước 30 phút, tối đa 20). Mỗi ngày vẫn có 8 lượt đầu ngày.'],
