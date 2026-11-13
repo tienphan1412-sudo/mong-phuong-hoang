@@ -160,7 +160,7 @@ function freshDay(p) {
   setTimeout(() => toast(p, `📅 Điểm danh ngày ${sd}/7 (chuỗi ${p.streak} ngày): +${gift} bạc${sd === 7 ? ', +1 lượt, +10 sủng ái' : ''}.${sd < 7 ? ` Ngày 7 được ${C.LOGIN_REWARD[6]} bạc.` : ''}`, 'good'), 4000);
 }
 // mọi bộ đồ nữ trong game: tài khoản quản trị được thay thử tất cả (lệnh /thudo hoặc tủ đồ)
-const ALL_OUTFITS = [...new Set([...C.RANKS.flatMap(r => [r.outfit, ...(r.extra || [])]), 'hoanghau', 'hoanghau2', 'hoangquyphi', 'phi_bau', 'aongu'])];
+const ALL_OUTFITS = [...new Set([...C.RANKS.flatMap(r => [r.outfit, ...(r.extra || [])]), 'hoanghau', 'hoanghau2', 'phi_bau', 'aongu'])];
 function allowedOutfits(p) {
   if (p.admin) return ALL_OUTFITS;
   const s = new Set(['aongu']); if (isHH(p)) { s.add('hoanghau'); s.add('hoanghau2'); }
@@ -2301,7 +2301,10 @@ io.on('connection', s => s.emit('top5', top5()));
 
 const PORT = process.env.PORT || 3000;
 loadDB().then(() => {
-  applyMocRieng(); for (const p of Object.values(DB.players)) if (p.moc) tryPromote(p); save();
+  applyMocRieng(); for (const p of Object.values(DB.players)) if (p.moc) tryPromote(p);
+  // bộ cam rồng phượng cũ của Hoàng quý phi đã bỏ (trùng áo Hoàng hậu): ai đang mặc thì đổi về áo hợp lệ
+  for (const p of Object.values(DB.players)) if (p.outfit === 'hoangquyphi') p.outfit = isHH(p) ? 'hoanghau2' : C.RANKS[p.rank].outfit;
+  save();
   vapid(); if (DB.state.updNews !== 'u2026-11-12') { DB.state.updNews = 'u2026-11-12'; news('📜 Thánh chỉ: hậu cung có biến lớn! Thêm 6 phi tần mới tranh ghế, Ngự thiện phòng, cờ vây, thị tẩm mới… Xem chi tiết ở 📖 Hướng dẫn → Có gì mới.', 'phong'); } save();
   setInterval(nightTick, 5e3);
   const url = process.env.RENDER_EXTERNAL_URL;

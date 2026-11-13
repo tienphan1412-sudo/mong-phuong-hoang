@@ -38,7 +38,7 @@ module.exports = {
   OUTFITS: {
     tunu: 'Tú nữ · xanh lá', thuongtai: 'Thường tại · tím mũ hoa', quynhan: 'Quý nhân · xanh dương',
     tan: 'Tần · cam áo khoác', phi: 'Phi · tím chuỗi ngọc', quyphi: 'Quý phi · đỏ vân kiên',
-    hoangquyphi: 'Hoàng quý phi · cam rồng phượng', hoanghau: 'Hoàng hậu · vàng mũ phượng', hoanghau2: 'Hoàng hậu · vàng rồng phượng', hoangquyphi2: 'Hoàng quý phi · xanh phỉ thúy', aongu: 'Áo ngủ · trắng',
+    hoanghau: 'Hoàng hậu · vàng mũ phượng', hoanghau2: 'Hoàng hậu · vàng rồng phượng', hoangquyphi2: 'Hoàng quý phi · xanh phỉ thúy', aongu: 'Áo ngủ · trắng',
   },
 
   // lối sống: lợi thế riêng
