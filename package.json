@@ -1,7 +1,7 @@
 {
   "name": "mong-phuong-hoang",
   "version": "1.0.0",
-  "description": "MỘNG PHƯỢNG HOÀNG – game cung đấu 3D nhiều người chơi",
+  "description": "PHƯỢNG KHỞI THÂM CUNG – game cung đấu 3D nhiều người chơi",
   "main": "server.js",
   "scripts": {
     "start": "node server.js"

@@ -1,4 +1,4 @@
-// MỘNG PHƯỢNG HOÀNG – cấu hình luật chơi. Chỉnh số ở đây, không cần sửa code.
+// PHƯỢNG KHỞI THÂM CUNG – cấu hình luật chơi. Chỉnh số ở đây, không cần sửa code.
 module.exports = {
   TZ_OFFSET_H: 7,              // giờ Việt Nam
   NIGHT_HOUR: 21,              // (cũ) giờ lật thẻ mỗi tối

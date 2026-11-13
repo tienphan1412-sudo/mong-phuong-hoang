@@ -1,4 +1,4 @@
-// MỘNG PHƯỢNG HOÀNG – phía người chơi
+// PHƯỢNG KHỞI THÂM CUNG – phía người chơi
 import * as THREE from 'three';
 import { CSS2DRenderer, CSS2DObject } from 'three/addons/renderers/CSS2DRenderer.js';
 import { buildLocation, DECOR, makeCradle, makeGuzheng, makeFan, makeScroll, makeSword, makeCup, makeRibbon, makeCleaver, makeLadle } from './scenes.js';
@@ -589,8 +589,8 @@ function snapPhoto(d) {
   g.fillStyle = '#4a1010'; g.fillRect(0, 0, c.width, c.height); g.drawImage(src, 0, 0, w, h);
   g.strokeStyle = '#e2bf6b'; g.lineWidth = 14; g.strokeRect(7, 7, c.width - 14, c.height - 14);
   g.fillStyle = '#f3dc96'; g.textAlign = 'center'; g.font = 'bold 40px "Noto Serif", serif'; g.fillText(`${d.name} · ${d.rankName}`, w / 2, h + 55);
-  g.font = 'italic 22px "Noto Serif", serif'; g.fillStyle = '#e2bf6b'; g.fillText(`MỘNG PHƯỢNG HOÀNG · ${new Date().toLocaleDateString('vi-VN')}`, w / 2, h + 92);
-  const a = document.createElement('a'); a.download = `mong-phuong-hoang-${d.rankName}.png`; a.href = c.toDataURL('image/png'); a.click();
+  g.font = 'italic 22px "Noto Serif", serif'; g.fillStyle = '#e2bf6b'; g.fillText(`PHƯỢNG KHỞI THÂM CUNG · ${new Date().toLocaleDateString('vi-VN')}`, w / 2, h + 92);
+  const a = document.createElement('a'); a.download = `phuong-khoi-tham-cung-${d.rankName}.png`; a.href = c.toDataURL('image/png'); a.click();
   toast('Đã lưu ảnh kỷ niệm.', 'good');
 }
 

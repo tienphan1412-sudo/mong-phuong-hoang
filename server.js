@@ -1,4 +1,4 @@
-// MỘNG PHƯỢNG HOÀNG – máy chủ game
+// PHƯỢNG KHỞI THÂM CUNG – máy chủ game
 const express = require('express');
 const http = require('http');
 const path = require('path');
@@ -2258,5 +2258,5 @@ loadDB().then(() => {
   setInterval(nightTick, 5e3);
   const url = process.env.RENDER_EXTERNAL_URL;
   if (url) setInterval(() => { const h = vnNow().getUTCHours(); if (h >= C.KEEPALIVE_HOURS[0] && h < C.KEEPALIVE_HOURS[1]) fetch(url + '/health').catch(() => {}); }, 10 * 60e3);
-  server.listen(PORT, () => console.log('MỘNG PHƯỢNG HOÀNG chạy ở cổng ' + PORT));
+  server.listen(PORT, () => console.log('PHƯỢNG KHỞI THÂM CUNG chạy ở cổng ' + PORT));
 }).catch(e => { console.error(e); process.exit(1); });
