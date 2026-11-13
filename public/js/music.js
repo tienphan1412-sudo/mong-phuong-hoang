@@ -1,3 +1,4 @@
+import { asset, cdnFail } from './cdn.js';
 // Nhạc nền: phát file mp3 theo từng nơi, chuyển cảnh thì nhạc mờ dần sang bài mới.
 // Tiếng cồng lúc tuyên thánh chỉ vẫn tự tạo bằng Web Audio.
 const LISTS = {
@@ -29,7 +30,8 @@ function fadeTo(a, target, ms, done) {
 function play(m) {
   if (!started || !on) return;
   const old = cur;
-  const a = new Audio(`music/${pick(m)}.mp3`); a.preload = 'auto'; a.volume = 0; a.dataset.mode = m;
+  const f = `music/${pick(m)}.mp3`, a = new Audio(asset(f)); a.preload = 'auto'; a.volume = 0; a.dataset.mode = m;
+  a.addEventListener('error', () => { if (!a.src.includes(location.host)) { a.src = cdnFail(f); a.play().then(() => fadeTo(a, VOL[m], FADE)).catch(() => {}); } }, { once: true });
   a.onended = () => { if (cur === a) play(mode); }; // hết bài thì sang bài khác cùng nơi
   cur = a;
   a.play().then(() => fadeTo(a, VOL[m], FADE)).catch(() => {});

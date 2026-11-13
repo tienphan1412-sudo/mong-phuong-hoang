@@ -2,6 +2,7 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import * as SkeletonUtils from 'three/addons/utils/SkeletonUtils.js';
+import { asset, cdnFail } from './cdn.js';
 
 const loader = new GLTFLoader();
 const cache = {};
@@ -16,7 +17,7 @@ function lock(clips) {
   return clips;
 }
 export function loadModel(name) {
-  if (!cache[name]) cache[name] = loader.loadAsync(`models/${name}.glb`).then(g => {
+  if (!cache[name]) cache[name] = loader.loadAsync(asset(`models/${name}.glb`)).catch(() => loader.loadAsync(cdnFail(`models/${name}.glb`))).then(g => {
     if (name === 'hoangtu1' || name === 'congchua3' || name === 'phi_bau') { const REN = { 'walk.001': 'di', 'female walk.001': 'di', 'run.001': 'chay', 'sit.001': 'ngoi', 'cry.001': 'khoc', 'laugh_01.001': 'cuoi', 'dance_01.001': 'mua' }; g.animations = g.animations.filter(a => REN[a.name]); g.animations.forEach(a => a.name = REN[a.name]); }
     if (name === 'thuongtai') FEMALE = lock(g.animations);
     if (name === 'hoangthuong') MALE = lock(g.animations); else lock(g.animations);
