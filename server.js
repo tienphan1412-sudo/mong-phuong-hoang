@@ -160,7 +160,7 @@ function freshDay(p) {
   setTimeout(() => toast(p, `📅 Điểm danh ngày ${sd}/7 (chuỗi ${p.streak} ngày): +${gift} bạc${sd === 7 ? ', +1 lượt, +10 sủng ái' : ''}.${sd < 7 ? ` Ngày 7 được ${C.LOGIN_REWARD[6]} bạc.` : ''}`, 'good'), 4000);
 }
 function allowedOutfits(p) {
-  const s = new Set(['aongu']); if (isHH(p)) s.add('hoanghau');
+  const s = new Set(['aongu']); if (isHH(p)) { s.add('hoanghau'); s.add('hoanghau2'); }
   for (let r = 0; r <= p.rank; r++) { s.add(C.RANKS[r].outfit); for (const x of C.RANKS[r].extra || []) s.add(x); }
   return [...s];
 }
@@ -429,7 +429,7 @@ function endHHVote() {
   DB.state.hhNext = now() + C.HH_CYCLE_DAYS * 864e5;
   if (!ranked.length) return save();
   const w = ranked[0].q, prev = DB.state.hh && P(DB.state.hh.id);
-  if (prev && prev.id !== w.id) { news(`Phượng ấn đổi chủ: ${prev.name} trở lại ngôi ${C.RANKS[prev.rank].name}.`, 'phat'); if (prev.outfit === 'hoanghau') prev.outfit = C.RANKS[prev.rank].outfit; push(prev); }
+  if (prev && prev.id !== w.id) { news(`Phượng ấn đổi chủ: ${prev.name} trở lại ngôi ${C.RANKS[prev.rank].name}.`, 'phat'); if (/^hoanghau/.test(prev.outfit)) prev.outfit = C.RANKS[prev.rank].outfit; push(prev); }
   DB.state.hh = { id: w.id, since: now() }; cnt(w, 'hh');
   if (!prev || prev.id !== w.id) {
     w.outfit = 'hoanghau'; w.trend = { dir: 1, t: now() };
@@ -440,14 +440,14 @@ function endHHVote() {
   save();
 }
 function loseHH(p, reason) {
-  if (!isHH(p)) return; DB.state.hh = null; if (p.outfit === 'hoanghau') p.outfit = C.RANKS[p.rank].outfit;
+  if (!isHH(p)) return; DB.state.hh = null; if (/^hoanghau/.test(p.outfit)) p.outfit = C.RANKS[p.rank].outfit;
   news(`💔 Hoàng hậu ${p.name} bị thu hồi phượng ấn vì ${reason}. Ngôi hậu bỏ trống.`, 'phat');
   DB.state.hhNext = Math.min(DB.state.hhNext || Infinity, now() + 864e5);
 }
 function hhTick() {
   // tài khoản quản trị không giữ phượng ấn, không ứng cử: nhường ngôi cho kỳ bầu chọn của người chơi
   const hq = DB.state.hh && P(DB.state.hh.id);
-  if (hq?.admin) { DB.state.hh = null; if (hq.outfit === 'hoanghau') hq.outfit = C.RANKS[hq.rank].outfit; DB.state.hhNext = now() + 3600e3; news('👑 Ngôi Hoàng hậu đang bỏ trống. Một canh giờ nữa Thái hậu sẽ truyền chỉ bầu phượng ấn, các phi tần từ bậc Tần trở lên chuẩn bị ứng cử.', 'phong'); push(hq); save(); }
+  if (hq?.admin) { DB.state.hh = null; if (/^hoanghau/.test(hq.outfit)) hq.outfit = C.RANKS[hq.rank].outfit; DB.state.hhNext = now() + 3600e3; news('👑 Ngôi Hoàng hậu đang bỏ trống. Một canh giờ nữa Thái hậu sẽ truyền chỉ bầu phượng ấn, các phi tần từ bậc Tần trở lên chuẩn bị ứng cử.', 'phong'); push(hq); save(); }
   if (DB.state.hhVote) { const vv = DB.state.hhVote; vv.cands = vv.cands.filter(id => !P(id)?.admin); }
   const v = DB.state.hhVote;
   if (v && now() >= v.end) endHHVote();
