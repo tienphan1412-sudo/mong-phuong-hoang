@@ -325,7 +325,7 @@ function renderHud() {
   qd.innerHTML = me.quest ? `🎯 <b>${me.quest.i + 1}/${me.quest.n}</b> ${esc(me.quest.t)}${me.quest.need > 1 && me.quest.need < 50 && !/^Lên/.test(me.quest.t) ? ` (${me.quest.cur}/${me.quest.need})` : ''}${me.quest.go || me.quest.ui ? ' <button class="qgo">👉 Làm ngay</button>' : ''}` : ''; qd.style.display = me.quest ? '' : 'none';
   const qb = qd.querySelector('.qgo'); if (qb) qb.onclick = e => { e.stopPropagation(); questGo(); };
   // bảng xếp hạng luôn nằm ngay dưới khung tên, không che dòng nhiệm vụ; người mới đang làm nhiệm vụ tân thủ thì thu gọn bảng xếp hạng
-  requestAnimationFrame(() => { const w = document.body.classList.contains('mob') && innerHeight > innerWidth ? $('hud') : $('who'), t5 = $('top5'); if (!w || !t5) return; t5.style.top = Math.round(w.getBoundingClientRect().bottom + 8) + 'px'; if (me.quest && !t5.dataset.user) t5.classList.add('min'); });
+  requestAnimationFrame(() => { placeNotice(); const w = document.body.classList.contains('mob') && innerHeight > innerWidth ? $('hud') : $('who'), t5 = $('top5'); if (!w || !t5) return; t5.style.top = Math.round(w.getBoundingClientRect().bottom + 8) + 'px'; if (me.quest && !t5.dataset.user) t5.classList.add('min'); });
   const t = me.tasks || {};
   const IT = me.items || {}, itTxt = [IT.tangvat ? `🎁 Túi gấm ×${IT.tangvat}: lần ra tay tới không tốn bạc` : '', IT.manhmoi ? `📜 Thư mật ×${IT.manhmoi}: lần tra manh mối tới miễn phí` : ''].filter(Boolean);
   $('stats').innerHTML = `${me.lanh ? `<span class="pill" title="Lãnh cung đói rét: mỗi ngày -20, làm việc -10, kiệt sức (dưới 10) thì không làm được. Tỷ muội gửi cơm, áo, thuốc vào để hồi sức." style="${(me.lanh.hp ?? 70) < 30 ? 'color:#ff9b9b' : ''}">❄️ Sức khỏe <b>${me.lanh.hp ?? 70}</b>/100</span>` : ''}${me.reborn ? `<span class="pill" title="Phượng hoàng tái sinh: công trạng ×1,5 tới ${new Date(me.reborn).toLocaleString('vi-VN')}">🔥 Tái sinh</span>` : ''}<span class="pill keep">💰 Bạc <b>${me.silver}</b></span>${itTxt.length ? `<button class="pill" id="itBtn" title="${itTxt.join(' · ')} (câu cá ở hồ thỉnh thoảng vớt được)">${CHEST_SVG} <b>${(IT.tangvat || 0) + (IT.manhmoi || 0)}</b></button>` : ''}<span class="pill keep" title="Cứ 60 phút hồi 1 lượt (tối đa ${me.turnCap}). Làm đủ 3 nhiệm vụ ngày, dự yến tiệc, được lật thẻ cũng được thêm lượt.">⏳ Lượt <b>${me.turns}</b>${me.nextTurn ? ` <small id="turnT" style="opacity:.75"></small>` : me.turns >= me.turnCap ? ` <small style="opacity:.75">· Đầy</small>` : ''}</span><span class="pill">💗 Sủng ái <b>${me.sung}</b></span><span class="pill">🍵 Thái hậu <b>${me.haiLong}</b></span><span class="pill" title="Nhiệm vụ ngày: thỉnh an, luyện tài nghệ, dò tin. Làm đủ 3 được thêm lượt và công trạng.">📋 ${t.thinhan ? '✅' : '⬜'}${t.luyen ? '✅' : '⬜'}${t.dotin ? '✅' : '⬜'}</span>${me.camTuc ? `<span class="pill" style="border-color:#c0503a">🔒 Cấm túc còn ${Math.max(1, Math.ceil((me.camTuc - Date.now()) / 3600e3))} giờ</span>` : ''}${me.thai ? `<span class="pill" style="border-color:#f3a6c8" title="Mỗi ngày uống thuốc an thai ở chỗ Thái y (Từ Ninh cung). Uống đủ 2 ngày trở lên thì sinh thuận.">🤰 Long thai · còn ${Math.max(0, Math.ceil((me.thai.due - Date.now()) / 3600e3))} giờ · an thai ${me.thai.antai ? '✅' : '⬜'}</span>` : ''}${me.isHH ? '<button class="pill" id="hhBtn" style="border-color:#e8c25a">👑 Hoàng hậu</button>' : ''}<button class="pill keep" id="todayBtn" style="position:relative">🗓 Hôm nay${todayNew() ? `<span class="rdot">${todayNew()}</span>` : ''}</button>${feast ? `<span class="pill feast">🎎 Yến tiệc · <b id="feastT"></b> · ${feast.n} tiết mục</span>` : ''}${me.cases.length ? `<button class="pill" id="caseBtn" style="border-color:#c0503a">${me.cases[0].det ? '🔍 Đang tra án' : '⚖️ Vụ án đang mở'}${me.cases.length > 1 ? ` (${me.cases.length})` : ''}</button>` : ''}`;
@@ -1480,7 +1480,7 @@ function tickNotice() {
   const lead = (sched.lead || 15) * 60e3;
   const up = ev.filter(e => e.t > nowVN && e.t - nowVN <= lead).sort((a, b) => a.t - b.t);
   if (!up.length || stage) { noticeEl.classList.add('hidden'); return; }
-  noticeEl.classList.remove('hidden');
+  noticeEl.classList.remove('hidden'); if (!document.body.classList.contains('ntside') && document.body.classList.contains('mob')) setTimeout(placeNotice, 0);
   noticeEl.innerHTML = up.map(e => { const l = e.t - nowVN, hh = new Date(e.t).toISOString().slice(11, 16);
     const key = e.text + e.t; if (!announced.has(key)) { announced.add(key); try { music.gong(); } catch {} }
     return `<div class="nt"><span class="ic">${e.icon}</span><div><b>${esc(e.text)}</b> lúc ${hh} · còn <b class="cd">${Math.floor(l / 60e3)}:${String(Math.floor(l % 60e3 / 1000)).padStart(2, '0')}</b>${e.hint ? `<small>${esc(e.hint)}</small>` : ''}</div></div>`; }).join('');
@@ -3191,3 +3191,15 @@ if (matchMedia('(pointer:coarse)').matches) {
     modal(`<button class="close" onclick="window._close()">✕</button><h3>🔄 Chơi màn hình ngang</h3><div style="line-height:1.7">${land ? 'Đang ở màn hình ngang rồi. Muốn về dọc thì xoay điện thoại lại.' : 'Điện thoại này không cho trang web tự xoay. Làm như sau:<br>1. Vuốt mở Trung tâm điều khiển, <b>tắt khoá xoay</b> 🔒.<br>2. <b>Xoay ngang</b> điện thoại, game tự đổi sang giao diện ngang.<br><small style="color:var(--muted)">iPhone: thêm game vào Màn hình chính (nút Chia sẻ → Thêm vào MH chính) để chơi toàn màn hình, không còn thanh địa chỉ.</small>'}</div>`);
   };
 }
+
+// điện thoại dọc: khung thông báo sự kiện nằm gọn ở khoảng trống bên phải khung tên, cao bằng khung tên
+function placeNotice() {
+  const n = $('notice'), w = $('who'); if (!n || !w) return;
+  const r0 = w.getBoundingClientRect(), port = document.body.classList.contains('mob') && innerHeight > innerWidth && innerWidth - r0.right - 62 >= 100;
+  document.body.classList.toggle('ntside', port);
+  if (!port) { n.style.cssText = ''; if (n.parentElement !== $('toasts')) $('toasts').prepend(n); return; }
+  if (n.parentElement !== document.body) document.body.appendChild(n);
+  const r = w.getBoundingClientRect(), left = Math.round(r.right + 6), right = 56;
+  n.style.cssText = `position:fixed;top:${Math.round(r.top)}px;left:${left}px;width:${Math.max(90, innerWidth - left - right)}px;height:${Math.round(r.height)}px;z-index:7`;
+}
+addEventListener('resize', () => setTimeout(placeNotice, 100)); setInterval(placeNotice, 2000);
