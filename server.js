@@ -37,7 +37,8 @@ let mongo = null, mongoDb = null;
 async function loadDB() {
   if (process.env.MONGODB_URI) {
     const { MongoClient } = require('mongodb');
-    const client = new MongoClient(process.env.MONGODB_URI);
+    // nén dữ liệu gửi lên MongoDB (zlib): mỗi lần lưu cả bản ghi game, nén lại để đỡ tốn băng thông Render
+    const client = new MongoClient(process.env.MONGODB_URI, { compressors: ['zlib'], zlibCompressionLevel: 6 });
     await client.connect();
     mongoDb = client.db(process.env.MONGODB_DB || 'mongphuonghoang'); mongo = mongoDb.collection('save');
     const doc = await mongo.findOne({ _id: 'world' });
@@ -81,7 +82,7 @@ function save() {
       if (mongo) await mongo.updateOne({ _id: 'world' }, { $set: { data: DB } }, { upsert: true });
       else fs.writeFileSync(path.join(__dirname, 'data.json'), JSON.stringify(DB));
     } catch (e) { console.error('save failed', e.message); }
-  }, mongo ? 4000 : 1500); // gom nhiều thay đổi thành một lần ghi
+  }, mongo ? 15000 : 1500); // gom thay đổi 15 giây mới ghi một lần (tắt máy chủ thì vẫn lưu ngay)
 }
 
 // ---------------- thời gian Việt Nam ----------------
