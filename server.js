@@ -7,6 +7,17 @@ const crypto = require('crypto');
 const { Server } = require('socket.io');
 const C = require('./config');
 
+// Link cũ: nếu đặt biến REDIRECT_TO thì service này chỉ chuyển người chơi sang link mới, không chạy game
+// (không đụng tới MongoDB, tránh 2 máy chủ cùng ghi đè dữ liệu)
+if (process.env.REDIRECT_TO) {
+  const to = process.env.REDIRECT_TO.replace(/\/+$/, '');
+  http.createServer((req, res) => {
+    if (req.url === '/health') { res.end('ok'); return; }
+    res.writeHead(302, { Location: to + req.url, 'Cache-Control': 'no-store' }); res.end();
+  }).listen(process.env.PORT || 3000, () => console.log('Link cũ: chuyển hướng sang ' + to));
+  return;
+}
+
 const app = express();
 const server = http.createServer(app);
 const io = new Server(server, { pingInterval: 25000, pingTimeout: 30000, maxHttpBufferSize: 1e5 });
@@ -48,7 +59,21 @@ function housekeep() {
   for (const p of Object.values(DB.players)) { if (p.ttLog?.length > 30) p.ttLog = p.ttLog.slice(-30); }
   const kb = Math.round(JSON.stringify(DB).length / 1024); if (kb > 9000) console.warn(`⚠️ Dữ liệu game đã ${kb} KB, gần giới hạn 16 MB của MongoDB, cần tách bản ghi.`); else console.log(`dữ liệu game: ${kb} KB, ${Object.keys(DB.players).length} người chơi, ${online.size} online`);
 }
+// Render tắt máy chủ khi deploy/khởi động lại: ghi ngay dữ liệu chưa lưu rồi mới thoát
+let closing = false;
+async function flushAndExit() {
+  if (closing) return; closing = true;
+  clearTimeout(saveTimer); saveTimer = null;
+  try {
+    if (mongo) await mongo.updateOne({ _id: 'world' }, { $set: { data: DB } }, { upsert: true });
+    else fs.writeFileSync(path.join(__dirname, 'data.json'), JSON.stringify(DB));
+    console.log('Đã lưu dữ liệu trước khi tắt');
+  } catch (e) { console.error('save on exit failed', e.message); }
+  process.exit(0);
+}
+process.on('SIGTERM', flushAndExit); process.on('SIGINT', flushAndExit);
 function save() {
+  if (closing) return;
   if (saveTimer) return;
   saveTimer = setTimeout(async () => {
     saveTimer = null;
