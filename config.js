@@ -30,7 +30,7 @@ module.exports = {
     { name: 'Tần',            pts: 1100,  seats: 6, outfit: 'tan', extra: ['tan_tim'] },
     { name: 'Phi',            pts: 1800,  seats: 4, outfit: 'phi', extra: ['phi_lam'] },
     { name: 'Quý phi',        pts: 3000,  seats: 2, outfit: 'quyphi', extra: ['quyphi_phuong'] },
-    { name: 'Hoàng quý phi',  pts: 4500, seats: 1, outfit: 'hoangquyphi', extra: ['hoangquyphi_kim'] },
+    { name: 'Hoàng quý phi',  pts: 4500, seats: 1, outfit: 'hoangquyphi_kim' }  // bộ vàng rồng phượng đã nhường cho Hoàng hậu; chờ mô hình mới cho Hoàng quý phi,
   ],
   FIGHT_RANK: 4,               // từ Quý nhân mới được hãm hại / bị hãm hại
   PALACE_RANK: 5,              // từ Tần được ban cung riêng
