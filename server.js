@@ -184,7 +184,7 @@ function selfView(p) {
     attacksLeft: C.ATTACK_PER_DAY - (p.attacks || 0), latThe: (p.tamCungUntil || 0) > now(),
     htKnown: htKnownView(p), decorOwned: p.decorOwned || [], huong: !!p.huong, feast: feastView(p), htTalked: p.htTalked === p.tamCungUntil && !!p.tamCungUntil,
     thai: p.thai?.known ? { due: p.thai.due, care: p.thai.care || 0, antai: p.thai.antai === dayKey() } : null, children: kidView(p), kidPub: kidPub(p), carry: p.carry || null, follow: p.follow || null, thaitu: DB.state.thaitu?.mother === p.id,
-    isHH: isHH(p), hhDay: p.hhDay || {}, hhVote: hhVoteView(p), hhName: DB.state.hh ? P(DB.state.hh.id)?.name || null : null,
+    isHH: isHH(p), hhDay: p.hhDay || {}, hhId: DB.state.hh?.id || null, thinhanHH: p.thinhanHH === dayKey(), hhUses: C.HH_USES, hhThinhan: C.HH_THINHAN, hhVote: hhVoteView(p), hhName: DB.state.hh ? P(DB.state.hh.id)?.name || null : null,
     event: { ...curEvent(), done: p.evDay === dayKey() }, streak: p.streak || 0, ach: achView(p), titleSel: p.titleSel || '',
     lying: !!p.lying, visit: p.visit || null, selfSick: !!(p.sick && p.sickUntil > now()), selfSickDay: p.selfSickDay === dayKey(),
     ccDay: p.ccDay?.d === dayKey() ? p.ccDay : {}, ccFeastOk: now() - (p.ccFeast || 0) >= 864e5,
@@ -2196,26 +2196,51 @@ io.on('connection', sock => {
       toast(me, `${changed ? 'Đã đổi lời tiến cử sang' : 'Đã tiến cử'} ${P(d.who).name}.`, 'good');
       for (const id of online.keys()) { const q = P(id); if (q) push(q); } save(); return;
     }
+    if (op === 'sangcung' || op === 'thinhan') { // lục cung tới cung Hoàng hậu thỉnh an buổi sáng
+      const h = DB.state.hh && P(DB.state.hh.id), hr = vnNow().getUTCHours(); if (!h || h.id === me.id) return;
+      if (hr < C.HH_THINHAN[0] || hr >= C.HH_THINHAN[1]) return toast(me, `Giờ thỉnh an Hoàng hậu là từ ${C.HH_THINHAN[0]}h tới ${C.HH_THINHAN[1]}h sáng.`);
+      if (me.lanh || (me.camTucUntil || 0) > now()) return;
+      if (op === 'sangcung') { if (me.outfit === 'aongu') me.outfit = C.RANKS[me.rank].outfit; me.lying = false; me.visit = h.id; enter(me, 'phong', sock); push(me); return; }
+      if (me.visit !== h.id) return toast(me, 'Tới cung Hoàng hậu mới thỉnh an được.'); if (me.thinhanHH === dayKey()) return toast(me, 'Hôm nay đã thỉnh an Hoàng hậu rồi.');
+      me.thinhanHH = dayKey(); addPts(me, 8); relAdd(me, 'thaihau', 1, 'giữ lễ với Hoàng hậu');
+      h.thinhanN = h.thinhanD === dayKey() ? (h.thinhanN || 0) + 1 : 1; h.thinhanD = dayKey(); if (h.thinhanN <= 10) { addPts(h, 3); h.silver += 10; push(h); }
+      io.to(roomOf(me)).emit('chat', { id: null, name: '🙇', text: `${title(me)} thỉnh an: Hoàng hậu nương nương vạn phúc kim an.` }); toast(me, 'Đã thỉnh an Hoàng hậu: công trạng +8.', 'good');
+      const hs = sockOf(h.id); if (hs) toast(h, `${me.name} tới thỉnh an Hoàng hậu.`, 'good'); push(me); save(); return;
+    }
     if (!isHH(me)) return toast(me, 'Chỉ Hoàng hậu mới có quyền này.', 'bad');
-    if (me.hhDay[op]) return toast(me, 'Hôm nay đã dùng quyền này rồi.');
+    if ((me.hhDay[op] || 0) >= C.HH_USES) return toast(me, `Hôm nay đã dùng quyền này đủ ${C.HH_USES} lần rồi.`);
+    const used = () => { me.hhDay[op] = (me.hhDay[op] || 0) + 1; };
     const t = d.who && P(d.who);
     if (op === 'anxa') {
       if (!t || t.id === me.id) return;
-      if (t.lanh) { me.hhDay[op] = 1; phucVi(t, 2, 'nhờ Hoàng hậu ân xá'); }
-      else if ((t.camTucUntil || 0) > now()) { me.hhDay[op] = 1; t.camTucUntil = 0; news(`👑 Hoàng hậu ${me.name} ân xá, cho ${t.name} ra khỏi cấm túc.`); toast(t, 'Hoàng hậu ân xá, bổn cung được ra khỏi phòng.', 'good'); }
+      if (t.lanh) { used(); phucVi(t, 2, 'nhờ Hoàng hậu ân xá'); }
+      else if ((t.camTucUntil || 0) > now()) { used(); t.camTucUntil = 0; news(`👑 Hoàng hậu ${me.name} ân xá, cho ${t.name} ra khỏi cấm túc.`); toast(t, 'Hoàng hậu ân xá, bổn cung được ra khỏi phòng.', 'good'); }
       else return toast(me, 'Người này không bị phạt.');
       relAdd(me, 'thaihau', 2, 'khoan dung với hậu cung'); push(t);
     } else if (op === 'phat') {
       if (!t || t.id === me.id || t.lanh) return;
       if (t.thai?.known) return toast(me, 'Không thể phạt người đang mang long thai.', 'bad');
       if ((t.protectUntil || 0) > now() || (t.camTucUntil || 0) > now()) return toast(me, 'Người này đang được bảo hộ hoặc đã bị phạt.', 'bad');
-      me.hhDay[op] = 1; t.camTucUntil = now() + 6 * 3600e3; t.protectUntil = Math.max(t.protectUntil || 0, t.camTucUntil);
+      used(); t.camTucUntil = now() + 6 * 3600e3; t.protectUntil = Math.max(t.protectUntil || 0, t.camTucUntil);
       news(`👑 Hoàng hậu ${me.name} phạt ${t.name} cấm túc 6 giờ vì ${String(d.why || 'thất lễ').slice(0, 40)}.`, 'phat');
       const sk = sockOf(t.id); if (sk) { toast(t, `Hoàng hậu phạt bổn cung cấm túc 6 giờ.`, 'bad'); if (t.loc !== 'phong') enter(t, 'phong', sk); }
       push(t);
+    } else if (op === 'thuong') { // ban thưởng 100 bạc từ quỹ cung
+      if (!t || t.id === me.id) return; used(); t.silver += 100; addPts(t, 5); relAdd(me, 'thaihau', 1, 'ban ân cho hậu cung');
+      news(`👑 Hoàng hậu ${me.name} ban thưởng ${t.name} 100 lượng bạc.`, 'an'); notify(t, '👑 Hoàng hậu ban thưởng', 'Hoàng hậu ban cho bổn cung 100 lượng bạc.', 'an'); toast(t, '👑 Hoàng hậu ban thưởng 100 bạc, công trạng +5.', 'good'); push(t);
+    } else if (op === 'trangsuc') { // tự bỏ bạc mua trang sức tặng
+      if (!t || t.id === me.id) return; const own = t.jewels || []; const left = Object.entries(C.JEWELS).filter(([k]) => !own.includes(k)).sort((a, b) => a[1].price - b[1].price);
+      if (!left.length) return toast(me, `${t.name} đã có đủ trang sức rồi.`); const [k, J] = left[0];
+      if (me.silver < J.price) return toast(me, `Cần ${J.price} bạc để mua ${J.name} ban tặng.`, 'bad');
+      used(); me.silver -= J.price; t.jewels = [...own, k]; addPts(t, 5);
+      news(`👑 Hoàng hậu ${me.name} ban tặng ${t.name} một ${J.name}.`, 'an'); notify(t, '👑 Hoàng hậu ban trang sức', `Hoàng hậu ban cho bổn cung ${J.name}.`, 'an'); toast(t, `👑 Hoàng hậu ban ${J.name}: ${J.desc}.`, 'good'); push(t);
+    } else if (op === 'hoso') { // xem hồ sơ các vụ án đang mở, mỗi vụ lộ 1 đặc điểm của kẻ gây án
+      const list = Object.values(DB.state.cases).filter(c => c.status === 'open' && !c.det && !c.big && !(c.test)).map(c => { const cu = c.suspects.find(x => x.id === c.culprit); const k = pick(['cung', 'gio', 'dau']);
+        return { victim: c.victimName, crime: c.crime, method: c.methodName || '', left: Math.max(0, (c.deadline || 0) - now()), suspects: c.suspects.map(x => x.name), hint: cu ? `Kẻ gây án ${k === 'cung' ? 'ở ' + C.TRAITS.cung[cu.traits.cung] : k === 'gio' ? 'ra tay vào ' + C.TRAITS.gio[cu.traits.gio] : 'có ' + C.TRAITS.dau[cu.traits.dau]}` : '' }; });
+      if (!list.length) return toast(me, 'Hiện trong cung không có vụ án nào đang mở.'); used(); sock.emit('hhHoso', list);
     } else if (op === 'yentiec') {
       if (DB.state.feast && !DB.state.feast.done) return toast(me, 'Đang có yến tiệc rồi.');
-      me.hhDay[op] = 1; news(`👑 Hoàng hậu ${me.name} thiết yến mời cả lục cung.`); startFeast(10, 'in');
+      used(); news(`👑 Hoàng hậu ${me.name} thiết yến mời cả lục cung.`); startFeast(10, 'in');
     } else return;
     save(); push(me);
   });
