@@ -2460,6 +2460,17 @@ io.on('connection', s => s.emit('top5', top5()));
 const PORT = process.env.PORT || 3000;
 loadDB().then(() => {
   applyMocRieng(); for (const p of Object.values(DB.players)) if (p.moc) tryPromote(p);
+  // khôi phục kỳ bầu phượng ấn bị hủy nhầm chiều 13/11: lấy lại danh sách ứng cử và giờ bắt đầu từ bảng tin
+  if (!DB.state.hhRestore1) { DB.state.hhRestore1 = 1;
+    const n = (DB.state.news || []).filter(x => /Thái hậu truyền chỉ bầu phượng ấn/.test(x.text)).sort((a, b) => b.t - a.t)[0];
+    if (!DB.state.hhVote && !DB.state.hh && n && now() - n.t < C.HH_VOTE_HOURS * 3600e3) {
+      const part = (n.text.split('Ứng cử:')[1] || '').split('. ')[0];
+      const cands = Object.values(DB.players).filter(q => !q.admin && part.includes(q.name)).sort((a, b) => part.indexOf(a.name) - part.indexOf(b.name)).map(q => q.id);
+      if (cands.length) { DB.state.hhVote = { start: n.t, end: n.t + C.HH_VOTE_HOURS * 3600e3 + 2 * 3600e3, cands, votes: DB.state.hhVoteLost || {} }; DB.state.hhNext = 0;
+        news('👑 Kỳ bầu phượng ấn tiếp tục như cũ. Do sự cố trong cung, ai đã tiến cử xin tới Từ Ninh cung tiến cử lại. Hạn bầu được kéo dài thêm 2 canh giờ.', 'phong');
+        console.log('Khôi phục kỳ bầu phượng ấn:', cands.map(id => P(id)?.name).join(', ')); } else console.log('Không tìm được ứng cử viên để khôi phục kỳ bầu'); }
+    else console.log('Khôi phục kỳ bầu: không cần', !!DB.state.hhVote, !!DB.state.hh, !!n);
+  }
   // đại án rút còn 3 ngày: vụ đang mở cũng rút theo
   { const B = DB.state.bigCase; if (B && !B.done && B.end - B.start > C.BIG_HOURS * 3600e3) B.end = B.start + C.BIG_HOURS * 3600e3; }
   // người đã nhận 1 vụ tra án hôm nay theo luật cũ: tính là 1/3
