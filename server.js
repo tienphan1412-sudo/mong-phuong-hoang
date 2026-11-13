@@ -2444,6 +2444,26 @@ function adminRaw(p, text) {
     q.rank = Math.max(q.rank, q.lanh.from || 0); q.lanh = null; q.outfit = C.RANKS[q.rank].outfit; q.trend = null;
     const sk = sockOf(q.id); if (sk) enter(q, 'hoavien', sk); push(q); save(); toast(p, `Đã đưa ${q.name} ra khỏi lãnh cung.`, 'good');
   }
+  else if (cmd === '/hoanlanh') { // quản trị: đưa một người về như lúc chưa vào lãnh cung (lỡ thử nghiệm), không đăng tin
+    const who = [arg, ...rest].filter(Boolean).join(' ').toLowerCase(); const q = who ? findP(who) : p; if (!q) return toast(p, 'Không tìm thấy người này.', 'bad');
+    (async () => {
+      let snap = null; try { for (const k of (await listBackups()).slice(0, 3)) { let data = null;
+        if (mongo) data = (await mongoDb.collection('backup').findOne({ _id: k }))?.data; else { const f = path.join(__dirname, 'backups', k + '.json'); if (fs.existsSync(f)) data = JSON.parse(fs.readFileSync(f, 'utf8')); }
+        const o = data?.players?.[q.id]; if (o && !o.lanh) { snap = o; break; } } } catch (e) { console.error('hoanlanh', e.message); }
+      const b = { rank: q.rank, pts: q.pts, silver: q.silver };
+      const from = q.lanh?.from; q.lanh = null; q.trend = null; q.hhPhat = null;
+      q.rank = Math.max(q.rank, from ?? 0, snap?.rank ?? 0);
+      if (snap) { q.pts = Math.max(q.pts, snap.pts || 0); q.silver = Math.max(q.silver, snap.silver || 0); q.turns = Math.max(q.turns, snap.turns || 0); q.haiLong = Math.max(q.haiLong, snap.haiLong || 0); q.sung = Math.max(q.sung, snap.sung || 0);
+        q.loyal = Math.max(q.loyal ?? 50, snap.loyal ?? 50); if (snap.rel) for (const [n, v] of Object.entries(snap.rel)) if ((q.rel?.[n] ?? 0) < v) { q.rel = q.rel || {}; q.rel[n] = v; } if (snap.outfit && snap.outfit !== 'tunu') q.outfit = snap.outfit; }
+      if (!allowedOutfits(q).includes(q.outfit)) q.outfit = C.RANKS[q.rank].outfit;
+      for (const h of Object.values(DB.players)) if (h.hhPun) h.hhPun = h.hhPun.filter(x => x.who !== q.id);
+      q.mail = (q.mail || []).filter(m => !/lãnh cung/i.test(m.text || '') || m.kind === 'he');
+      DB.state.news = DB.state.news.filter(n => !(n.text.includes(q.name) && /lãnh cung/i.test(n.text))); io.emit('newsAll', DB.state.news.slice(0, 30));
+      const sk = sockOf(q.id); if (sk && q.loc === 'lanhcung') enter(q, 'hoavien', sk);
+      push(q); freeSeatCheck(); save();
+      toast(p, `Đã đưa ${q.name} về như chưa vào lãnh cung${snap ? '' : ' (không tìm thấy bản sao lưu, chỉ trả lại cấp cũ)'}: cấp ${C.RANKS[b.rank].name}→${C.RANKS[q.rank].name}, công trạng ${b.pts}→${q.pts}, bạc ${b.silver}→${q.silver}.`, 'good');
+    })(); return;
+  }
   else if (cmd === '/cothai') { const who = [arg, ...rest].filter(Boolean).join(' ').toLowerCase(); const q = who ? findP(who) : p; if (!q) return toast(p, 'Không tìm thấy.', 'bad'); q.thai = { since: now() - 1000, known: false, test: true }; revealThai(q, 'mach'); }
   else if (cmd === '/lon') { const who = [arg, ...rest].filter(Boolean).join(' ').toLowerCase(); const q = who ? findP(who) : p; if (!q?.children?.length) return toast(p, 'Người này chưa có con.', 'bad'); for (const c of kidFix(q)) { c.born -= 3 * 864e5; c.cry = null; c.cryAt = 0; } push(q); kidEmit(q); return toast(p, `Các con của ${q.name} lớn thêm 3 ngày.`, 'good'); }
   else if (cmd === '/khoc') { for (const c of kidFix(p)) c.cryAt = 1; return toast(p, 'Các bé sẽ khóc ngay.', 'good'); }
@@ -2490,7 +2510,7 @@ function adminRaw(p, text) {
     if (rest[0] !== 'xacnhan') return toast(p, `Khôi phục sẽ đưa cả cung về ngày ${arg}, mất mọi thứ sau đó. Gõ: /khoiphuc ${arg} xacnhan`, 'bad');
     restore(arg).then(ok => { if (!ok) toast(p, 'Không có bản sao lưu ngày ' + arg, 'bad'); else console.log('restored', arg); }); return;
   }
-  else return toast(p, 'Lệnh: /latthe [trua] /yentiec [phút] /diem N /diemcho N tên /bac N /ngay /vuan /hethan /lanhcung /rakhoi [tên] /cothai /bung /chuyenda /tua /sinh /lon /khoc (thử, không đăng tin) · /xoacon [tên] /xoathai /xoatin · /an /hien (tàng hình) /baucu /sukien [hoadang|disan|phatdan|dichbenh|hoica] /tuulenh /bieudien /daian [giờ] /daile [giờ] /dailediem N /xoaacc tên /saoluu /khoiphuc [ngày xacnhan]');
+  else return toast(p, 'Lệnh: /latthe [trua] /yentiec [phút] /diem N /diemcho N tên /bac N /ngay /vuan /hethan /lanhcung /rakhoi [tên] /hoanlanh tên /cothai /bung /chuyenda /tua /sinh /lon /khoc (thử, không đăng tin) · /xoacon [tên] /xoathai /xoatin · /an /hien (tàng hình) /baucu /sukien [hoadang|disan|phatdan|dichbenh|hoica] /tuulenh /bieudien /daian [giờ] /daile [giờ] /dailediem N /xoaacc tên /saoluu /khoiphuc [ngày xacnhan]');
   toast(p, 'Đã chạy ' + cmd); push(p); save();
 }
 
