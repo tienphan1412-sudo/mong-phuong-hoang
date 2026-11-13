@@ -2467,7 +2467,6 @@ loadDB().then(() => {
       const part = (n.text.split('Ứng cử:')[1] || '').split('. ')[0];
       const cands = Object.values(DB.players).filter(q => !q.admin && part.includes(q.name)).sort((a, b) => part.indexOf(a.name) - part.indexOf(b.name)).map(q => q.id);
       if (cands.length) { DB.state.hhVote = { start: n.t, end: n.t + C.HH_VOTE_HOURS * 3600e3 + 2 * 3600e3, cands, votes: DB.state.hhVoteLost || {} }; DB.state.hhNext = 0;
-        news('👑 Kỳ bầu phượng ấn tiếp tục như cũ. Do sự cố trong cung, ai đã tiến cử xin tới Từ Ninh cung tiến cử lại. Hạn bầu được kéo dài thêm 2 canh giờ.', 'phong');
         console.log('Khôi phục kỳ bầu phượng ấn:', cands.map(id => P(id)?.name).join(', ')); } else console.log('Không tìm được ứng cử viên để khôi phục kỳ bầu'); }
     else console.log('Khôi phục kỳ bầu: không cần', !!DB.state.hhVote, !!DB.state.hh, !!n);
   }
@@ -2476,7 +2475,6 @@ loadDB().then(() => {
     const ts = Object.values(DB.players).flatMap(q => (q.mail || []).filter(m => m.fromName === '👑 Bầu phượng ấn' && now() - m.t < C.HH_VOTE_HOURS * 3600e3).map(m => m.t));
     const start = ts.length ? Math.min(...ts) : null, cands = hhEligible().sort((a, b) => b.rank - a.rank || b.pts - a.pts).slice(0, 3).map(q => q.id);
     if (start && cands.length) { DB.state.hhVote = { start, end: start + C.HH_VOTE_HOURS * 3600e3 + 2 * 3600e3, cands, votes: {} }; DB.state.hhNext = 0;
-      news(`👑 Kỳ bầu phượng ấn tiếp tục như cũ. Ứng cử: ${cands.map(id => title(P(id))).join(', ')}. Do sự cố trong cung, ai đã tiến cử xin tới Từ Ninh cung tiến cử lại. Hạn bầu được kéo dài thêm 2 canh giờ.`, 'phong');
       console.log('Khôi phục kỳ bầu (lần 2): bắt đầu', new Date(start + 7 * 3600e3).toISOString(), 'ứng cử', cands.map(id => P(id)?.name).join(', ')); }
     else console.log('Khôi phục kỳ bầu (lần 2): không tìm thấy', ts.length, cands.length); }
   // lần 3: chủ game xác nhận ứng cử viên cũ là Tạ Nguyệt Khanh, Nhược Hy, An An; số phiếu cũ Nhược Hy 35, Tạ Nguyệt Khanh 15
@@ -2484,8 +2482,9 @@ loadDB().then(() => {
     const T = by('Tạ Nguyệt Khanh'), N = by('Nhược Hy'), A = by('An An');
     if (T && N && A) { v.cands = [T.id, N.id, A.id]; v.base = { [N.id]: 35, [T.id]: 15 };
       for (const k of Object.keys(v.votes)) if (!v.cands.includes(v.votes[k])) delete v.votes[k];
-      news(`👑 Đính chính kỳ bầu phượng ấn: ứng cử viên là ${title(T)}, ${title(N)}, ${title(A)}. Số phiếu cũ đã được khôi phục (Nhược Hy 35, Tạ Nguyệt Khanh 15). Ai đã tiến cử trước đó thì không cần tiến cử lại.`, 'phong');
       console.log('Khôi phục kỳ bầu (lần 3): xong'); } else console.log('Khôi phục kỳ bầu (lần 3): thiếu người', !!T, !!N, !!A); }
+  // gỡ các tin về sự cố kỳ bầu phượng ấn khỏi bảng tin (chủ game không muốn thông báo cả cung)
+  DB.state.news = (DB.state.news || []).filter(x => !/Kỳ bầu phượng ấn tiếp tục như cũ|Đính chính kỳ bầu phượng ấn/.test(x.text));
   // đại án rút còn 3 ngày: vụ đang mở cũng rút theo
   { const B = DB.state.bigCase; if (B && !B.done && B.end - B.start > C.BIG_HOURS * 3600e3) B.end = B.start + C.BIG_HOURS * 3600e3; }
   // người đã nhận 1 vụ tra án hôm nay theo luật cũ: tính là 1/3
