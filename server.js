@@ -143,6 +143,7 @@ function freshDay(p) {
   p.day = k;
   p.turns = Math.max(p.turns || 0, C.TURNS_PER_DAY + (p.path === 'giaote' ? 1 : 0)); p.turnAt = now();
   p.thinhAn = false;
+  if (p.lanh) p.lanh.hp = Math.max(0, (p.lanh.hp ?? 70) - 20); // lãnh cung đói rét: mỗi ngày sức khỏe giảm
   p.attacks = 0; p.targeted = 0;
   p.tasks = { thinhan: false, luyen: false, dotin: false };
   p.taskBonus = false;
@@ -177,7 +178,7 @@ function selfView(p) {
     ...publicView(p), path: p.path, pathName: C.PATHS[p.path].name, origin: C.ORIGINS[p.origin].name,
     mailUnread: (p.mail || []).filter(m => !m.read).length, pushOn: !!p.pushSubs?.length,
     created: p.created || 0, items: p.items || {}, pts: p.pts, nextPts: p.rank + 1 < C.RANKS.length ? RP(p, p.rank + 1) : null, silver: p.silver, turns: (regen(p), p.turns), turnCap: C.TURN_CAP, nextTurn: p.turns >= C.TURN_CAP ? null : p.turnAt + C.TURN_REGEN_MIN * 60e3, sung: p.sung, haiLong: p.haiLong,
-    stats: p.stats, tasks: p.tasks, thinhAn: p.thinhAn, waiting: p.waiting || false, lanh: p.lanh || null,
+    stats: p.stats, tasks: p.tasks, thinhAn: p.thinhAn, waiting: p.waiting || false, lanh: p.lanh || null, reborn: (p.rebornUntil || 0) > now() ? p.rebornUntil : 0, lanhVisit: p.lanhVisit === dayKey(),
     outfits: allowedOutfits(p), decor: p.decor || [], hasPalace: p.rank >= C.PALACE_RANK, cases: open,
     protectedUntil: p.protectUntil || 0, admin: !!p.admin, hamDay: p.hamDay === dayKey(), canFight: !p.lanh && p.rank >= C.FIGHT_RANK,
     rel: { thaihau: rel(p, 'thaihau'), mama: rel(p, 'mama'), thaiy: rel(p, 'thaiy'), tonggiam: rel(p, 'tonggiam') }, goldFish: p.goldFish || 0, fishN: p.fishN || 0, group: groupView(grp(p)), relDay: p.relDay || {},
@@ -281,7 +282,7 @@ function freeSeatCheck() {
   const waiting = Object.values(DB.players).filter(p => p.waiting && !p.lanh).sort((a, b) => b.pts - a.pts);
   for (const p of waiting) tryPromote(p);
 }
-function addPts(p, n) { if (n > 0 && !p.lanh && p.rank <= C.CATCHUP_RANK) n = Math.round(n * 1.3); if (n > 0 && p.rank >= 6) n = Math.max(1, Math.round(n * C.HIGH_RANK_SLOW)); p.pts += n; tryPromote(p); }
+function addPts(p, n) { if (n > 0 && !p.lanh && p.rank <= C.CATCHUP_RANK) n = Math.round(n * 1.3); if (n > 0 && (p.rebornUntil || 0) > now()) n = Math.round(n * 1.5); if (n > 0 && p.rank >= 6) n = Math.max(1, Math.round(n * C.HIGH_RANK_SLOW)); p.pts += n; tryPromote(p); }
 
 function demote(p, steps, reason) {
   if (isHH(p)) loseHH(p, reason);
@@ -299,7 +300,7 @@ function sendToLanhCung(p, reason, caseId) {
   if (isHH(p)) loseHH(p, reason);
   if (!p.lanh) p.trend = { dir: -1, t: now() };
   if (p.lanh) { if (caseId) p.lanh.caseId = caseId; return; }
-  p.lanh = { from: p.rank, tasks: 0, caseId: caseId || null, since: now() }; p.loyal = Math.max(0, (p.loyal ?? 50) - 20);
+  p.lanh = { from: p.rank, tasks: 0, caseId: caseId || null, since: now(), hp: 70, food: 0 }; p.loyal = Math.max(0, (p.loyal ?? 50) - 20);
   p.waiting = false;
   p.outfit = 'tunu';
   p.protectUntil = now() + C.PROTECT_HOURS * 3600e3;
@@ -316,7 +317,8 @@ function phucVi(p, toRank, how) {
   while (r > 2 && C.RANKS[r].seats && seatCount(r) >= C.RANKS[r].seats) r--;
   p.rank = r; p.outfit = C.RANKS[r].outfit; p.pts = Math.max(p.pts, RP(p, r)); p.trend = { dir: 1, t: now() };
   p.loc = 'phong';
-  news(`${p.name} được phục vị ${C.RANKS[r].name} ${how}.`, 'phong');
+  p.rebornUntil = now() + 3 * 864e5; p.sung += 10; cnt(p, 'taisinh'); // Phượng hoàng tái sinh: 3 ngày công trạng ×1,5
+  news(`🔥 ${p.name} được phục vị ${C.RANKS[r].name} ${how}. Phượng hoàng tái sinh!`, 'phong');
   const s = sockOf(p.id); if (s) s.emit('cutscene', { type: 'phucvi', rank: r, rankName: C.RANKS[r].name, outfit: p.outfit, name: p.name });
   push(p);
 }
@@ -462,6 +464,38 @@ function hhTick() {
   else if (!v && now() >= (DB.state.hhNext || 0) && hhEligible().length) startHHVote();
 }
 
+
+
+// ---------------- lãnh cung: sức khỏe, gửi đồ, thăm hỏi, chế giễu, đêm trăng ----------------
+const LC_ITEMS = { com: { name: 'Hộp cơm nóng', price: 30, hp: 20, food: 1 }, ao: { name: 'Áo bông ấm', price: 50, hp: 35, food: 0 }, thuoc: { name: 'Thang thuốc bổ', price: 80, hp: 50, food: 0 } };
+const lcList = () => Object.values(DB.players).filter(q => q.lanh).map(q => ({ id: q.id, name: q.name, hp: q.lanh.hp ?? 70, tasks: q.lanh.tasks, online: online.has(q.id) && q.loc === 'lanhcung' }));
+function lanhSock(sock, getMe) {
+  sock.on('lc', d => { const me = getMe(); if (!me || !d) return; freshDay(me); const t = d.who && P(d.who);
+    if (d.op === 'list') return sock.emit('lcList', lcList());
+    if (d.op === 'com') { if (!me.lanh || me.lanh.comDay === dayKey()) return; me.lanh.comDay = dayKey(); me.lanh.hp = Math.min(100, (me.lanh.hp ?? 70) + 10); sock.emit('lcCom'); push(me); return save(); }
+    if (d.op === 'gui') { const it = LC_ITEMS[d.item]; if (!it || !t?.lanh || t.id === me.id || me.lanh) return;
+      me.lcGui = me.lcGui?.d === dayKey() ? me.lcGui : { d: dayKey(), n: 0 }; if (me.lcGui.n >= 3) return toast(me, 'Hôm nay đã gửi đồ 3 lần, thị vệ không cho gửi thêm.');
+      if (me.silver < it.price) return toast(me, `Cần ${it.price} bạc.`, 'bad'); me.silver -= it.price; me.lcGui.n++;
+      t.lanh.hp = Math.min(100, (t.lanh.hp ?? 70) + it.hp); t.lanh.food = (t.lanh.food || 0) + it.food; (t.lanh.on = t.lanh.on || []).includes(me.name) || t.lanh.on.push(me.name);
+      notify(t, '🧺 Có người gửi đồ vào lãnh cung', `${me.name} gửi ${it.name} vào cho bổn cung.`, 'an'); toast(t, `🧺 ${me.name} lén gửi ${it.name} vào: sức khỏe +${it.hp}.`, 'good');
+      toast(me, `Đã nhờ thị vệ đưa ${it.name} vào cho ${t.name}.`, 'good'); push(t); push(me); return save(); }
+    if (d.op === 'tham' || d.op === 'che') { if (me.lanh || me.loc !== 'lanhcung' || !t?.lanh) return; const key = d.op + ':' + t.id;
+      me.lcDid = me.lcDid?.d === dayKey() ? me.lcDid : { d: dayKey(), k: [] }; if (me.lcDid.k.includes(key)) return toast(me, 'Hôm nay đã làm vậy với người này rồi.'); 
+      if (d.op === 'tham') { if (me.silver < 20) return toast(me, 'Cần 20 bạc mua chút đồ ăn mang vào.', 'bad'); me.silver -= 20; me.lcDid.k.push(key);
+        t.lanh.hp = Math.min(100, (t.lanh.hp ?? 70) + 15); t.lanh.food = (t.lanh.food || 0) + 1; (t.lanh.on = t.lanh.on || []).includes(me.name) || t.lanh.on.push(me.name); addPts(me, 5); relAdd(me, 'thaihau', 1, 'có lòng nhân hậu');
+        io.to('lanhcung').emit('chat', { id: null, name: '🧺', text: `${me.name} tới thăm ${t.name}, mang theo bánh trái và lời hỏi han.` }); toast(t, `🧺 ${me.name} tới thăm: sức khỏe +15, có thêm đồ ăn.`, 'good'); toast(me, 'Thăm hỏi người trong lãnh cung: công trạng +5, Thái hậu khen có lòng nhân hậu.', 'good'); }
+      else { me.lcDid.k.push(key); t.hanLC = t.hanLC || {}; t.hanLC[me.id] = now() + 7 * 864e5;
+        io.to('lanhcung').emit('chat', { id: null, name: '😏', text: `${me.name}: ${pick(['Chậc chậc, ngày trước oai phong lắm mà, giờ quét sân cũng không xong.', 'Tưởng ai, hóa ra là phế phi. Lãnh cung hợp với ngươi lắm.', 'Áo vải thô này mới đúng thân phận của ngươi.'])}` });
+        toast(t, `😤 ${me.name} tới chế giễu bổn cung. Mối nhục này ghi tạc, ra khỏi đây sẽ đòi lại gấp đôi.`, 'bad'); notify(t, '😤 Bị chế giễu', `${me.name} tới lãnh cung chế giễu bổn cung.`, 'phat'); toast(me, 'Hả dạ rồi… nhưng cẩn thận, người ta sẽ nhớ.'); }
+      push(t); push(me); sock.emit('lcList', lcList()); return save(); }
+    if (d.op === 'hat') { if (!me.lanh || me.loc !== 'lanhcung') return; const h = vnNow().getUTCHours();
+      if (h < 19 || h >= 24) return toast(me, 'Chờ trăng lên (từ 19h) hãy gảy đàn, giờ này Hoàng thượng không đi ngang.'); if (me.lanh.hatDay === dayKey()) return toast(me, 'Đêm nay đã gảy đàn rồi.');
+      me.lanh.hatDay = dayKey(); const q = +d.q || 0, ch = q >= .85 ? .35 : q >= .65 ? .15 : .03;
+      if (Math.random() < ch) { const from = me.lanh.from; sock.emit('cutscene', { type: 'lanhtrang', name: me.name }); setTimeout(() => { if (P(me.id)?.lanh) phucVi(me, from, 'vì tiếng đàn đêm trăng làm Hoàng thượng động lòng'); }, 9000); }
+      else { toast(me, q >= .65 ? 'Tiếng đàn vang trong đêm… nhưng đêm nay Hoàng thượng không đi ngang. Mai thử lại.' : 'Tiếng đàn rời rạc tan vào gió lạnh. Không ai nghe thấy.'); }
+      push(me); return save(); }
+  });
+}
 
 // ---------------- đại lễ công bố phượng ấn và sắc lập Hoàng hậu (Dưỡng Tâm điện) ----------------
 // chờ tân Hoàng hậu online → báo trước 3 phút → công bố kết quả (1 phút) → sắc phong (100 giây) → xong
@@ -634,6 +668,8 @@ function festTick() {
 
 // ---------------- danh hiệu ----------------
 const ACH = [
+  { id: 'taisinh', name: 'Phượng hoàng tái sinh', desc: 'Được phục vị từ lãnh cung', need: 1, cur: p => p.cnt?.taisinh || 0 },
+  { id: 'dongcam', name: 'Đồng cam cộng khổ', desc: 'Cùng phế phi khác làm việc ở lãnh cung', need: 1, cur: p => p.cnt?.dongcam || 0 },
   { id: 'ngu', name: 'Ngư ông đắc lợi', desc: 'Câu được 100 con cá', need: 100, cur: p => p.cnt?.fish || 0 },
   { id: 'kimly', name: 'Cá chép hóa rồng', desc: 'Câu được 3 cá chép vàng', need: 3, cur: p => p.cnt?.gold || 0 },
   { id: 'tymuoi', name: 'Tỷ muội tình thâm', desc: 'Kết nghĩa tỷ muội', need: 1, cur: p => p.sis ? 1 : (p.cnt?.sis || 0) },
@@ -747,7 +783,7 @@ function createCase(victim, culprit /* player or null for NPC */, opts = {}) {
   const c = {
     id, victim: victim.id, victimName: title(victim), culprit: culpritEntry.id, culpritName: culpritEntry.name,
     method: method.id, methodName: method.name, crime: method.crime,
-    suspects, found: [], blurred: opts.blur ? pick(['gio', 'cung', 'dau']) : null, witness: null,
+    suspects, found: [], blurred: opts.blur ? pick(['gio', 'cung', 'dau']) : null, witness: null, revenge: !!opts.revenge,
     status: 'open', created: now(), thai: !!opts.thai, det: !!opts.det, hours: opts.hours ?? (opts.det ? C.DET_HOURS : opts.thai ? C.THAI_CASE_HOURS + (victim.thai?.antai === dayKey() ? 6 : 0) : C.CASE_HOURS), deadline: opts.det ? now() + C.DET_HOURS * 3600e3 : online.has(victim.id) ? now() + caseHoursFor(victim, opts.hours ?? C.CASE_HOURS) * 3600e3 : null, npc: !culprit,
   };
   DB.state.cases[id] = c;
@@ -918,7 +954,7 @@ function checkDeadlines() {
       if (c.det) { closeCase(c, 'xu', 'Hết hạn tra án, thủ phạm đã cao chạy xa bay.'); continue; }
       closeCase(c, 'xu', c.thai ? 'Hết hạn mà không tìm ra kẻ hãm hại. Long thai không giữ được.' : `Hết hạn mà không tìm ra thủ phạm. Thái hậu phán phạt.`);
       if (!c.thai) news(`Hết hạn điều tra, Thái hậu phán ${P(c.victim)?.name} có tội ${c.crime}.`, 'phat');
-      punishVictim(c, 0);
+      punishVictim(c, c.revenge ? 1 : 0);
     }
   }
 }
@@ -1591,7 +1627,8 @@ io.on('connection', sock => {
   sock.on('goto', loc => {
     if (!me || !LOCS.includes(loc)) return; track(me, 'goto:' + loc);
     if (me.lanh && loc !== 'lanhcung') return toast(me, 'Người ở lãnh cung không được ra ngoài.', 'bad');
-    if (!me.lanh && loc === 'lanhcung') return toast(me, 'Lãnh cung không phải nơi tùy tiện lui tới.');
+    if (!me.lanh && loc === 'lanhcung') { if ((me.camTucUntil || 0) > now()) return toast(me, 'Đang bị cấm túc, chưa được ra khỏi phòng.', 'bad');
+      if (me.lanhVisit !== dayKey()) { if (me.silver < 30) return toast(me, 'Phải lót tay thị vệ canh lãnh cung 30 bạc mới được vào.', 'bad'); me.silver -= 30; me.lanhVisit = dayKey(); toast(me, 'Đã lót tay thị vệ 30 bạc, được vào lãnh cung (hôm nay ra vào tự do).'); } }
     if (loc === 'tamcung' && !(me.tamCungUntil > now())) return toast(me, 'Chỉ người được lật thẻ mới vào tẩm cung đêm nay.');
     if ((me.camTucUntil || 0) > now() && loc !== 'phong') return toast(me, 'Đang bị cấm túc, chưa được ra khỏi phòng.', 'bad');
     if (loc === 'yentiec' && !(DB.state.feast && !DB.state.feast.done)) return toast(me, 'Hiện không có yến tiệc.');
@@ -1712,7 +1749,8 @@ io.on('connection', sock => {
       if (!useTurn(1, cost)) return; if (tv) { me.items.tangvat--; toast(me, '🎁 Dùng túi gấm câu được ở hồ làm tang vật, không tốn bạc.', 'good'); }
       freshDay(t); me.attacks = (me.attacks || 0) + 1; t.targeted = (t.targeted || 0) + 1;
       const thaiM = C.THAI_METHODS.find(m => m.id === d.method);
-      createCase(t, me, { method: d.method, blur: !!d.blur, thai: !!thaiM });
+      const rev = (me.hanLC?.[t.id] || 0) > now(); if (rev) { delete me.hanLC[t.id]; toast(me, `🔥 Trả mối nhục lãnh cung: ${t.name} từng tới chế giễu bổn cung. Lần này tang vật được che giấu kỹ, tội trút lên đầu nặng gấp đôi.`, 'good'); }
+      createCase(t, me, { method: d.method, blur: !!d.blur || rev, thai: !!thaiM, revenge: rev });
       toast(me, thaiM ? `Đã sai người đưa ${thaiM.name} tới cung ${t.name}. Chuyện này mà lộ ra thì vào lãnh cung…` : `Đã cài ${C.METHODS.find(m => m.id === d.method)?.name || 'tang vật'} vào phòng ${t.name}. Giờ chỉ chờ xem…`, 'good');
     } else if (a === 'hamhai') {
       const n = NPCF().find(x => x.id === d.target); if (!n) return; if (me.rank < C.FIGHT_RANK) return toast(me, `Từ ${C.RANKS[C.FIGHT_RANK].name} mới được ra tay.`, 'bad');
@@ -1854,7 +1892,10 @@ io.on('connection', sock => {
       }
     } else if (a === 'phephi') {
       if (!me.lanh) return; if (me.phephiToday) return toast(me, 'Phế phi đã ngủ thiếp đi, mai hãy hỏi.');
-      me.phephiToday = true; const s = sockOf(me.id);
+      const s = sockOf(me.id);
+      // bà phế phi đói lắm: phải có đồ ăn (tỷ muội gửi vào, người tới thăm mang cho) mới chịu kể bí mật
+      if (!(me.lanh.food > 0)) { if (s) s.emit('npcSay', { who: 'Phế phi Trần thị', text: pick(['Đói… đói quá… ngươi có gì ăn không? Có miếng ăn thì ta kể cho nghe chuyện trong cung.', 'Mười năm rồi, ta chỉ ăn cơm nguội… Mang cho ta cái bánh, ta chỉ đường cho ngươi ra khỏi đây.', 'Nghe nói… đêm trăng có người gảy đàn ở góc tường, Hoàng thượng đi ngang mà động lòng… Hì hì. Muốn nghe thêm thì mang đồ ăn tới.']), long: true }); return; }
+      me.lanh.food--; me.phephiToday = true;
       const c = me.lanh.caseId && DB.state.cases[me.lanh.caseId];
       let text;
       if (c) { const g = c.suspects.find(x => x.guilty); const miss = ['cung', 'gio', 'dau'].filter(k => !c.found.some(f => f.trait === k && f.value !== null)); const k = miss.length ? pick(miss) : pick(['cung', 'gio', 'dau']);
@@ -1862,7 +1903,12 @@ io.on('connection', sock => {
         if (!c.found.some(f => f.kind === 'phephi')) c.found.push({ kind: 'phephi', name: 'Lời phế phi', text: `Phế phi kể kẻ hãm hại có ${C.TRAITS[k][g.traits[k]]}.`, trait: k, value: g.traits[k] });
       } else {
         const atk = Object.values(DB.state.cases).filter(x => !x.npc && x.culprit !== me.id).sort((a, b) => b.created - a.created)[0];
-        text = atk ? `Ngươi có biết ${atk.victimName} từng bị hãm hại không? Ta nghe kẻ đứng sau là ${atk.culpritName}. Trong cung, kẻ thù của kẻ thù có khi là bạn.` : 'Lãnh cung lạnh lắm… nhưng ai rồi cũng có ngày ra. Chớ để mất ý chí.';
+        const fav = Object.values(DB.players).filter(q => !q.lanh && !q.admin && q.id !== me.id).sort((a, b) => b.sung - a.sung)[0];
+        const opts = [atk && `Ngươi có biết ${atk.victimName} từng bị hãm hại không? Ta nghe kẻ đứng sau là ${atk.culpritName}. Trong cung, kẻ thù của kẻ thù có khi là bạn.`,
+          fav && `${fav.name} đang được sủng nhất cung, ${fav.sung} phần ân sủng. Kẻ đứng cao thì nhiều người muốn kéo xuống… ${(fav.items?.tangvat || 0) > 0 ? 'Ta còn nghe nó đang giấu túi gấm có xạ hương trong cung.' : 'Nó chưa từng đề phòng ai.'}`,
+          'Mỗi đêm từ giờ Tuất tới giờ Tý, Hoàng thượng hay đi dạo ngang tường lãnh cung. Gảy đàn cho hay, may ra người động lòng mà cho ngươi về.',
+          'Có tỷ muội bên ngoài thì nhờ họ quỳ ở Từ Ninh cung cầu tình. Hoàng hậu cũng có quyền ân xá, lấy lòng được Hoàng hậu là có đường ra.'].filter(Boolean);
+        text = pick(opts);
       }
       if (s) s.emit('npcSay', { who: 'Phế phi Trần thị', text, long: true });
     } else if (a === 'httalk') {
@@ -1913,8 +1959,14 @@ io.on('connection', sock => {
     } else if (a === 'lanh') {
       if (!me.lanh) return;
       if (me.lanhToday) return toast(me, 'Hôm nay đã làm xong việc ở lãnh cung.');
+      if ((me.lanh.hp ?? 70) < 15) return toast(me, 'Kiệt sức rồi, không nhấc nổi chổi. Chờ tỷ muội gửi đồ ăn, áo ấm, thuốc vào.', 'bad');
       if ((+d.q || 0) < .4) return toast(me, 'Làm chưa đạt, lão ma ma bắt làm lại.', 'bad');
-      me.lanhToday = true; me.lanh.tasks++;
+      me.lanhToday = true; me.lanh.tasks++; me.lanh.hp = Math.max(0, (me.lanh.hp ?? 70) - 10);
+      // phế phi cùng cảnh: có người khác cùng ở lãnh cung thì làm chung, mỗi người thêm tiến độ (mỗi ngày 1 lần)
+      const mates = Object.values(DB.players).filter(q => q.id !== me.id && q.lanh && online.has(q.id) && q.loc === 'lanhcung');
+      if (mates.length && me.lanh.chungDay !== dayKey()) { me.lanh.chungDay = dayKey(); me.lanh.tasks++; cnt(me, 'dongcam');
+        for (const q of mates) if (q.lanh.chungGot !== dayKey()) { q.lanh.chungGot = dayKey(); q.lanh.tasks++; cnt(q, 'dongcam'); toast(q, `🤝 ${me.name} làm việc chung với bổn cung: tiến độ phục vị +1 (${q.lanh.tasks}/3).`, 'good'); if (q.lanh.tasks >= 3) phucVi(q, 2, 'nhờ đồng cam cộng khổ'); else push(q); }
+        io.to('lanhcung').emit('chat', { id: null, name: '🤝', text: `${me.name} cùng ${mates.map(q => q.name).join(', ')} đồng cam cộng khổ, làm việc chung ở lãnh cung.` }); }
       toast(me, `${pick(['Chép xong một quyển kinh', 'Quét sạch sân lãnh cung', 'Vá xong áo cho các phế phi'])}. Tiến độ phục vị ${me.lanh.tasks}/3.`, 'good');
       if (me.lanh.tasks >= 3) phucVi(me, 2, 'nhờ thành tâm hối lỗi');
     } else return;
@@ -2150,7 +2202,7 @@ io.on('connection', sock => {
     rTo(me, null, true).emit('tt', { from: 'p:' + me.id, to, act, back, fname: me.name, tname });
     save(); push(me); if (t) push(t);
   });
-  vuaSock(sock, () => me); kidSock(sock, () => me); sinhSock(sock, () => me); leSock(sock, () => me); hhcSock(sock, () => me);
+  vuaSock(sock, () => me); kidSock(sock, () => me); sinhSock(sock, () => me); leSock(sock, () => me); hhcSock(sock, () => me); lanhSock(sock, () => me);
   sock.on('caocap', d => {
     if (!me || !d || me.lanh || me.rank < 6) return toast(me, 'Từ Phi trở lên mới được giao việc này.');
     me.ccDay = me.ccDay?.d === dayKey() ? me.ccDay : { d: dayKey() }; const C2 = me.ccDay;
