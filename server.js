@@ -2433,7 +2433,7 @@ function adminRaw(p, text) {
     if (!q) return toast(p, 'Không tìm thấy người tên ' + who, 'bad'); addPts(q, +arg || 100); push(q);
   }
   else if (cmd === '/diem') addPts(p, +arg || 100);
-  else if (cmd === '/bac') { p.silver += +arg || 500; }
+  else if (cmd === '/bac') { const who = rest.join(' ').toLowerCase(); const q = who ? findP(who) : p; if (!q) return toast(p, 'Không tìm thấy người này.', 'bad'); q.silver += +arg || 500; push(q); save(); if (q !== p) return toast(p, `Đã cộng ${+arg || 500} bạc cho ${q.name} (không báo cho người chơi).`, 'good'); }
   else if (cmd === '/ngay') { for (const q of Object.values(DB.players)) { q.day = ''; freshDay(q); push(q); } }
   else if (cmd === '/vuan') createCase(p, null, { hours: +arg || C.CASE_HOURS });
   else if (cmd === '/hethan') { for (const c of Object.values(DB.state.cases)) if (c.victim === p.id && c.status === 'open') c.deadline = 0; checkDeadlines(); }
@@ -2510,7 +2510,7 @@ function adminRaw(p, text) {
     if (rest[0] !== 'xacnhan') return toast(p, `Khôi phục sẽ đưa cả cung về ngày ${arg}, mất mọi thứ sau đó. Gõ: /khoiphuc ${arg} xacnhan`, 'bad');
     restore(arg).then(ok => { if (!ok) toast(p, 'Không có bản sao lưu ngày ' + arg, 'bad'); else console.log('restored', arg); }); return;
   }
-  else return toast(p, 'Lệnh: /latthe [trua] /yentiec [phút] /diem N /diemcho N tên /bac N /ngay /vuan /hethan /lanhcung /rakhoi [tên] /hoanlanh tên /cothai /bung /chuyenda /tua /sinh /lon /khoc (thử, không đăng tin) · /xoacon [tên] /xoathai /xoatin · /an /hien (tàng hình) /baucu /sukien [hoadang|disan|phatdan|dichbenh|hoica] /tuulenh /bieudien /daian [giờ] /daile [giờ] /dailediem N /xoaacc tên /saoluu /khoiphuc [ngày xacnhan]');
+  else return toast(p, 'Lệnh: /latthe [trua] /yentiec [phút] /diem N /diemcho N tên /bac N [tên] /ngay /vuan /hethan /lanhcung /rakhoi [tên] /hoanlanh tên /cothai /bung /chuyenda /tua /sinh /lon /khoc (thử, không đăng tin) · /xoacon [tên] /xoathai /xoatin · /an /hien (tàng hình) /baucu /sukien [hoadang|disan|phatdan|dichbenh|hoica] /tuulenh /bieudien /daian [giờ] /daile [giờ] /dailediem N /xoaacc tên /saoluu /khoiphuc [ngày xacnhan]');
   toast(p, 'Đã chạy ' + cmd); push(p); save();
 }
 
