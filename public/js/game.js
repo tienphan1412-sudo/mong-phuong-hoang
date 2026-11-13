@@ -805,7 +805,8 @@ async function renderNotebook() {
   const c = nb; if (!c) return;
   nbEl.classList.remove('hidden'); nbEl.classList.toggle('min', nbMin); document.body.classList.toggle('nbopen', !nbMin);
   const open = c.status === 'open' || c.reopen;
-  if (nbMin) { nbEl.innerHTML = `<div class="nbtab">📒 Sổ điều tra · ⏳ <span id="nbTimer">${fmtLeft(c.deadline - Date.now())}</span></div>`; nbEl.onclick = () => { nbMin = false; renderNotebook(); }; return; }
+  if (nbMin) { nbEl.innerHTML = `<div class="nbtab">📒 Sổ điều tra · ⏳ <span id="nbTimer">${fmtLeft(c.deadline - Date.now())}</span></div>`; nbEl.onclick = () => { nbMin = false; renderNotebook(); }; nbPlace(); return; }
+  nbEl.style.top = nbEl.style.right = '';
   nbEl.onclick = null;
   const S = analyse(c), left = S.filter(s => !s.out);
   nbEl.innerHTML = `
@@ -3274,3 +3275,7 @@ function gardenTime(force) {
 }
 setInterval(() => gardenTime(false), 30e3);
 socket.on('demTest', v => { window.__forceNight = v ?? undefined; gardenTime(true); });
+// điện thoại: sổ điều tra thu gọn nằm dưới nút 🔄 bên phải cho khỏi vướng
+function nbPlace() { const r = $('rotbtn'); if (!nbEl.classList.contains('min') || !document.body.classList.contains('mob') || !r || !r.getBoundingClientRect().width) { nbEl.style.top = nbEl.style.right = ''; return; }
+  const b = r.getBoundingClientRect(); nbEl.style.top = Math.round(b.bottom + 8) + 'px'; nbEl.style.right = Math.round(innerWidth - b.right) + 'px'; }
+addEventListener('resize', () => setTimeout(nbPlace, 150));
