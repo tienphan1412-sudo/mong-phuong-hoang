@@ -30,7 +30,7 @@ let world = null;        // địa điểm hiện tại
 let me = null;           // thông tin bản thân từ máy chủ
 let selfC = null;        // nhân vật của mình
 const others = new Map();
-let camYaw = 0, camDist = 3.2, camH = 1.6, snapCam = false;
+let camYaw = 0, camDist = 3.2, camH = 1.6, snapCam = false, thPitch = .06;
 let loadToken = 0;
 
 function applyLights(L) {
@@ -96,7 +96,7 @@ async function enterScene(loc, players, venue, seatId) {
       for (const l of o.throne.userData.legs) { const h = s.y - .04 - o.dais.y; l.scale.y = h; l.position.y = -h / 2; }
       c.play('ngoi');
       // phượng tọa của Hoàng hậu: ghế đỏ giống ngai rồng nhưng nhỏ hơn, đặt bên phải Hoàng thượng
-      if (o.loc === 'duongtam' && !o.hhThrone) { const h = s.y - .04 - o.dais.y, K = .85, t2 = o.throne.clone(true); t2.scale.setScalar(K); t2.position.set(s.x - 1.05, o.dais.y + K * h, s.z + .05); t2.rotation.y = s.ry; o.group.add(t2); o.hhThrone = t2;
+      if ((o.loc === 'duongtam' || o.loc === 'yentiec') && !o.hhThrone) { const h = s.y - .04 - o.dais.y, K = .85, t2 = o.throne.clone(true); t2.scale.setScalar(K); t2.position.set(s.x - 1.05, o.dais.y + K * h, s.z + .05); t2.rotation.y = s.ry; o.group.add(t2); o.hhThrone = t2;
         o.seats = o.seats || []; o.seats.push({ id: 'hh0', x: s.x - 1.05, z: s.z + .05, ry: s.ry, top: t2.position.y + .034, kind: 'chair', obj: t2 }); }
     } else if (n.seat) { seatPose(c, n.seat); } else {
       c.root.position.set(n.x, 0, n.z); c.root.rotation.y = n.ry || 0;
@@ -151,8 +151,8 @@ function removeOther(id) { const o = others.get(id); if (!o) return; if (o.c) { 
 // ---------------- di chuyển ----------------
 const ray = new THREE.Raycaster(), ndc = new THREE.Vector2();
 let drag = null;
-canvas.addEventListener('pointerdown', e => { if (specCam?.loc !== 'ngutien' && !specCam?.keep) specCam = null; drag = { x: e.clientX, y: e.clientY, yaw: camYaw, moved: false }; });
-addEventListener('pointermove', e => { if (!drag || specCam?.loc === 'ngutien' || specCam?.keep) return; const dx = e.clientX - drag.x; if (Math.abs(dx) > 4) drag.moved = true; camYaw = drag.yaw - dx * 0.006; });
+canvas.addEventListener('pointerdown', e => { if (specCam?.loc !== 'ngutien' && !specCam?.keep) specCam = null; drag = { x: e.clientX, y: e.clientY, yaw: camYaw, pitch: thPitch, moved: false }; });
+addEventListener('pointermove', e => { if (!drag || specCam?.loc === 'ngutien' || specCam?.keep) return; const dx = e.clientX - drag.x, dy = e.clientY - drag.y; if (Math.abs(dx) > 4 || Math.abs(dy) > 4) drag.moved = true; camYaw = drag.yaw - dx * 0.006; if (chairSeat?.id === 'hh0') { camYaw = Math.max(-1.3, Math.min(1.3, camYaw)); thPitch = Math.max(-.2, Math.min(.75, drag.pitch + dy * 0.004)); } });
 addEventListener('pointerup', e => { const d = drag; drag = null; if (!d || d.moved || e.target !== canvas) return; clickWorld(e); });
 canvas.addEventListener('wheel', e => { camDist = Math.min(7, Math.max(1.4, camDist + e.deltaY * 0.002)); }, { passive: true });
 function clickWorld(e) {
@@ -225,6 +225,11 @@ renderer.setAnimationLoop(() => {
     if (world.flicker) for (const L of world.flicker) L.intensity = 2 + Math.sin(T * 9 + L.id) * .25 + Math.random() * .2;
     if (stage) stage.update(dt);
     else if (specCam && Date.now() < specCam.until && world.loc === specCam.loc) {  camera.position.lerp(specCam.pos, Math.min(1, dt * 3)); camera.lookAt(specCam.look); }
+    else if (selfC && !gateSpin && chairSeat?.id === 'hh0') { // phượng tọa: nhìn từ trên cao xuống sảnh, kéo để xoay/ngẩng cúi
+      const st = chairSeat, B = world.bounds, yaw = (B ? Math.atan2((B.minX + B.maxX) / 2 - st.x, (B.minZ + B.maxZ) / 2 - st.z) : st.ry) + camYaw, eye = new THREE.Vector3(st.x + Math.sin(st.ry) * .2, (st.top || .8) + 1.5, st.z + Math.cos(st.ry) * .2);
+      if (snapCam) { camera.position.copy(eye); snapCam = false; } else camera.position.lerp(eye, Math.min(1, dt * 5));
+      camera.lookAt(eye.x + Math.sin(yaw) * 5, eye.y - 5 * Math.tan(thPitch + .12), eye.z + Math.cos(yaw) * 5);
+    }
     else if (selfC && !gateSpin) {
       let p = selfC.root.position;
       if (seated?.ht?.c) { p = p.clone().add(seated.ht.c.root.position).multiplyScalar(.5); p.y = 0; }
@@ -406,7 +411,7 @@ function renderActs() {
     if (me.lanh.caseId) add('📜 Kêu oan', 'Điều tra lại vụ án cũ', () => openCase(me.lanh.caseId)); }
   if (L === 'lanhcung' && !me.lanh) { for (const q of lcList) { add(`🧺 Thăm ${q.name}`, `20 bạc · mang đồ ăn, hỏi han · công trạng +5 · sức khỏe người đó ${q.hp}/100`, () => socket.emit('lc', { op: 'tham', who: q.id })); add(`😏 Chế giễu ${q.name}`, '50 bạc · mỗi ngày 1 người · Thái hậu không vui · người đó ghi thù, ra ngoài trả gấp đôi', () => socket.emit('lc', { op: 'che', who: q.id })); }
     if (!lcList.length) add('🍂 Lãnh cung vắng tanh', 'Hiện không có ai bị đày', () => {}, true); add('🚪 Rời lãnh cung', '', () => socket.emit('goto', 'hoavien')); }
-  const ev = me.event; if (ev?.loc && ev.loc === L && !me.lanh) add(ev.act, ev.done ? 'Hôm nay đã tham gia · mai quay lại' : `${ev.sub} · sự kiện tuần`, () => act('event'), ev.done);
+  const ev = me.event; if (ev?.loc && ev.loc === L && !me.lanh) add(ev.act, ev.id === 'hoadang' && vua.den ? `Hoàng thượng đang trên cầu · còn ${vuaLeft(vua.den.end)} · ${denUsed()}/${denMaxC()} chiếc` : ev.done ? 'Hôm nay đã tham gia · mai quay lại' : `${ev.sub} · sự kiện tuần`, () => act('event'), ev.done);
   if (L === 'tuninh' && me.hhVote) add('👑 Bầu phượng ấn', me.hhVote.mine ? 'Đã tiến cử · có thể đổi' : 'Tiến cử người xứng làm Hoàng hậu', openVote);
   const B = me.big; if (B && !B.done && !me.lanh && ['hoavien', 'tuninh', 'duongtam'].includes(L)) add('📜 Tra đại án ở đây', B.invToday.length >= 2 ? 'Hôm nay đã tra đủ 2 lần · mai quay lại' : B.invToday.includes(L) ? 'Hôm nay đã tra ở đây · thử nơi khác' : `1 lượt · còn ${2 - B.invToday.length} lần hôm nay · mỗi người nhận manh mối khác nhau`, () => socket.emit('big', { op: 'inv' }), B.invToday.includes(L) || B.invToday.length >= 2);
   const F = me.fest; if (F && !F.done && !me.lanh) { if (L === 'phong') add('🧵 Thêu gấm cho đại lễ', F.today.theu ? 'Hôm nay đã thêu' : '1 lượt · mỗi ngày 1 lần · thêu khéo được nhiều điểm', () => gameRhythm('múa', q => socket.emit('fest', { op: 'theu', q })), F.today.theu); if (L === 'tuninh') add('📿 Chép kinh cho đại lễ', F.today.kinh ? 'Hôm nay đã chép' : '1 lượt · mỗi ngày 1 lần · +15 điểm đại lễ', () => socket.emit('fest', { op: 'kinh' }), F.today.kinh); }
@@ -1283,7 +1288,7 @@ function seatPose(c, st) {
   r.position.set(st.x, 0, st.z); r.updateMatrixWorld(true); const sp = seatPlacement(c);
   r.position.x += st.x - sp.x; r.position.z += st.z - sp.z; r.position.y = st.top - sp.y; c.play('ngoi');
 }
-function sitSelfAt(id) { const st = world?.seats?.find(x => x.id === id); if (!st || !selfC) return; selfC.target = null; chairSeat = st; seatPose(selfC, st); }
+function sitSelfAt(id, n = 0) { const st = world?.seats?.find(x => x.id === id); if (!st && id === 'hh0' && n < 20) return setTimeout(() => sitSelfAt(id, n + 1), 400); if (!st || !selfC) return; selfC.target = null; chairSeat = st; seatPose(selfC, st); if (id === 'hh0') { camYaw = 0; thPitch = .06; toast('👑 Ngồi phượng tọa: kéo màn hình để nhìn quanh sảnh. Bấm xuống sàn để đứng dậy.', 'info'); } }
 socket.on('sitOk', d => { sitSelfAt(d.seat); });
 function standChair() { if (!chairSeat || !selfC) return; const st = chairSeat; chairSeat = null; const r = selfC.root; const bx = st.x - Math.sin(st.ry) * .45, bz = st.z - Math.cos(st.ry) * .45; r.position.set(bx, world.floorAt ? world.floorAt(bx, bz) : 0, bz); selfC.pose = null; selfC.play('dung_cho'); socket.emit('stand'); sendMove('dung_cho'); }
 // hiển thị động tác của người khác (ngồi ghế, biểu diễn)
@@ -1482,7 +1487,7 @@ function tickNotice() {
   for (const [h, m, venue] of sched.feast) ev.push({ t: dayStart + (h * 60 + m) * 60e3, icon: '🎎', text: `Yến tiệc ${venue === 'in' ? 'trong điện' : 'ngoài trời'}`, hint: 'Chuẩn bị tiết mục đàn, múa hoặc thơ' });
   if (sched.vua && !me.lanh) { for (const [h, m] of sched.vua.WALK_SLOTS) ev.push({ t: dayStart + (h * 60 + m) * 60e3, icon: '🌸', text: 'Hoàng thượng dạo Ngự hoa viên', hint: 'Tới Ngự hoa viên theo hầu, đáp hợp tâm trạng người' });
     if ((me.children || []).some(k => k.stage === 'hoc')) for (const [h, m] of sched.vua.KHAO_SLOTS || []) ev.push({ t: dayStart + (h * 60 + m) * 60e3, icon: '📜', text: 'Hoàng thượng kiểm tra bài ở Thượng thư phòng', hint: 'Dắt con đi học tới trình bài' });
-    const [dh, dm] = sched.vua.DEN_SLOT; ev.push({ t: dayStart + (dh * 60 + dm) * 60e3, icon: '🏮', text: 'Ngắm trăng thả hoa đăng cùng Hoàng thượng', hint: 'Ra hồ Ngự hoa viên viết lời ước' }); }
+    if (me.event?.id === 'hoadang') { const [dh, dm] = sched.vua.DEN_SLOT; ev.push({ t: dayStart + (dh * 60 + dm) * 60e3, icon: '🏮', text: 'Lễ hoa đăng cùng Hoàng thượng', hint: 'Ra cầu hồ lớn Ngự hoa viên, bấm vào Hoàng thượng để thả' }); } }
   const lead = (sched.lead || 15) * 60e3;
   const up = ev.filter(e => e.t > nowVN && e.t - nowVN <= lead).sort((a, b) => a.t - b.t);
   if (!up.length || stage) { noticeEl.classList.add('hidden'); return; }
@@ -2362,7 +2367,7 @@ const UPDATE_NOTES = [
   ['🌸 Theo hầu Hoàng thượng dạo vườn', '10:30, 14:30, 16:30 (20 phút, luôn cách giờ lật thẻ 30 phút). Hoàng thượng đi một vòng hồ cá → vườn mẫu đơn → cầu hồ sen → đình Vọng Nguyệt rồi quay lại. Theo sau người, tới mỗi cảnh người dừng lại hỏi chuyện hợp cảnh đó, đáp 3 câu hợp tâm trạng được tới 18 sủng ái.'],
   ['⚫⚪ Hầu cờ · 🖌 Mài mực · 📜 Đối thơ', 'Ở Dưỡng Tâm điện, mỗi việc 1 lần/ngày. Hầu cờ: Hoàng thượng rời ngai sang sập La Hán đánh cờ cùng bổn cung, quân cờ hiện trên bàn thật, có ước đếm để canh thua sít sao (trong 10 mục). Mài mực: đứng bên án thư mài mực trong lúc Hoàng thượng phê tấu chương, xong có thể liếc trộm tấu chương. Đối thơ có thêm nhiều câu mới.'],
   ['🐉 Hoàng thượng ngự giá thăm cung', 'Khoảng 9:30, 13:00, 15:30, 19:00 người ghé cung một phi tần đang online. Có 10 phút về cung nghênh giá; cung bài trí đẹp, có trà, mặc đúng màu được nhiều điểm. Lỡ dịp cũng không bị phạt.'],
-  ['🌕 Ngắm trăng thả hoa đăng', '20:30 tối, ra hồ Ngự hoa viên viết lời ước thả hoa đăng (+2 sủng). Hết giờ Hoàng thượng nhặt một chiếc, đọc to lời ước cho cả cung: người được nhặt +12 sủng ái.'],
+  ['🏮 Lễ hoa đăng', 'Tuần lễ hoa đăng, 20:30 mỗi tối Hoàng thượng đứng trên cầu hồ lớn Ngự hoa viên. Bấm vào người để thả hoa đăng (+2 sủng, may mắn nhặt được bạc). Sủng ái trên 200 được thả 2 chiếc. Hết giờ Hoàng thượng nhặt một chiếc, đọc to lời ước: người được nhặt +12 sủng ái.'],
   ['⚖️ Ân sủng có chừng mực', 'Mỗi ngày nhận tối đa 40 sủng ái trọn vẹn từ các hoạt động cùng Hoàng thượng, vượt mức thì chỉ còn 1/3. Người mới vẫn đuổi kịp được.'],
   ['🍽 Giờ ngự thiện', 'Dâng món tự nấu lúc 11–13h hoặc 18–20h được ×1.5 sủng ái, nhưng nấu dở thì cả cung biết. Gây sự nay được 8 lần/ngày.'],
   ['🎉 Ân điển cho hậu cung', 'Mỗi ngày nay có 8 lượt (trước 5), hồi 1 lượt mỗi 30 phút, tích tối đa 20. Hoàng thượng ưu tiên lật thẻ người chơi, phi tần NPC rất hiếm khi được chọn và chỉ khi các nương nương đều đã được sủng hạnh hôm đó.'],
@@ -2485,6 +2490,7 @@ async function syncVua() {
   else if (mode === 'khao') { c.root.position.set(.7, 0, -2.0); c.root.rotation.y = 0; }
   c.play(mode === 'walk' ? 'di' : 'dung_cho'); w.group.add(c.root);
   const lb = makeLabel('Hoàng thượng', '', true, () => vuaTalk()); c.root.add(lb); c.label = lb;
+  if (mode === 'den') { const ar = document.createElement('div'); ar.className = 'tapArrow'; ar.textContent = '▼'; lb.element.prepend(ar); }
   const n = { c, name: 'Hoàng thượng', model: 'hoangthuong', label: lb, talk: 'vua' }; w.npcs.push(n); Object.assign(vuaHT, { c, n, loading: false });
   if (mode === 'walk') FX.push(() => { if (vuaHT?.c !== c) return false; const p = walkPos((Date.now() - vua.walk.start) / 1000); c.root.position.set(p.x, w.floorAt ? w.floorAt(p.x, p.z) : 0, p.z); c.root.rotation.y = p.ry; const an = p.stop ? 'dung_cho' : 'di'; if (c.curName !== an) c.play(an); vuaHT.pos = p; walkStopCheck(p); });
   if (mode === 'visit') { bubble(lb, `${me.name}, trẫm ghé qua thăm nàng.`); setTimeout(() => { if (vuaHT?.c === c) { c.play('om', { restart: true }); setTimeout(() => { if (vuaHT?.c === c && c.curName === 'om_nam') c.play('dung_cho'); }, 5600); } }, 1500); }
@@ -2511,14 +2517,14 @@ const hashId = id => { let h = 0; for (const ch of String(id)) h = (h * 31 + ch.
 function denSpot(id) { const h = hashId(id), side = h % 2 ? 1 : -1; return { x: side * .38, z: 13.1 + (h % 9) * .3, side }; }
 let denMine = 0, denFrom = null, denSettle = true;
 function addLantern(x, from) {
-  const g = lanternMesh(), h = hashId(x.id), side = from?.side ?? (h % 2 ? 1 : -1);
+  const key = x.k || x.id, g = lanternMesh(), h = hashId(key), side = from?.side ?? (h % 2 ? 1 : -1);
   // quỹ đạo: trôi ra giữa nửa hồ rồi lững lờ quanh một điểm
   const tx = side * (2 + (h % 30) / 10), tz = 16 + ((h >> 5) % 50) / 10 - 2.5, ez = Math.min(1, Math.sqrt(Math.max(0, 1 - (tx * tx) / 31)) * 2.9);
   const goal = { x: tx, z: Math.max(16 - ez, Math.min(16 + ez, tz)) };
   const st = from ? { x: from.x, y: from.y, z: from.z } : { x: side * .3, y: .05, z: 13 + (h % 13) * .5 };
   g.position.set(st.x, st.y, st.z); world.group.add(g);
   const lb = makeLabel('', '', true); lb.element.innerHTML = `<div style="font-size:10px;color:#ffe9b0;max-width:110px;white-space:normal;text-align:center;text-shadow:0 0 4px #000">🏮 ${esc(x.name)}</div>`; lb.position.set(0, .38, 0); g.add(lb);
-  const o = { g, w: world }; vuaLan.set(x.id, o); let t = from ? 0 : (x.settled ? 30 : 1.4); const sp = .12 + (h % 7) / 50;
+  const o = { g, w: world }; vuaLan.set(key, o); let t = from ? 0 : (x.settled ? 30 : 1.4); const sp = .12 + (h % 7) / 50;
   FX.push(dt => { if (!g.parent) { lb.element.remove(); return false; } t += dt;
     if (t < 1.4) { const k = t / 1.4; g.position.set(st.x + side * .55 * k, st.y + (.05 - st.y) * k * k, st.z); return; }
     const k = Math.min(1, (t - 1.4) / 14), e = k * k * (3 - 2 * k), bx = st.x + side * .55 + (goal.x - st.x - side * .55) * e, bz = st.z + (goal.z - st.z) * e;
@@ -2527,9 +2533,9 @@ function addLantern(x, from) {
 function syncLanterns() {
   const want = world?.loc === 'hoavien' && vua.den ? vua.den.list : [];
   if (syncLanterns.w !== world) { denSettle = true; syncLanterns.w = world; }
-  for (const [id, o] of vuaLan) if (o.w !== world || (id !== 'ht' && !want.some(x => x.id === id))) { o.g.parent?.remove(o.g); vuaLan.delete(id); }
+  for (const [id, o] of vuaLan) if (o.w !== world || (id !== 'ht' && !want.some(x => (x.k || x.id) === id))) { o.g.parent?.remove(o.g); vuaLan.delete(id); }
   if (!want.length && vuaLan.has('ht')) { vuaLan.get('ht').g.parent?.remove(vuaLan.get('ht').g); vuaLan.delete('ht'); }
-  for (const x of want) { if (vuaLan.has(x.id)) continue; if (x.id === me?.id && Date.now() < denMine) continue; addLantern(denSettle ? { ...x, settled: true } : x, x.id === me?.id ? denFrom : null); if (x.id === me?.id) denFrom = null; }
+  for (const x of want) { if (vuaLan.has(x.k || x.id)) continue; if (x.id === me?.id && Date.now() < denMine) continue; addLantern(denSettle ? { ...x, settled: true } : x, x.id === me?.id ? denFrom : null); if (x.id === me?.id) denFrom = null; }
   denSettle = false;
 }
 // cảnh thả đèn: đi ra cầu, quỳ bên lan can, đặt hoa đăng xuống nước; Hoàng thượng cũng thả một chiếc
@@ -2603,10 +2609,17 @@ socket.on('vuaTho', async () => {
   dlgClose(); socket.emit('vua', { op: 'tho', ok });
 });
 // 6) hoa đăng
+const denUsed = () => (vua.den?.list || []).filter(x => x.id === me.id).length, denMaxC = () => (me.sung || 0) > 200 ? 2 : 1;
+// bấm "Thả hoa đăng": ra cầu đứng cạnh Hoàng thượng, mũi tên vàng chỉ vào người
+function denGo() { if (!vua.den || !selfC) return; closeModal?.(); if (world?.loc !== 'hoavien') return socket.emit('goto', 'hoavien');
+  const sp = denSpot(me.id), r = selfC.root.position; if (Math.hypot(r.x - sp.x, r.z - sp.z) > 3) { r.set(sp.x, world.floorAt ? world.floorAt(sp.x, sp.z - 1.4) : 0, sp.z - 1.4); snapCam = true; sendMove('dung_cho'); }
+  selfC.target = { x: sp.x, z: sp.z - .3 }; toast('🏮 Bấm vào Hoàng thượng trên cầu (mũi tên vàng) để thả hoa đăng.', 'info'); }
+socket.on('denGo', denGo);
 function openDen() {
-  if (vua.den?.list.some(x => x.id === me.id)) return toast('Bổn cung đã thả hoa đăng rồi.');
+  if (denUsed() >= denMaxC()) return toast(denMaxC() > 1 ? 'Bổn cung đã thả đủ 2 chiếc hoa đăng.' : 'Bổn cung đã thả hoa đăng rồi. Sủng ái trên 200 được thả 2 chiếc.');
   const SUG = ['Nguyện Hoàng thượng long thể an khang.', 'Mong được ở bên người đến bạc đầu.', 'Cầu cho phụ mẫu ở nhà bình an.', 'Nguyện hậu cung hòa thuận, tỷ muội yêu thương.'];
   modal(`<button class="close" onclick="window._close()">✕</button><h3>🏮 Thả hoa đăng</h3><div style="color:var(--muted);font-size:12.5px">Viết lời ước (tối đa 60 chữ). Hết giờ, Hoàng thượng sẽ nhặt một chiếc hoa đăng và đọc to lời ước cho cả hậu cung nghe.</div>
+  <div style="margin-top:6px;font-size:12.5px;padding:6px 10px;border-radius:8px;background:rgba(232,194,90,.12);border:1px solid rgba(232,194,90,.35)">🏮 Lượt thả: <b>${denUsed()}/${denMaxC()}</b> chiếc · ${denMaxC() > 1 ? 'sủng ái trên 200 nên được thả 2 chiếc' : 'sủng ái trên 200 sẽ được thả 2 chiếc'} (không trừ sủng ái)</div>
   <input id="denW" maxlength="60" placeholder="Lời ước…" style="width:100%;margin:10px 0;padding:8px;border-radius:8px">
   <div class="btns" style="flex-wrap:wrap">${SUG.map((s, i) => `<button data-s="${i}" style="font-size:12px">${esc(s)}</button>`).join('')}</div>
   <div class="btns"><button class="gold" id="denOk">Thả hoa đăng</button></div>`);
@@ -2617,7 +2630,7 @@ const vuaLeft = t => { const l = Math.max(0, t - Date.now()); return `${Math.flo
 function vuaActs(add) {
   const L = world.loc, VD = me.vuaDay || {}; if (me.lanh) return;
   if (L === 'hoavien' && vua.walk) add('🌸 Theo hầu Hoàng thượng dạo vườn', `Còn ${vuaLeft(vua.walk.end)} · ${vua.walk.n} người đang hầu · đáp hợp tâm trạng người được nhiều sủng`, vuaWalkGo);
-  if (L === 'hoavien' && vua.den) add('🌕 Ngắm trăng cùng Hoàng thượng · thả hoa đăng ước nguyện', vua.den.list.some(x => x.id === me.id) ? 'Đã thả · chờ Hoàng thượng nhặt' : `Còn ${vuaLeft(vua.den.end)} · ${vua.den.list.length} chiếc trên hồ · sủng ái +2, được nhặt +12`, openDen, vua.den.list.some(x => x.id === me.id));
+  if (L === 'hoavien' && vua.den && (me.event?.id !== 'hoadang' || me.admin)) add('🏮 Thả hoa đăng cùng Hoàng thượng', `Còn ${vuaLeft(vua.den.end)} · bấm vào Hoàng thượng trên cầu`, denGo);
   if (L === 'duongtam') {
     if (GOV?.ht && !GOV.g.over) add('⚫⚪ Trở lại ván cờ', 'Hoàng thượng đang chờ nước đi', () => goDraw());
     else add('⚫⚪ Hầu cờ Hoàng thượng', VD.co ? 'Hôm nay đã hầu cờ' : 'Mỗi ngày 1 ván · thua sít sao (trong 10 mục) được sủng nhiều nhất', () => socket.emit('vua', { op: 'coStart' }), VD.co);

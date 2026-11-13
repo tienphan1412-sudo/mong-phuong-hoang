@@ -411,6 +411,8 @@ body.mob #rotbtn { display:block; position:fixed; right:6px; top:132px; width:42
   body.mob #chat { bottom:40px !important; left:4px; width:34vw; } #chatlog { max-height:70px; font-size:11px; } #chatin { font-size:12px; padding:6px 8px; }
   #mcard { max-height:90vh; overflow-y:auto; }
 }
+.tapArrow { color:#ffd84a; font-size:20px; line-height:1; text-shadow:0 0 6px #ff9a00, 0 1px 2px #000; animation:tapBob .8s ease-in-out infinite; margin-bottom:2px; }
+@keyframes tapBob { 0%,100% { transform:translateY(0); opacity:1 } 50% { transform:translateY(6px); opacity:.55 } }
 </style>
 </head>
 <body>

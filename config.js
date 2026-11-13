@@ -191,7 +191,7 @@ module.exports = {
   LOGIN_REWARD: [20, 30, 40, 50, 60, 80, 200], // bạc điểm danh ngày 1..7 (ngày 7 thêm 1 lượt, 10 sủng ái)
   KEEPALIVE_HOURS: [7, 24],    // giờ VN giữ server thức (ngoài giờ này server được ngủ để tiết kiệm giờ miễn phí của Render)
   EVENTS: [
-    { id: 'hoadang', name: 'Lễ hoa đăng', desc: 'Cả tuần thả hoa đăng ở hồ Ngự hoa viên cầu may, mỗi ngày một lần.', loc: 'hoavien', act: '🏮 Thả hoa đăng', sub: 'Miễn phí · mỗi ngày 1 lần · cầu may' },
+    { id: 'hoadang', name: 'Lễ hoa đăng', desc: 'Cả tuần, 20:30 mỗi tối Hoàng thượng đứng trên cầu hồ lớn Ngự hoa viên. Tới bấm vào người để thả hoa đăng cầu may (sủng ái trên 200 được thả 2 chiếc).', loc: 'hoavien', act: '🏮 Thả hoa đăng', sub: '20:30 mỗi tối · thả cùng Hoàng thượng trên cầu' },
     { id: 'disan', name: 'Hoàng thượng đi săn', desc: 'Thắng yến tiệc được thưởng gấp đôi. Ra Dưỡng Tâm điện tiễn giá mỗi ngày.', loc: 'duongtam', act: '🏹 Tiễn giá Hoàng thượng', sub: 'Miễn phí · mỗi ngày 1 lần · sủng ái +5' },
     { id: 'phatdan', name: 'Lễ Phật đản', desc: 'Thỉnh an được gấp đôi hài lòng. Chép kinh ở Từ Ninh cung dâng Thái hậu.', loc: 'tuninh', act: '📿 Chép kinh dâng Thái hậu', sub: '1 lượt · mỗi ngày 1 lần · hài lòng +5' },
     { id: 'dichbenh', name: 'Dịch bệnh trong cung', desc: 'Thuốc an thai miễn phí. Phát thuốc cho cung nhân ở Ngự hoa viên để lập công.', loc: 'hoavien', act: '🌿 Phát thuốc cho cung nhân', sub: '20 bạc · mỗi ngày 1 lần · công trạng +12' },

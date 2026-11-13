@@ -217,7 +217,7 @@ function selfView(p) {
     htKnown: htKnownView(p), decorOwned: p.decorOwned || [], huong: !!p.huong, feast: feastView(p), htTalked: p.htTalked === p.tamCungUntil && !!p.tamCungUntil,
     thai: p.thai?.known ? { due: p.thai.due, care: p.thai.care || 0, antai: p.thai.antai === dayKey() } : null, children: kidView(p), kidPub: kidPub(p), carry: p.carry || null, follow: p.follow || null, thaitu: DB.state.thaitu?.mother === p.id,
     isHH: isHH(p), hhDay: p.hhDay || {}, hhId: DB.state.hh?.id || null, thinhanHH: p.thinhanHH === dayKey(), hhUses: C.HH_USES, hhThinhan: C.HH_THINHAN, hhVote: hhVoteView(p), hhName: DB.state.hh ? P(DB.state.hh.id)?.name || null : null,
-    event: { ...curEvent(), done: p.evDay === dayKey() }, streak: p.streak || 0, ach: achView(p), titleSel: p.titleSel || '',
+    event: { ...curEvent(), done: curEvent().id !== 'hoadang' && p.evDay === dayKey() }, streak: p.streak || 0, ach: achView(p), titleSel: p.titleSel || '',
     lying: !!p.lying, visit: p.visit || null, selfSick: !!(p.sick && p.sickUntil > now()), selfSickDay: p.selfSickDay === dayKey(),
     ccDay: p.ccDay?.d === dayKey() ? p.ccDay : {}, ccFeastOk: now() - (p.ccFeast || 0) >= 864e5,
     big: bigView(p), fest: festView(p), night: nightView(p), diary: (p.diary || []).slice(0, 30), tinvat: p.tinvat || {}, keoDay: p.keoDay === dayKey(),
@@ -1379,10 +1379,11 @@ const VUA_WALK = [
   { at: 'dinh', q: 'Nàng vào cung đã lâu, có nhớ nhà không?', opts: [{ t: 'Có người ở đây, nơi này là nhà.', s: [3, 2, 3], r: 'Nàng làm trẫm cảm động.' }, { t: 'Nhớ lắm, thần thiếp muốn xin về thăm.', s: [0, 0, 1], r: 'Để trẫm tính.' }, { t: 'Không nhớ, ở nhà nghèo khổ lắm.', s: [-1, -1, -1], r: 'Hừm.' }] },
 ];
 function VS() { return DB.state.vua || (DB.state.vua = { done: {} }); }
+const denMax = p => (p.sung || 0) > 200 ? 2 : 1;
 function vuaPub(adm = false) {
   const v0 = VS(), v = {}; for (const k of ['walk', 'den', 'visit', 'khao']) v[k] = v0[k] && (!v0[k].test || adm) ? v0[k] : null; return {
     walk: v.walk ? { start: v.walk.start, end: v.walk.end, n: Object.keys(v.walk.sc).length } : null,
-    den: v.den ? { start: v.den.start, end: v.den.end, list: v.den.list.map(x => ({ id: x.id, name: x.name, wish: x.wish })) } : null,
+    den: v.den ? { start: v.den.start, end: v.den.end, list: v.den.list.map(x => ({ id: x.id, k: x.k || x.id, name: x.name, wish: x.wish })) } : null,
     visit: v.visit ? { id: v.visit.id, name: v.visit.name, until: v.visit.until } : null,
     khao: v.khao ? { start: v.khao.start, end: v.khao.end } : null,
   };
@@ -1406,13 +1407,13 @@ function vuaTick(mins, k) {
     v.walk = null; ch = true;
   });
   const [dh, dm] = U.DEN_SLOT, dst = dh * 60 + dm, dkey = k + ':den';
-  if (mins >= dst && mins < dst + U.DEN_MIN && !v.done[dkey] && !v.den) { v.done[dkey] = 1; v.den = { start: now(), end: now() + (U.DEN_MIN - (mins - dst)) * 60e3, list: [] }; ch = true;
-    news('🏮 Trăng lên, Hoàng thượng ra hồ Ngự hoa viên ngắm trăng. Ai thả hoa đăng, người sẽ nhặt một chiếc đọc lời ước.', 'vua');
+  if (mins >= dst && mins < dst + U.DEN_MIN && !v.done[dkey] && !v.den && curEvent().id === 'hoadang') { v.done[dkey] = 1; v.den = { start: now(), end: now() + (U.DEN_MIN - (mins - dst)) * 60e3, list: [] }; ch = true;
+    news('🏮 Lễ hoa đăng: trăng lên, Hoàng thượng đứng trên cầu hồ Ngự hoa viên. Ai thả hoa đăng, người sẽ nhặt một chiếc đọc lời ước.', 'vua');
     for (const q of Object.values(DB.players)) if (!q.lanh) notify(q, '🏮 Thả hoa đăng cùng Hoàng thượng', 'Ra hồ Ngự hoa viên thả hoa đăng ước nguyện.', 'vuaden'); }
   if (v.den && now() > v.den.end) quiet(v.den.test, () => { const L = v.den.list; v.den = null; ch = true;
     if (L.length) { const w = wpick(L, x => 10 + Math.sqrt(Math.max(0, P(x.id)?.sung || 0)) * 2); const p = P(w.id);
       if (p) { htGain(p, 12); addPts(p, 10); push(p); notify(p, '🏮 Hoàng thượng nhặt hoa đăng của bổn cung', w.wish); }
-      news(`🏮 Hoàng thượng nhặt hoa đăng của ${w.name}, đọc lời ước: “${w.wish}”. Người mỉm cười, sủng ái +12.`); io.emit('denEnd', { id: w.id, name: w.name, wish: w.wish }); } });
+      news(`🏮 Hoàng thượng nhặt hoa đăng của ${w.name}, đọc lời ước: “${w.wish}”. Người mỉm cười, sủng ái +12.`); io.emit('denEnd', { id: w.k || w.id, name: w.name, wish: w.wish }); } });
   U.VISIT_SLOTS.forEach(([h, m], i) => { const key = k + ':v' + i, st = h * 60 + m;
     if (mins < st || mins >= st + 30 || v.done[key] || v.visit) return;
     const pool = Object.values(DB.players).filter(p => online.has(p.id) && !p.lanh && !p.admin && p.loc !== 'tamcung' && !(p.sick && p.sickUntil > now()) && vuaDay(p).vis == null);
@@ -1492,9 +1493,13 @@ function vuaSock(sock, getMe) {
       if (ok === 3) news(`📜 ${me.name} đối thơ cùng Hoàng thượng ở Dưỡng Tâm điện, câu nào cũng chỉnh, được ban bút lông tử hào.`);
       toast(me, `Đối thơ đúng ${ok}/3: sủng ái ${g >= 0 ? '+' : ''}${g}.`, ok >= 2 ? 'good' : 'info');
     } else if (d.op === 'den') {
-      if (me.loc !== 'hoavien' || !v.den) return toast(me, 'Chưa tới giờ thả hoa đăng.'); if (v.den.list.some(x => x.id === me.id)) return toast(me, 'Đã thả hoa đăng rồi.');
+      if (me.loc !== 'hoavien' || !v.den) return toast(me, 'Lễ hoa đăng bắt đầu lúc 20:30, Hoàng thượng sẽ ra cầu hồ lớn.');
+      const used = v.den.list.filter(x => x.id === me.id).length, max = denMax(me); if (used >= max) return toast(me, max > 1 ? 'Đã thả đủ 2 chiếc hoa đăng rồi.' : 'Đã thả hoa đăng rồi. Sủng ái trên 200 được thả 2 chiếc.');
       const wish = String(d.wish || '').replace(/\s+/g, ' ').trim().slice(0, 60) || 'Nguyện Hoàng thượng long thể an khang.';
-      v.den.list.push({ id: me.id, name: me.name, wish }); htGain(me, 2); cnt(me, 'vuaden'); toast(me, 'Hoa đăng đã trôi ra hồ. Sủng ái +2, chờ xem Hoàng thượng có nhặt được không…', 'good'); vuaEmit();
+      v.den.list.push({ id: me.id, k: used ? me.id + '#2' : me.id, name: me.name, wish }); htGain(me, 2); cnt(me, 'vuaden');
+      const r = Math.random(); let msg = 'Hoa đăng đã trôi ra hồ. Sủng ái +2';
+      if (r < .45) { const g = 15 + rnd(26); me.silver += g; msg += `, nhặt được túi bạc rơi bên hồ (+${g} bạc)`; } else if (r < .55) { htGain(me, 5); msg += ', hoa đăng trôi sát chân Hoàng thượng (thêm sủng ái +5)'; }
+      toast(me, msg + '. Chờ xem Hoàng thượng có nhặt được không…', 'good'); push(me); vuaEmit();
     } else if (d.op === 'visit') {
       if (!v.visit || v.visit.id !== me.id) return; if (me.loc !== 'phong' || me.visit) return toast(me, 'Về cung riêng để nghênh giá.');
       const it = new Set((me.decor || []).map(x => x.item)); var sc = 5 + Math.min(8, it.size); const good = [];
@@ -1592,7 +1597,7 @@ function nightTick() {
 // ---------------- vị trí, phòng ----------------
 const LOCS = ['tuninh', 'hoavien', 'duongtam', 'phong', 'tamcung', 'lanhcung', 'yentiec', 'ngutien', 'acaso', 'sansinh'];
 // ghế ngồi: loc -> { seatId: playerId }
-const SEATS = {}; const SEAT_IDS = { duongtam: ['hh0'], hoavien: ['hv0', 'hv1', 'hv2', 'hv3', 'hv4'], yentiec: ['f0', 'f1', 'f2', 'f3', 'f4', 'f5', 'f6', 'f7'] };
+const SEATS = {}; const SEAT_IDS = { duongtam: ['hh0'], hoavien: ['hv0', 'hv1', 'hv2', 'hv3', 'hv4'], yentiec: ['f0', 'f1', 'f2', 'f3', 'f4', 'f5', 'f6', 'f7', 'hh0'] };
 function freeSeat(p) { for (const loc in SEATS) for (const k in SEATS[loc]) if (SEATS[loc][k] === p.id) delete SEATS[loc][k]; p.seat = null; }
 function takeSeat(p, id) { const rk = roomOf(p), L = (SEATS[rk] = SEATS[rk] || {}); if (p.loc === 'phong' ? !/^(d\d{1,2}|b0|k\d{1,2}[ab])$/.test(id) : !(SEAT_IDS[p.loc] || []).includes(id)) return false; if (L[id] && L[id] !== p.id && online.has(L[id])) return false; freeSeat(p); L[id] = p.id; p.seat = id; p.anim = 'sit:' + id; return true; }
 function roomOf(p) { return p.loc === 'phong' ? 'phong:' + (p.visit || p.id) : p.loc === 'tamcung' ? 'tamcung:' + p.id : p.loc; }
@@ -1604,7 +1609,7 @@ function enter(p, loc, sock) {
   sock.join(room);
   const others = [...online.keys()].map(P).filter(q => q && q.id !== p.id && roomOf(q) === room && (!stealth(q) || p.admin)).map(publicView);
   let seat = null;
-  if (loc === 'yentiec') { const free = SEAT_IDS.yentiec.find(id => !(SEATS.yentiec || {})[id] || !online.has(SEATS.yentiec[id])); if (free) { takeSeat(p, free); seat = free; } }
+  if (loc === 'yentiec') { const L = SEATS.yentiec || {}, hhFree = isHH(p) && (!L.hh0 || !online.has(L.hh0)); const free = hhFree ? 'hh0' : SEAT_IDS.yentiec.find(id => id !== 'hh0' && (!L[id] || !online.has(L[id]))); if (free) { takeSeat(p, free); seat = free; } }
   if (loc === 'phong' && p.lying) p.anim = 'lie:b0';
   const host = loc === 'phong' ? (P(p.visit) || p) : null;
   sock.emit('scene', { fei: feiPresent(loc).map(feiView), loc, players: others, venue: DB.state.feast?.venue || 'out', seat, host: host ? { id: host.id, name: host.name, decor: host.decor || [], palace: host.rank >= C.PALACE_RANK, kids: kidView(host).filter(c => !c.ward && !c.test && c.id !== host.carry && c.id !== host.follow).map(c => ({ id: c.id, sex: c.sex, name: c.name, stage: c.stage, cry: c.cry, tt: c.thaitu || c.coluan, ao: c.ao })) } : null, sinh: loc === 'sansinh' ? sinhPub() : null, acaso: loc === 'acaso' ? Object.values(DB.players).flatMap(q => kidView(q).filter(c => c.ward && !c.test).map(c => ({ id: c.id, sex: c.sex, name: c.name, stage: c.stage, cry: c.cry, tt: c.thaitu || c.coluan, ao: c.ao, mother: q.name, mid: q.id }))) : null, lying: loc === 'phong' && !!p.lying });
@@ -1841,8 +1846,12 @@ io.on('connection', sock => {
     } else if (a === 'event') {
       const e = curEvent(); if (!e.loc) return;
       if (me.loc !== e.loc) return toast(me, 'Không đúng chỗ cho sự kiện này.');
-      if (me.evDay === dayKey()) return toast(me, 'Hôm nay đã tham gia rồi, mai quay lại nhé.');
       if (e.id === 'hoadang') {
+        if (VS().den && !VS().den.test || (VS().den && me.admin)) return sockOf(me.id)?.emit('denGo'); // đang lễ: ra cầu gặp Hoàng thượng
+        return toast(me, 'Lễ hoa đăng diễn ra lúc 20:30 mỗi tối. Hoàng thượng sẽ đứng trên cầu hồ lớn, tới bấm vào người để thả hoa đăng.');
+      }
+      if (me.evDay === dayKey()) return toast(me, 'Hôm nay đã tham gia rồi, mai quay lại nhé.');
+      if (false) {
         me.evDay = dayKey(); const r = Math.random();
         if (r < .1) { me.sung += 15; news(`🏮 Hoa đăng của ${me.name} trôi tới chân Hoàng thượng đang dạo hồ. Người mỉm cười cầm lên đọc lời ước.`); toast(me, 'Đại cát! Hoàng thượng nhặt được hoa đăng của bổn cung: sủng ái +15.', 'good'); }
         else if (r < .55) { const g = 20 + rnd(31); me.silver += g; toast(me, `Trung cát: thả hoa đăng xong nhặt được túi bạc rơi bên hồ (+${g} bạc).`, 'good'); }
@@ -2505,7 +2514,7 @@ function adminRaw(p, text) {
     const v = VS(); if (arg === 'tat') { if (v.den?.test) v.den = null; vuaEmit(); return toast(p, 'Đã kết thúc ngắm trăng thử.', 'good'); }
     if (v.den && !v.den.test) return toast(p, 'Đang có buổi ngắm trăng thật, không thử chồng lên được.', 'bad');
     v.den = { test: true, start: now(), end: now() + (+arg || 20) * 60e3, list: [] }; vuaEmit(); sockOf(p.id)?.emit('demTest', true);
-    return toast(p, `Hoàng thượng đã ra cầu hồ lớn (thử ${+arg || 20} phút, chỉ admin thấy). Tới Ngự hoa viên → 🌕 Ngắm trăng cùng Hoàng thượng.`, 'good'); }
+    return toast(p, `Hoàng thượng đã ra cầu hồ lớn (thử ${+arg || 20} phút, chỉ admin thấy). Tới Ngự hoa viên → bấm Hoàng thượng trên cầu (hoặc nút 🏮 Thả hoa đăng cùng Hoàng thượng).`, 'good'); }
   else if (cmd === '/sukien') { DB.state.evForce = C.EVENTS.some(e => e.id === arg) ? arg : null; for (const id of online.keys()) { const q = P(id); if (q) push(q); } toast(p, 'Sự kiện: ' + curEvent().name + (DB.state.evForce ? ' (ép)' : ' (theo tuần)')); }
   else if (cmd === '/xoaacc') {
     const who = [arg, ...rest].filter(Boolean).join(' ').toLowerCase(); const q = findP(who);
