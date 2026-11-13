@@ -140,7 +140,7 @@ const gMax = g => G_LV[g.lv || 0].max;
 const G_TASKS = [
   { k: 'thinhan', t: 'Tỷ muội thỉnh an Thái hậu', need: 3, r: 40, per: 1 }, // mỗi người 1 lần/ngày nên nhóm nhỏ chỉ cần đủ số người
   { k: 'fish', t: 'Câu cá ở Ngự hoa viên', need: 10, r: 30 },
-  { k: 'cook', t: 'Nấu món ở Ngự thiện phòng', need: 3, r: 30 },
+  { k: 'cook', t: 'Nấu món ở Ngự thiện phòng (từ Quý nhân)', need: 3, r: 30 },
   { k: 'det', t: 'Phá án giúp Quế ma ma', need: 1, r: 40 },
   { k: 'feast', t: 'Dâng tiết mục ở yến tiệc', need: 2, r: 40 },
 ];
@@ -150,7 +150,7 @@ function gTask(p, k, n) {
   const T = G_TASKS.find(x => x.k === k); if (!T) return; const g = DB.state.groups?.[p.sis]; if (!g) return; const D = gDay(g);
   if (D.done[k]) return; D.c[k] = (D.c[k] || 0) + n;
   if (D.c[k] >= gNeed(T, g)) { D.done[k] = 1; g.bank = (g.bank || 0) + T.r;
-    for (const id of g.members) { const q = P(id); if (q) toast(q, `🏮 Nhiệm vụ nhóm xong: ${T.t}. Ngân khố tỷ muội +${T.r} bạc (${g.bank}).`, 'good'); } }
+    for (const id of g.members) { const q = P(id); if (q) toast(q, `🪙 Nhiệm vụ nhóm xong: ${T.t}. Ngân khố tỷ muội +${T.r} bạc (${g.bank}).`, 'good'); } }
   setTimeout(() => pushGroup(g), 0);
 }
 // tên nhóm tỷ muội không được trùng nhau (so không phân biệt hoa thường, bỏ khoảng trắng thừa)
@@ -380,7 +380,9 @@ function addMail(p, m) {
   const s = sockOf(p.id); if (s) { s.emit('mailNew', { from: m.anon ? 'Thư nặc danh' : m.fromName, kind: m.kind }); push(p); }
   return item;
 }
-const mailView = p => (p.mail || []).map(m => ({ id: m.id, t: m.t, read: m.read, kind: m.kind, from: m.anon ? null : m.from, fromName: m.anon ? 'Không rõ người gửi' : m.fromName, text: m.text, silver: m.silver || 0, group: m.group || null }));
+// thư mật báo: bị hại sau lưng thì luôn có thư lưu lại, kẻ ra tay ẩn tên, hỏi Tổng quản (50 bạc) để biết là ai
+function harmMail(t, by, text) { if (!t || !by) return; addMail(t, { kind: 'han', fromName: 'Mật báo', text, by: by.id, byName: by.name, byRank: C.RANKS[by.rank]?.name || '', revealed: false }); }
+const mailView = p => (p.mail || []).map(m => ({ id: m.id, t: m.t, read: m.read, kind: m.kind, from: m.anon ? null : m.from, fromName: m.anon ? 'Không rõ người gửi' : m.fromName, text: m.kind === 'han' ? m.text + (m.revealed ? `\n👁 Tổng quản thì thầm: kẻ đó là ${m.byName} (${m.byRank}).` : '') : m.text, silver: m.silver || 0, group: m.group || null, han: m.kind === 'han' ? { revealed: !!m.revealed } : null }));
 
 // ---------------- thống kê cho quản trị ----------------
 function track(p, key, n = 1) {
@@ -1545,7 +1547,7 @@ function resolveKeo(tid, held) {
   const k = KEO[tid]; if (!k) return; delete KEO[tid]; clearTimeout(k.timer);
   const t = P(tid), a = P(k.by); if (!t || !a) return;
   if (held) { a.sung = Math.max(0, a.sung - 5); toast(a, `Hoàng thượng chỉ sai thái y qua xem, rồi ở lại với ${t.name}. Kế không thành (sủng ái -5).`, 'bad'); toast(t, '💕 Bổn cung giữ chân được Hoàng thượng. Người ở lại cả đêm.', 'good'); t.sung += 5; diary(t, `Có kẻ giả bệnh mời Hoàng thượng đi, nhưng người ở lại với bổn cung.`); news(`🌙 Có người giả bệnh mời Hoàng thượng giữa đêm, nhưng người vẫn ở lại với ${t.name}.`); }
-  else { t.tamCungUntil = now(); a.sung += 10; toast(t, `💔 Hoàng thượng bỏ đi giữa đêm sang cung ${a.name}…`, 'bad'); toast(a, `🌙 Kế thành! Hoàng thượng rời ${t.name}, sang thăm bổn cung (+10 sủng ái).`, 'good'); diary(t, `Đang hầu thì ${a.name} sai người báo bệnh, Hoàng thượng bỏ đi giữa đêm.`); diary(a, `Giả bệnh kéo Hoàng thượng khỏi tẩm cung của ${t.name}. Người sang thăm bổn cung.`); news(`🌙 Nửa đêm ${a.name} trở bệnh, Hoàng thượng rời tẩm cung của ${t.name} sang thăm.`, 'latthe');
+  else { t.tamCungUntil = now(); a.sung += 10; toast(t, `💔 Hoàng thượng bỏ đi giữa đêm sang cung ${a.name}…`, 'bad'); addMail(t, { kind: 'he', fromName: '🕯 Mật báo', text: `Đang hầu Hoàng thượng thì cung ${a.name} sai người báo bệnh, Hoàng thượng bỏ đi giữa đêm.` }); toast(a, `🌙 Kế thành! Hoàng thượng rời ${t.name}, sang thăm bổn cung (+10 sủng ái).`, 'good'); diary(t, `Đang hầu thì ${a.name} sai người báo bệnh, Hoàng thượng bỏ đi giữa đêm.`); diary(a, `Giả bệnh kéo Hoàng thượng khỏi tẩm cung của ${t.name}. Người sang thăm bổn cung.`); news(`🌙 Nửa đêm ${a.name} trở bệnh, Hoàng thượng rời tẩm cung của ${t.name} sang thăm.`, 'latthe');
     const sk = sockOf(t.id); if (sk) { sk.emit('keoKet', { lost: true }); setTimeout(() => { if (t.loc === 'tamcung') { t.outfit = C.RANKS[t.rank].outfit; enter(t, 'phong', sk); push(t); } }, 3500); } }
   push(t); push(a); save();
 }
@@ -1978,7 +1980,7 @@ io.on('connection', sock => {
       else if (d.kind === 'thalanh') { if (!t.lanh) { N.tau = 0; return toast(me, 'Người này không ở lãnh cung.'); } t.lanh.tasks++; say('Thôi được, nể nàng, trẫm sẽ cho người xét lại.'); toast(t, `🙏 ${me.name} xin Hoàng thượng tha tội cho bổn cung. Tiến độ phục vị ${t.lanh.tasks}/3.`, 'good'); diary(me, `Xin Hoàng thượng khoan dung cho ${t.name} ở lãnh cung.`); if (t.lanh.tasks >= 3) phucVi(t, 2, 'nhờ có người cầu xin Hoàng thượng'); }
       else if (d.kind === 'noixau') {
         if (sisters(me, t)) { N.tau = 0; return toast(me, 'Sao nỡ nói xấu tỷ muội.'); } if (t.lanh) { N.tau = 0; return; }
-        if (Math.random() < .62) { t.sung = Math.max(0, t.sung - 15); say(`Thật sao? Trẫm không ngờ ${t.name} lại như vậy…`); diary(me, `Thì thầm với Hoàng thượng về ${t.name}. Người có vẻ tin.`); toast(t, '🗣 Có tin đồn ai đó nói xấu bổn cung bên gối Hoàng thượng (sủng ái -15).', 'bad'); }
+        if (Math.random() < .62) { t.sung = Math.max(0, t.sung - 15); say(`Thật sao? Trẫm không ngờ ${t.name} lại như vậy…`); diary(me, `Thì thầm với Hoàng thượng về ${t.name}. Người có vẻ tin.`); toast(t, '🗣 Có tin đồn ai đó nói xấu bổn cung bên gối Hoàng thượng (sủng ái -15). Xem ✉️ Thư.', 'bad'); harmMail(t, me, 'Đêm qua có người gối đầu tâu với Hoàng thượng nói xấu bổn cung. Hoàng thượng tin lời, sủng ái -15.'); }
         else { me.sung = Math.max(0, me.sung - 10); relAdd(me, 'thaihau', -3, 'đố kỵ nói xấu người khác'); say('Nàng cũng biết đố kỵ sao? Trẫm không thích nghe chuyện này.'); diary(me, `Nói xấu ${t.name} với Hoàng thượng, bị người quở là đố kỵ.`); toast(me, 'Hoàng thượng chê bổn cung đố kỵ (sủng ái -10).', 'bad'); }
       } else { N.tau = 0; return; }
       push(t);
@@ -2079,26 +2081,24 @@ io.on('connection', sock => {
       news(`✂️ ${me.name} cắt áo đoạn nghĩa, rời nhóm tỷ muội "${g.name}".`);
       if (g.members.length < 2) { for (const id of g.members) { const q = P(id); if (q) { q.sis = null; push(q); } } delete DB.state.groups[g.id]; } else pushGroup(g);
       push(me); save();
-    } else if (op === 'donate') {
-      const g = grp(me); if (!g) return; const amt = Math.max(10, Math.min(500, Math.floor(+d.amount || 0)));
-      if (me.silver < amt) return toast(me, 'Không đủ bạc.', 'bad'); me.silver -= amt; g.fund += amt;
-      if (g.fund >= gGoal(g)) {
-        g.fund -= gGoal(g); g.goal = Math.min(1000, g.goal + 100);
-        for (const id of g.members) { const q = P(id); if (q) { q.haiLong = Math.min(100, q.haiLong + 10); addPts(q, 30); relAdd(q, 'thaihau', 8, 'cùng tỷ muội may áo dâng ai gia'); toast(q, '🧵 Áo gấm tỷ muội may xong, dâng Thái hậu: hài lòng +10, công trạng +30.', 'good'); } }
-        news(`🧵 Tỷ muội "${g.name}" góp lụa may áo gấm dâng Thái hậu. Thái hậu khen ngợi cả nhóm.`, 'an');
-      } else toast(me, `Đã góp ${amt} bạc. Quỹ may áo: ${g.fund}/${gGoal(g)}.`, 'good');
+    } else if (op === 'mayao') { // dùng ngân khố may áo gấm dâng Thái hậu
+      const g = grp(me); if (!g) return; const cost = gGoal(g);
+      if ((g.bank || 0) < cost) return toast(me, `Ngân khố cần ${cost} bạc để may áo (đang có ${g.bank || 0}).`, 'bad');
+      g.bank -= cost; g.goal = Math.min(1000, g.goal + 100);
+      for (const id of g.members) { const q = P(id); if (q) { q.haiLong = Math.min(100, q.haiLong + 10); addPts(q, 30); relAdd(q, 'thaihau', 8, 'cùng tỷ muội may áo dâng ai gia'); toast(q, `🧵 ${me.name} dùng ngân khố may áo gấm dâng Thái hậu: cả nhóm hài lòng +10, công trạng +30.`, 'good'); } }
+      news(`🧵 Tỷ muội "${g.name}" may áo gấm dâng Thái hậu. Thái hậu khen ngợi cả nhóm.`, 'an');
       pushGroup(g); save();
-    } else if (op === 'nap') { // góp bạc vào ngân khố nhóm
+    } else if (op === 'nap' || op === 'donate') { // góp bạc vào ngân khố nhóm
       const g = grp(me); if (!g) return; const amt = Math.max(10, Math.min(500, Math.floor(+d.amount || 0)));
       if (me.silver < amt) return toast(me, 'Không đủ bạc.', 'bad'); me.silver -= amt; g.bank = (g.bank || 0) + amt;
-      for (const id of g.members) { const q = P(id); if (q && q.id !== me.id) toast(q, `🏮 ${me.name} góp ${amt} bạc vào ngân khố tỷ muội (${g.bank}).`); }
+      for (const id of g.members) { const q = P(id); if (q && q.id !== me.id) toast(q, `🪙 ${me.name} góp ${amt} bạc vào ngân khố tỷ muội (${g.bank}).`); }
       toast(me, `Đã góp ${amt} bạc vào ngân khố. Ngân khố: ${g.bank} bạc.`, 'good'); pushGroup(g); save();
     } else if (op === 'upgrade') {
       const g = grp(me); if (!g) return; if (g.members[0] !== me.id) return toast(me, 'Chỉ chủ nhóm mới nâng cấp được.');
       const nx = G_LV[(g.lv || 0) + 1]; if (!nx) return toast(me, 'Nhóm đã đạt cấp cao nhất.');
       if ((g.bank || 0) < nx.cost) return toast(me, `Ngân khố cần ${nx.cost} bạc (đang có ${g.bank || 0}).`, 'bad');
       g.bank -= nx.cost; g.lv = (g.lv || 0) + 1;
-      for (const id of g.members) { const q = P(id); if (q) toast(q, `🏮 Nhóm tỷ muội "${g.name}" nâng cấp: nay được tối đa ${nx.max} người.`, 'good'); }
+      for (const id of g.members) { const q = P(id); if (q) toast(q, `🪙 Nhóm tỷ muội "${g.name}" nâng cấp: nay được tối đa ${nx.max} người.`, 'good'); }
       pushGroup(g); save();
     } else if (op === 'cautinh') {
       const t = P(d.who); if (!t || !sisters(me, t)) return;
@@ -2293,6 +2293,9 @@ io.on('connection', sock => {
   sock.on('mail', d => {
     if (!me || !d) return; freshDay(me); const op = d.op;
     if (op === 'list') { for (const m of me.mail || []) m.read = true; sock.emit('mailList', mailView(me)); push(me); save(); return; }
+    if (op === 'reveal') { const m = (me.mail || []).find(x => x.id === d.id && x.kind === 'han'); if (!m || m.revealed) return;
+      if (me.silver < 50) return toast(me, 'Cần 50 bạc lót tay Tổng quản thái giám.', 'bad'); me.silver -= 50; m.revealed = true; relAdd(me, 'tonggiam', 2, 'nhờ dò la kẻ hại mình');
+      toast(me, `👁 Tổng quản thì thầm: là ${m.byName} (${m.byRank}).`, 'info'); sock.emit('mailList', mailView(me)); push(me); save(); return; }
     if (op === 'del') { me.mail = (me.mail || []).filter(m => m.id !== d.id); sock.emit('mailList', mailView(me)); save(); return; }
     if (op === 'send') {
       const t = P(d.to); if (!t || t.id === me.id) return toast(me, 'Chọn người nhận.', 'bad');
@@ -2557,7 +2560,7 @@ loadDB().then(() => {
   { const seen = {}; for (const g of Object.values(DB.state.groups || {}).sort((a, b) => (a.created || 0) - (b.created || 0))) { const k = gNorm(g.name); if (!seen[k]) { seen[k] = 1; continue; } const base = String(g.name).trim().replace(/\s+/g, ' '); let n = 2; while (gNameTaken(base + ' ' + n, g.id)) n++; console.log('đổi tên nhóm trùng:', g.name, '->', base + ' ' + n); g.name = base + ' ' + n; } }
   // nhóm bị đổi tên vì trùng (thêm số phía sau): gửi thư cho chủ nhóm, cho 24 giờ tự đổi tên
   // cấp nhóm: nhóm cũ đã đông người giữ đủ chỗ hiện có
-  for (const g of Object.values(DB.state.groups || {})) if (g.lv == null) { g.lv = g.members.length > 6 ? 2 : g.members.length > 4 ? 1 : 0; g.bank = g.bank || 0; }
+  for (const g of Object.values(DB.state.groups || {})) { if (g.lv == null) g.lv = g.members.length > 6 ? 2 : g.members.length > 4 ? 1 : 0; g.bank = (g.bank || 0) + (g.fund || 0); g.fund = 0; }
   if (!DB.state.gRenameMail1) { DB.state.gRenameMail1 = 1; const G = Object.values(DB.state.groups || {});
     for (const g of G) { const m = String(g.name).match(/^(.*) (\d+)$/); if (!m || !G.some(x => x.id !== g.id && gNorm(x.name) === gNorm(m[1]))) continue;
       g.renameUntil = now() + 24 * 3600e3; const f = P(g.members[0]);
