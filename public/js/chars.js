@@ -84,6 +84,10 @@ export { aim, v3 };
 // đặt tay theo tư thế bế em bé (lấy từ động tác ru con); trả về false nếu chưa tải xong
 export function cradleArms(c) { if (!CRADLE) return false; c._cradleOk = true; c.root.traverse(o => { if (o.isBone && CRADLE[o.name] && !/Spine2|Neck|Head/.test(o.name)) o.quaternion.copy(CRADLE[o.name]); }); c.root.updateMatrixWorld(true); return true; }
 
+const _cy = new THREE.Vector3(0, 1, 0), _cq = new THREE.Quaternion(), _cw = new THREE.Quaternion(), _cp = new THREE.Quaternion();
+function turnWorld(root, bone, ang) { if (!bone) return; _cy.set(0, 1, 0).applyQuaternion(root.getWorldQuaternion(_cp)); _cq.setFromAxisAngle(_cy, ang); bone.getWorldQuaternion(_cw); _cw.premultiply(_cq); bone.parent.getWorldQuaternion(_cp); bone.quaternion.copy(_cp.invert().multiply(_cw)); bone.updateWorldMatrix(false, true); }
+export const CLAP = { a: .14 };
+function clapWiden(c) { turnWorld(c.root, c.B.lArm, CLAP.a); turnWorld(c.root, c.B.rArm, -CLAP.a); }
 let HT_IDLE = null, HT_G = []; // Hoàng thượng đứng khoanh tay (cắt đoạn giữa của động tác, lặp mượt)
 export async function spawn(modelName) {
   const g = await loadModel(modelName);
@@ -144,6 +148,7 @@ export async function spawn(modelName) {
       aim(root, B.rArm, B.rFore, v3([-.18, -.9, .38])); aim(root, B.rFore, B.rHand, v3([.35, -.25, .9]));
     }
     if (male && !isHT && c.curName === 'dung_cho' && !c.pose) { root.updateMatrixWorld(true); maleStance(c); }
+    if (c.curName === 'vo_tay' && !male) { root.updateMatrixWorld(true); clapWiden(c); } // vai nữ hẹp hơn mô hình gốc: tách hai tay ra cho khỏi xuyên vào nhau
     if (c.pose) { root.updateMatrixWorld(true); POSES[c.pose](c, c.t); }
     if (c.post) { root.updateMatrixWorld(true); c.post(c, c.t); }
     if (c.post2) { root.updateMatrixWorld(true); c.post2(c, c.t); }

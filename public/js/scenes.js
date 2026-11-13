@@ -407,6 +407,56 @@ function duongtamProps(o) {
   o.goTable = { obj: lh, board: lh.userData.board, seats: [{ ...at(.56), ry: ry - Math.PI / 2, top: .36, kind: 'chair' }, { ...at(-.56), ry: ry + Math.PI / 2, top: .36, kind: 'chair' }] };
   o.blocks = [...(o.blocks || []), { x: X, z: Z - .5, r: .5 }, { x: X, z: Z + .5, r: .5 }];
 }
+// ---------- Ngự hoa viên ban đêm: đèn lồng thắp sáng, trăng sao ----------
+let GLOW_TEX = null;
+function glowTex() { if (GLOW_TEX) return GLOW_TEX; const c = document.createElement('canvas'); c.width = c.height = 64; const x = c.getContext('2d'); const gr = x.createRadialGradient(32, 32, 0, 32, 32, 32); gr.addColorStop(0, 'rgba(255,220,150,1)'); gr.addColorStop(.35, 'rgba(255,150,60,.55)'); gr.addColorStop(1, 'rgba(255,120,40,0)'); x.fillStyle = gr; x.fillRect(0, 0, 64, 64); GLOW_TEX = new THREE.CanvasTexture(c); return GLOW_TEX; }
+function gardenNight(o, sun) {
+  const g = o.group, N = new THREE.Group(); N.visible = false; g.add(N);
+  const red = new THREE.MeshStandardMaterial({ color: 0xc8261c, emissive: 0xff5a1e, emissiveIntensity: 0, roughness: .6 });
+  const gold = new THREE.MeshStandardMaterial({ color: 0xc9a227, metalness: .5, roughness: .4 }), wood = new THREE.MeshStandardMaterial({ color: 0x3a2014, roughness: .8 });
+  const glowM = new THREE.SpriteMaterial({ map: glowTex(), color: 0xffb060, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, opacity: 0 });
+  const lanternGeo = new THREE.SphereGeometry(.17, 14, 10), capGeo = new THREE.CylinderGeometry(.09, .11, .05, 12), tasGeo = new THREE.CylinderGeometry(.012, .012, .16, 4);
+  const lanterns = [];
+  const lantern = (parent, x, y, z, s = 1) => { const l = new THREE.Group(); l.position.set(x, y, z); l.scale.setScalar(s); parent.add(l);
+    const b = new THREE.Mesh(lanternGeo, red); b.scale.y = 1.15; l.add(b);
+    for (const cy of [.2, -.2]) { const cp = new THREE.Mesh(capGeo, gold); cp.position.y = cy; l.add(cp); }
+    const ts = new THREE.Mesh(tasGeo, red); ts.position.y = -.31; l.add(ts);
+    const sp = new THREE.Sprite(glowM); sp.scale.setScalar(1.5); l.add(sp); lanterns.push(l); return l; };
+  // cột treo đèn dọc lối đi
+  const post = (x, z) => { const p = new THREE.Group(); p.position.set(x, 0, z); N.add(p);
+    const c = new THREE.Mesh(new THREE.CylinderGeometry(.04, .05, 2.1, 8), wood); c.position.y = 1.05; p.add(c);
+    const arm = new THREE.Mesh(new THREE.BoxGeometry(.5, .04, .04), wood); arm.position.set(-Math.sign(x) * .22, 2.05, 0); p.add(arm);
+    lantern(p, -Math.sign(x) * .42, 1.7, 0, .9); };
+  for (const z of [-7.5, -4.5, -1.5, 4, 7, 10.5]) for (const sx of [-1, 1]) post(sx * 1.35, z);
+  // hai đầu cầu và giữa cầu
+  for (const z of [12.1, 16, 19.9]) for (const sx of [-1, 1]) lantern(N, sx * .66, 1.0, z, .7);
+  // đình Vọng Nguyệt: đèn treo bốn góc mái
+  for (const sx of [-1, 1]) for (const sz of [-1, 1]) lantern(N, sx * 1.75, 2.45, 23.4 + sz * 1.55, .95);
+  // đình ngắm cá và tường cung
+  for (const a of [0, 1.57, 3.14, 4.71]) lantern(N, 4 + Math.cos(a) * 1.55, 2.0, -3 + Math.sin(a) * 1.55, .8);
+  for (const x of [-9, -6, -3, 3, 6, 9]) lantern(N, x, 2.2, -9.6, .85);
+  for (const z of [-6, 0, 5, 13, 19, 24]) for (const sx of [-1, 1]) lantern(N, sx * 11.6, 2.2, z, .85);
+  // đèn hoa sen nổi trên hồ
+  const lotusM = [0xffd27a, 0xff9fb8, 0xffb36a].map(c => new THREE.MeshStandardMaterial({ color: c, emissive: c, emissiveIntensity: 0, roughness: .5 }));
+  const lotusGlow = [];
+  for (let k = 0; k < 9; k++) { const x = (k % 2 ? 1 : -1) * (1.8 + (k * 1.37) % 3.3), z = 16 + ((k * 2.1) % 4.4) - 2.2; const lg = new THREE.Group(); lg.position.set(x, .06, z); N.add(lg);
+    for (let p = 0; p < 6; p++) { const pe = new THREE.Mesh(new THREE.SphereGeometry(.07, 8, 6), lotusM[k % 3]); pe.scale.set(.6, 1.4, .35); pe.position.set(Math.cos(p) * .06, .07, Math.sin(p) * .06); pe.rotation.set(Math.sin(p) * .5, 0, -Math.cos(p) * .5); lg.add(pe); }
+    const sp = new THREE.Sprite(glowM); sp.scale.setScalar(.7); sp.position.y = .1; lg.add(sp); lotusGlow.push(lg); }
+  // vài nguồn sáng thật (ít để điện thoại chạy mượt)
+  const PL = [[0, 1.6, 16], [0, 2.2, 23.4], [0, 2, -3], [4, 2, -3], [-4.5, 1.8, -1], [0, 2, 9.5]].map(([x, y, z]) => { const l = new THREE.PointLight(0xffa050, 0, 12, 1.4); l.position.set(x, y, z); N.add(l); return l; });
+  // trăng và sao
+  const moon = new THREE.Mesh(new THREE.SphereGeometry(1.6, 24, 16), new THREE.MeshBasicMaterial({ color: 0xfff4d6, fog: false })); moon.position.set(-14, 22, 40); N.add(moon);
+  const mg = new THREE.Sprite(new THREE.SpriteMaterial({ map: glowTex(), color: 0xfff0c8, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, fog: false, opacity: .6 })); mg.scale.setScalar(9); mg.position.copy(moon.position); N.add(mg);
+  const sv = []; for (let k = 0; k < 260; k++) { const a = Math.random() * Math.PI * 2, e = .25 + Math.random() * 1.1, r = 60; sv.push(Math.cos(a) * Math.cos(e) * r, Math.sin(e) * r, Math.sin(a) * Math.cos(e) * r + 8); }
+  const sg = new THREE.BufferGeometry(); sg.setAttribute('position', new THREE.Float32BufferAttribute(sv, 3)); N.add(new THREE.Points(sg, new THREE.PointsMaterial({ color: 0xffffff, size: .35, fog: false })));
+  const day = { int: sun.intensity, col: sun.color.getHex() };
+  o.nightLights = { hemi: [0x6a78b0, 0x1c1420, .8], bg: 0x0a1028, fog: [0x121a34, .016], exposure: 1.2 };
+  o.isNight = false;
+  o.setNight = on => { o.isNight = on; N.visible = on; red.emissiveIntensity = on ? .75 : 0; glowM.opacity = on ? .85 : 0; for (const lm of lotusM) lm.emissiveIntensity = on ? .9 : 0; for (const l of PL) l.intensity = on ? 9 : 0; sun.intensity = on ? .22 : day.int; sun.color.setHex(on ? 0x9fb4ff : day.col); };
+  // đèn lồng đung đưa nhẹ
+  o.nightTick = tt => { if (!on()) return; for (let i = 0; i < lanterns.length; i++) lanterns[i].rotation.z = Math.sin(tt * 1.3 + i) * .05; for (let i = 0; i < lotusGlow.length; i++) lotusGlow[i].position.y = .06 + Math.sin(tt * 1.1 + i * 2) * .015; };
+  const on = () => o.isNight;
+}
 function garden(o) {
   const m = mats(), t = textures(), g = o.group;
   const gr = new THREE.Mesh(new THREE.PlaneGeometry(36, 50), new THREE.MeshStandardMaterial({ map: t.grass, roughness: 1 })); gr.rotation.x = -Math.PI / 2; gr.position.z = 8; gr.receiveShadow = true; gr.name = 'ground'; g.add(gr);
@@ -442,6 +492,7 @@ function garden(o) {
   const sun = new THREE.DirectionalLight(0xfff2d8, 3); sun.position.set(6, 10, 5); sun.castShadow = true; sun.shadow.mapSize.set(2048, 2048); sun.position.set(7, 14, 14); sun.target.position.set(0, 0, 8); Object.assign(sun.shadow.camera, { left: -16, right: 16, top: 20, bottom: -20, far: 60 }); g.add(sun, sun.target);
   gardenSouth(o, m, t, tree);
   o.lights = { hemi: [0xdff0ff, 0x6a7a4a, 1.8], bg: 0xa9d3ea, fog: [0xcfe3ea, .013], exposure: 1.2 };
+  gardenNight(o, sun);
   o.bounds = { minX: -11, maxX: 11, minZ: -9, maxZ: 25 };
   o.blocks = [{ x: -4.5, z: -1, r: 3.1 }, { x: 4, z: -3, r: .55 }, ...o.seats.map(s => ({ x: s.x, z: s.z, r: .2 })), ...o.southBlocks];
   o.floorAt = (x, z) => Math.hypot(x - 4, z + 3) < 1.72 ? .25 : (Math.abs(x) < .7 && z > 12.1 && z < 19.9) ? .16 : (Math.abs(x) < 2.05 && Math.abs(z - 23.4) < 1.85) ? .34 : 0;

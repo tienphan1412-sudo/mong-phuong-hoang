@@ -110,7 +110,7 @@ async function enterScene(loc, players, venue, seatId) {
     if (ht?.c) { const r = ht.c.root, px = r.position.x, pz = r.position.z, ry = r.rotation.y; r.position.set(0, 0, 0); r.rotation.y = 0; const sp = seatPlacement(ht.c); o.bedTop = sp.y; o.bed.scale.y = Math.max(.6, sp.y / .38); r.position.set(px, 0, pz); r.rotation.y = ry; ht.c.play(ht.idle || 'dung_cho'); ht.home = { x: px, z: pz, ry }; }
   }
   clearWorld();
-  world = o; scene.add(o.group); applyLights(o.lights); if (loc === 'lanhcung') setTimeout(lanhEnter, 800);
+  world = o; scene.add(o.group); applyLights(o.lights); gardenTime(true); if (loc === 'lanhcung') setTimeout(lanhEnter, 800);
   if (o.steamAt) startSteam(o);
   camDist = o.cam.dist; camH = o.cam.height; camYaw = 0;
   if (selfC) selfC.root.rotation.x = 0; lying = false;
@@ -162,6 +162,10 @@ function clickWorld(e) {
   if (world.bed && ray.intersectObject(world.bed, true).length) return openBed();
   if (world.brazier && ray.intersectObject(world.brazier, true).length) return clueTro();
   if (cookTarget && ray.intersectObject(cookTarget.g, true).length) return cookTarget.fn();
+  if (cookTarget && cooking) { // bấm gần vòng xanh hoặc vào món đồ (kệ, thớt, bếp) cũng được
+    const p = cookTarget.g.position, hits = ray.intersectObjects(world.group.children, true).slice(0, 3);
+    if (hits.some(h => Math.hypot(h.point.x - p.x, h.point.z - p.z) < 1.3)) return cookTarget.fn();
+    return; }
   if (taiOn) return;
   if (world.myBed && !lying && ray.intersectObject(world.myBed.obj, true).length) return openMyBed();
   if (world.kangs?.length && !lying) { const K = world.kangs.find(k => ray.intersectObject(k.obj, true).length); if (K) return openKang(K); }
@@ -217,6 +221,7 @@ renderer.setAnimationLoop(() => {
     if (selfC) selfC.update(dt);
     for (let i = FX.length; i--;) if (FX[i](dt) === false) FX.splice(i, 1);
     if (kidEnts.size || me?.children?.length) kidFrame(dt);
+    if (world.nightTick) world.nightTick(T);
     if (world.flicker) for (const L of world.flicker) L.intensity = 2 + Math.sin(T * 9 + L.id) * .25 + Math.random() * .2;
     if (stage) stage.update(dt);
     else if (specCam && Date.now() < specCam.until && world.loc === specCam.loc) {  camera.position.lerp(specCam.pos, Math.min(1, dt * 3)); camera.lookAt(specCam.look); }
@@ -1961,9 +1966,10 @@ function ringAt(x, y, z, r = .32) {
   world.group.add(g); let t = 0; FX.push(dt => { if (!g.parent) return false; t += dt; const k = 1 + Math.sin(t * 5) * .08; ring.scale.set(k, k, k); ring.rotation.z += dt * 1.2; });
   return { g, hit };
 }
+function kitchenFocus(x, z) { if (specCam?.loc !== 'ngutien' || innerWidth / innerHeight > 1.5) return; specCam.pos.set(x * .6, 6.2, z + 5.2); specCam.look.set(x * .8, .3, z - .6); }
 function setCookTarget(pos, label, fn) {
-  clearCookTarget(); const R = ringAt(pos.x, pos.y, pos.z, pos.r);
-  const d = document.createElement('div'); d.innerHTML = `<div class="cktip">${esc(label)}</div>`; const lb = new CSS2DObject(d); lb.position.set(pos.x, pos.y + .4, pos.z); world.group.add(lb);
+  clearCookTarget(); if (world?.loc === 'ngutien') kitchenFocus(pos.x, pos.z); const R = ringAt(pos.x, pos.y, pos.z, pos.r);
+  const d = document.createElement('div'); d.innerHTML = `<div class="cktip">👆 ${esc(label)}</div>`; d.style.pointerEvents = 'auto'; d.style.cursor = 'pointer'; d.onclick = e => { e.stopPropagation(); cookTarget?.fn(); }; const lb = new CSS2DObject(d); lb.position.set(pos.x, pos.y + .4, pos.z); world.group.add(lb);
   cookTarget = { ...R, lb, fn: () => { const f = fn; clearCookTarget(); f(); } };
 }
 function clearCookTarget() { if (!cookTarget) return; cookTarget.lb.element.remove(); cookTarget.lb.parent?.remove(cookTarget.lb); cookTarget.g.parent?.remove(cookTarget.g); cookTarget = null; }
@@ -2474,7 +2480,7 @@ async function syncVua() {
   if (!mode || vuaHT) return;
   const w = world; vuaHT = { w, mode, loading: true, c: null, n: null };
   const c = await spawn('hoangthuong'); if (world !== w || vuaHT?.w !== w || vuaHT.mode !== mode) { c.dispose(); return; }
-  if (mode === 'den') { c.root.position.set(-1.25, 0, -.4); c.root.rotation.y = -Math.PI / 2 - .3; }
+  if (mode === 'den') { c.root.position.set(.2, w.floorAt ? w.floorAt(.2, 13.7) : .16, 13.7); c.root.rotation.y = Math.PI / 2; }
   else if (mode === 'visit') { c.root.position.set(0, 0, .6); c.root.rotation.y = Math.PI; }
   else if (mode === 'khao') { c.root.position.set(.7, 0, -2.0); c.root.rotation.y = 0; }
   c.play(mode === 'walk' ? 'di' : 'dung_cho'); w.group.add(c.root);
@@ -2486,20 +2492,61 @@ async function syncVua() {
 }
 // theo sau Hoàng thượng khi đang hầu dạo vườn
 setInterval(() => { if (!vuaFollow || !vuaHT?.c || !selfC || seated || chairSeat) return; const h = vuaHT.c.root, p = vuaHT.pos; let bx, bz; if (p?.stop) { bx = h.position.x + Math.sin(h.rotation.y + 1.2) * .8; bz = h.position.z + Math.cos(h.rotation.y + 1.2) * .8; } else { bx = h.position.x - Math.sin(h.rotation.y) * .9; bz = h.position.z - Math.cos(h.rotation.y) * .9; } const dd = Math.hypot(bx - selfC.root.position.x, bz - selfC.root.position.z); if (dd > 6) { const q = clampPos(bx, bz); selfC.root.position.set(q.x, world.floorAt ? world.floorAt(q.x, q.z) : 0, q.z); selfC.target = null; sendMove('dung_cho'); } else if (dd > .35) selfC.target = clampPos(bx, bz); else if (p?.stop && !selfC.target) { const want = Math.atan2(h.position.x - selfC.root.position.x, h.position.z - selfC.root.position.z); if (Math.abs(want - selfC.root.rotation.y) > .3) { selfC.root.rotation.y = want; sendMove('dung_cho'); } } }, 300);
-// hoa đăng trôi trên hồ
+// hoa đăng trôi trên hồ sen lớn (cầu đá ở giữa, tâm hồ z=16)
+let HD = null; loadModel('hoadang').then(g => { HD = g.scene; HD.traverse(o => { if (o.isMesh) { o.castShadow = false; o.material = o.material.clone(); o.material.emissive = new THREE.Color(0xffa040); o.material.emissiveMap = o.material.map; o.material.emissiveIntensity = 1.1; } }); }).catch(() => {});
+let HD_GLOW = null;
 function lanternMesh() {
-  const g = new THREE.Group(); const m = lanternMesh.m || (lanternMesh.m = { p: new THREE.MeshStandardMaterial({ color: 0xff8fa8, emissive: 0xff5a3c, emissiveIntensity: .9, side: THREE.DoubleSide }), f: new THREE.MeshBasicMaterial({ color: 0xffe08a }) });
-  for (let k = 0; k < 6; k++) { const pt = new THREE.Mesh(new THREE.ConeGeometry(.07, .12, 4, 1, true), m.p); pt.rotation.z = .5; pt.rotation.y = k / 6 * Math.PI * 2; pt.position.set(Math.cos(k / 6 * Math.PI * 2) * .05, .05, Math.sin(k / 6 * Math.PI * 2) * .05); g.add(pt); }
-  const fl = new THREE.Mesh(new THREE.SphereGeometry(.025, 8, 6), m.f); fl.position.y = .08; g.add(fl); return g;
+  const g = new THREE.Group();
+  if (HD) { const m = HD.clone(); m.scale.setScalar(.36); g.add(m); }
+  else { const m = lanternMesh.m || (lanternMesh.m = { p: new THREE.MeshStandardMaterial({ color: 0xff8fa8, emissive: 0xff5a3c, emissiveIntensity: .9, side: THREE.DoubleSide }), f: new THREE.MeshBasicMaterial({ color: 0xffe08a }) });
+    for (let k = 0; k < 6; k++) { const pt = new THREE.Mesh(new THREE.ConeGeometry(.07, .12, 4, 1, true), m.p); pt.rotation.z = .5; pt.rotation.y = k / 6 * Math.PI * 2; pt.position.set(Math.cos(k / 6 * Math.PI * 2) * .05, .05, Math.sin(k / 6 * Math.PI * 2) * .05); g.add(pt); } }
+  if (!HD_GLOW) { const c = document.createElement('canvas'); c.width = c.height = 64; const x = c.getContext('2d'); const gr = x.createRadialGradient(32, 32, 0, 32, 32, 32); gr.addColorStop(0, 'rgba(255,225,150,1)'); gr.addColorStop(.4, 'rgba(255,160,70,.5)'); gr.addColorStop(1, 'rgba(255,120,40,0)'); x.fillStyle = gr; x.fillRect(0, 0, 64, 64); HD_GLOW = new THREE.SpriteMaterial({ map: new THREE.CanvasTexture(c), transparent: true, depthWrite: false, blending: THREE.AdditiveBlending }); }
+  const sp = new THREE.Sprite(HD_GLOW); sp.scale.setScalar(.75); sp.position.y = .12; g.add(sp);
+  // bóng đèn in xuống mặt nước
+  const rf = new THREE.Sprite(HD_GLOW); rf.scale.set(.35, .7, 1); rf.position.y = -.12; rf.material = HD_GLOW; g.add(rf);
+  return g;
+}
+const hashId = id => { let h = 0; for (const ch of String(id)) h = (h * 31 + ch.charCodeAt(0)) >>> 0; return h; };
+// điểm đứng thả đèn trên cầu: hai bên lan can, cạnh Hoàng thượng
+function denSpot(id) { const h = hashId(id), side = h % 2 ? 1 : -1; return { x: side * .38, z: 13.1 + (h % 9) * .3, side }; }
+let denMine = 0, denFrom = null, denSettle = true;
+function addLantern(x, from) {
+  const g = lanternMesh(), h = hashId(x.id), side = from?.side ?? (h % 2 ? 1 : -1);
+  // quỹ đạo: trôi ra giữa nửa hồ rồi lững lờ quanh một điểm
+  const tx = side * (2 + (h % 30) / 10), tz = 16 + ((h >> 5) % 50) / 10 - 2.5, ez = Math.min(1, Math.sqrt(Math.max(0, 1 - (tx * tx) / 31)) * 2.9);
+  const goal = { x: tx, z: Math.max(16 - ez, Math.min(16 + ez, tz)) };
+  const st = from ? { x: from.x, y: from.y, z: from.z } : { x: side * .3, y: .05, z: 13 + (h % 13) * .5 };
+  g.position.set(st.x, st.y, st.z); world.group.add(g);
+  const lb = makeLabel('', '', true); lb.element.innerHTML = `<div style="font-size:10px;color:#ffe9b0;max-width:110px;white-space:normal;text-align:center;text-shadow:0 0 4px #000">🏮 ${esc(x.name)}</div>`; lb.position.set(0, .38, 0); g.add(lb);
+  const o = { g, w: world }; vuaLan.set(x.id, o); let t = from ? 0 : (x.settled ? 30 : 1.4); const sp = .12 + (h % 7) / 50;
+  FX.push(dt => { if (!g.parent) { lb.element.remove(); return false; } t += dt;
+    if (t < 1.4) { const k = t / 1.4; g.position.set(st.x + side * .55 * k, st.y + (.05 - st.y) * k * k, st.z); return; }
+    const k = Math.min(1, (t - 1.4) / 14), e = k * k * (3 - 2 * k), bx = st.x + side * .55 + (goal.x - st.x - side * .55) * e, bz = st.z + (goal.z - st.z) * e;
+    const wob = t * sp; g.position.set(bx + Math.sin(wob) * .25 * e, .05 + Math.sin(t * 1.6 + h) * .012, bz + Math.cos(wob * .8) * .2 * e); g.rotation.y = t * .15; });
 }
 function syncLanterns() {
   const want = world?.loc === 'hoavien' && vua.den ? vua.den.list : [];
-  for (const [id, o] of vuaLan) if (o.w !== world || !want.some(x => x.id === id)) { o.g.parent?.remove(o.g); vuaLan.delete(id); }
-  for (const x of want) { if (vuaLan.has(x.id)) continue; const g = lanternMesh(); let h = 0; for (const ch of x.id) h = (h * 31 + ch.charCodeAt(0)) >>> 0;
-    const a0 = (h % 360) / 57.3, r = .8 + (h % 17) / 10, sp = .05 + (h % 7) / 100; g.position.set(-4.5 + Math.cos(a0) * r, .05, -1 + Math.sin(a0) * r); world.group.add(g);
-    const lb = makeLabel('', '', true); lb.element.innerHTML = `<div style="font-size:10px;color:#ffe9b0;max-width:110px;white-space:normal;text-align:center">🏮 ${esc(x.name)}</div>`; lb.position.set(0, .3, 0); g.add(lb);
-    const o = { g, w: world }; vuaLan.set(x.id, o); let t = h % 100;
-    FX.push(dt => { if (!g.parent) { lb.element.remove(); return false; } t += dt; const a = a0 + t * sp; g.position.x = -4.5 + Math.cos(a) * r; g.position.z = -1 + Math.sin(a) * r; g.position.y = .04 + Math.sin(t * 1.7) * .012; g.rotation.y = t * .3; }); }
+  if (syncLanterns.w !== world) { denSettle = true; syncLanterns.w = world; }
+  for (const [id, o] of vuaLan) if (o.w !== world || (id !== 'ht' && !want.some(x => x.id === id))) { o.g.parent?.remove(o.g); vuaLan.delete(id); }
+  if (!want.length && vuaLan.has('ht')) { vuaLan.get('ht').g.parent?.remove(vuaLan.get('ht').g); vuaLan.delete('ht'); }
+  for (const x of want) { if (vuaLan.has(x.id)) continue; if (x.id === me?.id && Date.now() < denMine) continue; addLantern(denSettle ? { ...x, settled: true } : x, x.id === me?.id ? denFrom : null); if (x.id === me?.id) denFrom = null; }
+  denSettle = false;
+}
+// cảnh thả đèn: đi ra cầu, quỳ bên lan can, đặt hoa đăng xuống nước; Hoàng thượng cũng thả một chiếc
+function denRelease() {
+  if (!selfC || world?.loc !== 'hoavien') return; const sp = denSpot(me.id); denMine = Date.now() + 15e3;
+  if (seated) standUp(); if (chairSeat) standChair();
+  { const r = selfC.root.position; if (Math.hypot(r.x - sp.x, r.z - sp.z) > 3) { r.set(sp.x, world.floorAt ? world.floorAt(sp.x, sp.z - 1.4) : 0, sp.z - 1.4); snapCam = true; sendMove('dung_cho'); } }
+  selfC.target = { x: sp.x, z: sp.z }; const t0 = Date.now();
+  const wait = setInterval(() => { const r = selfC.root.position, d = Math.hypot(r.x - sp.x, r.z - sp.z);
+    if (d > .12 && Date.now() - t0 < 14e3 && world?.loc === 'hoavien') return; clearInterval(wait); if (world?.loc !== 'hoavien') { denMine = 0; return; }
+    selfC.target = null; selfC.root.rotation.y = sp.side > 0 ? Math.PI / 2 : -Math.PI / 2; emote('quy1chan');
+    const H = vuaHT?.c; if (H && !vuaLan.has('ht')) { H.root.rotation.y = sp.side > 0 ? Math.PI / 2 : -Math.PI / 2; H.play('cui_chao', { restart: true }); setTimeout(() => { if (vuaHT?.c === H) H.play('dung_cho'); }, 3200); }
+    setTimeout(() => { if (world?.loc !== 'hoavien') return; const r2 = selfC.root.position; denFrom = { x: r2.x + sp.side * .3, y: .35, z: r2.z, side: sp.side }; denMine = 0; syncLanterns();
+      if (H && vuaHT?.c === H && !vuaLan.has('ht')) { const hp = H.root.position; addLantern({ id: 'ht', name: 'Hoàng thượng' }, { x: hp.x + sp.side * .35, y: .4, z: hp.z + .2, side: sp.side }); }
+      { const L3 = ['Nguyện cho giang sơn yên ổn, hậu cung an hòa.', 'Trẫm cùng nàng thả chiếc đèn này.', 'Hoa đăng trôi xa, ước nguyện sẽ thành.']; if (vuaHT?.c) bubble(vuaHT.c.label, L3[Math.floor(Math.random() * 3)]); } }, 1600);
+    setTimeout(() => { if (selfC && world?.loc === 'hoavien') { selfC.play('dung_cho'); socket.emit('emote', 'dung_cho'); } }, 4200);
+  }, 150);
 }
 socket.on('denEnd', d => { const o = vuaLan.get(d.id); if (o && world?.loc === 'hoavien') { const p = o.g.position; burst(p.x, .3, p.z, 60, .9, [0xffd77a, 0xff8fa8, 0xffffff], 1.6, .4, .06); }
   showScroll('🏮 Lời ước được Hoàng thượng nhặt', `<b>${esc(d.name)}</b>:<br><i>“${esc(d.wish)}”</i>`, [['Đóng', hideCut]]); });
@@ -2564,7 +2611,7 @@ function openDen() {
   <div class="btns" style="flex-wrap:wrap">${SUG.map((s, i) => `<button data-s="${i}" style="font-size:12px">${esc(s)}</button>`).join('')}</div>
   <div class="btns"><button class="gold" id="denOk">Thả hoa đăng</button></div>`);
   $('mcard').querySelectorAll('[data-s]').forEach(b => b.onclick = () => { $('denW').value = SUG[+b.dataset.s]; });
-  $('denOk').onclick = () => { socket.emit('vua', { op: 'den', wish: $('denW').value }); closeModal(); if (selfC) { selfC.target = clampPos(-1.6, -1); setTimeout(() => emote('quy'), 1500); } };
+  $('denOk').onclick = () => { socket.emit('vua', { op: 'den', wish: $('denW').value }); closeModal(); denRelease(); };
 }
 const vuaLeft = t => { const l = Math.max(0, t - Date.now()); return `${Math.floor(l / 60e3)}:${String(Math.floor(l % 60e3 / 1000)).padStart(2, '0')}`; };
 function vuaActs(add) {
@@ -3204,3 +3251,12 @@ function placeNotice() {
   n.style.cssText = `position:fixed;top:${Math.round(r.top)}px;left:${left}px;width:${Math.max(90, innerWidth - left - right)}px;height:${Math.round(r.height)}px;z-index:7`;
 }
 addEventListener('resize', () => setTimeout(placeNotice, 100)); setInterval(placeNotice, 2000);
+
+// Ngự hoa viên: 19h tới 6h sáng là trời tối, đèn lồng thắp sáng
+const vnHour = () => new Date(Date.now() + 7 * 3600e3).getUTCHours() + new Date(Date.now() + 7 * 3600e3).getUTCMinutes() / 60;
+function gardenTime(force) {
+  if (!world?.setNight) return; const h = vnHour(), night = window.__forceNight ?? (h >= 19 || h < 6);
+  if (!force && night === world.isNight) return;
+  world.setNight(night); applyLights(night ? world.nightLights : world.lights);
+}
+setInterval(() => gardenTime(false), 30e3);
