@@ -2248,8 +2248,12 @@ function openDay() {
 // =====================================================================
 // THÁNH CHỈ CẬP NHẬT: hiện một lần cho mỗi bản mới
 // =====================================================================
-const UPDATE_VER = 'u2026-11-13c';
+const UPDATE_VER = 'u2026-11-13d';
 const UPDATE_NOTES = [
+  ['🏯 Game đổi tên: Phượng Khởi Thâm Cung', 'Link mới: phuong-khoi-tham-cung.onrender.com. Link cũ vẫn tự chuyển sang, tài khoản giữ nguyên.'],
+  ['🪑 Ghế hậu cung theo lệ nhà Thanh', 'Quý nhân trở xuống không giới hạn ghế, ai đủ công trạng là lên và được tham gia cung đấu. Ghế cao giữ đúng lệ: 6 Tần, 4 Phi, 2 Quý phi, 1 Hoàng quý phi.'],
+  ['⏳ Ghế cao không được bỏ trống', 'Từ Tần trở lên vắng 2 ngày thì cáo bệnh, vắng 4 ngày phải nhường ghế cho người đang chờ (về lại Quý nhân, quay lại đủ công trạng thì lên lại).'],
+  ['🌙 Cung đông thì lật nhiều thẻ', 'Mỗi 10 người chờ ở Tẩm cung, Hoàng thượng lật thêm 1 thẻ, tối đa 3 người một lần.'],
   ['👘 Thay đồ cho con', 'Hoàng tử, công chúa có 2 bộ thường phục để mẹ chọn. Lễ phục (vàng cho Thái tử, đỏ phượng cho công chúa giỏi) tự mặc khi được sắc phong.'],
   ['🤱 Bế con trên tay', 'Bé sơ sinh nằm gọn trên cánh tay mẹ, đầu gối lên khuỷu tay. Hôn trán: mẹ nâng bé lên cúi xuống hôn; ôm con: mẹ khom người dang tay ôm.'],
   ['⏳ Sinh con', 'Chỉ chuyển dạ khi người mẹ đang online để cả cung chờ tin. Chờ tin còn 1 phút.'],

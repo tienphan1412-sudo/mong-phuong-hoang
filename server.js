@@ -883,7 +883,7 @@ function latThe(when = 'Đêm nay') {
     m *= 1 + 0.1 * (p.children || []).length; if (p.jewels?.includes('tramthuy')) m *= 1.15;
     return Math.max(0.05, (10 + p.sung + p.stats.tai * 0.5) * m);
   };
-  const n = pool.length > C.LAT_THE_CROWD ? 2 : 1, left = [...pool], picked = [];
+  const n = Math.min(C.LAT_THE_MAX || 2, 1 + Math.floor(pool.length / C.LAT_THE_CROWD)), left = [...pool], picked = [];
   for (let k = 0; k < n && left.length; k++) {
     const w = left.map(weight); let r = Math.random() * w.reduce((a, b) => a + b, 0), i = 0;
     for (; i < left.length - 1; i++) { r -= w[i]; if (r <= 0) break; }
@@ -1440,7 +1440,7 @@ function nightTick() {
     if (p.lanh || p.rank < C.PALACE_RANK) continue;
     const days = (now() - (p.lastSeen || now())) / 864e5;
     if (days >= C.ABSENT_SICK_DAYS && days < C.ABSENT_LOSE_DAYS && !p.sick && !online.has(p.id)) { p.sick = true; news(`${p.name} cáo bệnh, đã ${Math.floor(days)} ngày không ra khỏi cung.`); }
-    if (days >= C.ABSENT_LOSE_DAYS && !online.has(p.id)) { p.sick = false; const r = p.rank; p.rank = C.FIGHT_RANK - 1; p.trend = { dir: -1, t: now() }; p.outfit = C.RANKS[p.rank].outfit; news(`${p.name} vắng mặt quá lâu, nhường ghế ${C.RANKS[r].name}.`); freeSeatCheck(); }
+    if (days >= C.ABSENT_LOSE_DAYS && !online.has(p.id)) { p.sick = false; const r = p.rank; p.rank = C.PALACE_RANK - 1; p.waiting = true; p.trend = { dir: -1, t: now() }; p.outfit = C.RANKS[p.rank].outfit; news(`${p.name} vắng mặt quá lâu, nhường ghế ${C.RANKS[r].name}.`); freeSeatCheck(); }
   }
   checkDeadlines(); thaiTick(); kidTick(); sinhTick(); leTick(); housekeep(); hhTick(); eventTick(); npcDaily(); grudgeTick(); bigTick(); festTick(); if (v.getUTCHours() >= 3) backup();
   // vụ án do hệ thống dàn dựng khi cung vắng người

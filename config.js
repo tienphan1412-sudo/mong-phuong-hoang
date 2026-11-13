@@ -15,19 +15,20 @@ module.exports = {
   PROTECT_HOURS: 24,           // bảo hộ sau khi bị giáng cấp
   ATTACK_PER_DAY: 2,           // số lần được ra tay / ngày
   TARGETED_PER_DAY: 2,         // số lần bị nhắm / ngày
-  ABSENT_SICK_DAYS: 3,
-  ABSENT_LOSE_DAYS: 7,
+  ABSENT_SICK_DAYS: 2,         // từ Tần trở lên: vắng 2 ngày thì cáo bệnh
+  ABSENT_LOSE_DAYS: 4,         // vắng 4 ngày thì nhường ghế cho người đang chờ
   START_SILVER: 300,
 
   // cấp bậc: tên, điểm công trạng cần, số ghế (0 = không giới hạn), trang phục
+  // ghế theo lệ nhà Thanh: 1 Hoàng quý phi, 2 Quý phi, 4 Phi, 6 Tần; từ Quý nhân trở xuống không giới hạn
   RANKS: [
     { name: 'Tú nữ',          pts: 0,    seats: 0, outfit: 'tunu' },
     { name: 'Quan nữ tử',     pts: 30,   seats: 0, outfit: 'tunu' },
     { name: 'Đáp ứng',        pts: 80,   seats: 0, outfit: 'thuongtai' },
     { name: 'Thường tại',     pts: 150,  seats: 0, outfit: 'thuongtai_hong' },
-    { name: 'Quý nhân',       pts: 250,  seats: 6, outfit: 'quynhan', extra: ['quynhan_lam'] },
-    { name: 'Tần',            pts: 400,  seats: 4, outfit: 'tan', extra: ['tan_tim'] },
-    { name: 'Phi',            pts: 600,  seats: 3, outfit: 'phi', extra: ['phi_lam'] },
+    { name: 'Quý nhân',       pts: 250,  seats: 0, outfit: 'quynhan', extra: ['quynhan_lam'] },
+    { name: 'Tần',            pts: 400,  seats: 6, outfit: 'tan', extra: ['tan_tim'] },
+    { name: 'Phi',            pts: 600,  seats: 4, outfit: 'phi', extra: ['phi_lam'] },
     { name: 'Quý phi',        pts: 1300,  seats: 2, outfit: 'quyphi', extra: ['quyphi_phuong'] },
     { name: 'Hoàng quý phi',  pts: 2000, seats: 1, outfit: 'hoangquyphi', extra: ['hoangquyphi_kim'] },
   ],
@@ -101,7 +102,8 @@ module.exports = {
   NEWBIE_DAYS: 3,              // 3 ngày đầu mỗi ngày thêm 2 lượt
   DECOR_PRICE: { denlong: 60, binhsu: 80, luhuong: 100, tham: 40, giuong: 200, lahan: 350 }, // món không có tên ở đây là miễn phí
   LAT_THE: { pts: 25, sung: 20, turns: 2 },
-  LAT_THE_CROWD: 10,          // cung đông hơn số này thì mỗi lần lật 2 thẻ
+  LAT_THE_CROWD: 10,          // cứ đủ số người này chờ ở Tẩm cung thì lật thêm 1 thẻ
+  LAT_THE_MAX: 3,             // tối đa 3 thẻ mỗi lần lật
   LAT_THE_GIFT: { silver: 6, sung: 1 }, // quà an ủi cho người không được lật thẻ
 
   WITNESS_WAIT_MS: 5 * 60e3, // chờ nhân chứng khai tối đa 5 phút, quá hạn thì tự khai
