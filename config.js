@@ -8,8 +8,8 @@ module.exports = {
   FISH_PAID: 15,                // mỗi ngày bán được 15 con cá lấy bạc
   NOTICE_LEAD_MIN: 15,         // báo trước sự kiện bao nhiêu phút               // yến tiệc kéo dài (phút)
   TURNS_PER_DAY: 8,           // lượt đầu ngày
-  TURN_REGEN_MIN: 45,         // cứ 45 phút hồi 1 lượt
-  TURN_CAP: 14,               // hồi tối đa tới 14 lượt
+  TURN_REGEN_MIN: 60,         // cứ 60 phút hồi 1 lượt
+  TURN_CAP: 10,               // hồi tối đa tới 10 lượt
   TASK_TURNS: 2,              // làm đủ 3 nhiệm vụ ngày được thêm 2 lượt
   CASE_HOURS: 24,              // thời hạn điều tra trước khi xử án
   PROTECT_HOURS: 24,           // bảo hộ sau khi bị giáng cấp
@@ -23,13 +23,13 @@ module.exports = {
   // ghế theo lệ nhà Thanh: 1 Hoàng quý phi, 2 Quý phi, 4 Phi, 6 Tần; từ Quý nhân trở xuống không giới hạn
   RANKS: [
     { name: 'Tú nữ',          pts: 0,    seats: 0, outfit: 'tunu' },
-    { name: 'Quan nữ tử',     pts: 30,   seats: 0, outfit: 'tunu' },
-    { name: 'Đáp ứng',        pts: 80,   seats: 0, outfit: 'thuongtai' },
-    { name: 'Thường tại',     pts: 150,  seats: 0, outfit: 'thuongtai_hong' },
-    { name: 'Quý nhân',       pts: 250,  seats: 0, outfit: 'quynhan', extra: ['quynhan_lam'] },
-    { name: 'Tần',            pts: 900,  seats: 6, outfit: 'tan', extra: ['tan_tim'] },
-    { name: 'Phi',            pts: 1600,  seats: 4, outfit: 'phi', extra: ['phi_lam'] },
-    { name: 'Quý phi',        pts: 2800,  seats: 2, outfit: 'quyphi', extra: ['quyphi_phuong'] },
+    { name: 'Quan nữ tử',     pts: 50,   seats: 0, outfit: 'tunu' },
+    { name: 'Đáp ứng',        pts: 150,   seats: 0, outfit: 'thuongtai' },
+    { name: 'Thường tại',     pts: 300,  seats: 0, outfit: 'thuongtai_hong' },
+    { name: 'Quý nhân',       pts: 600,  seats: 0, outfit: 'quynhan', extra: ['quynhan_lam'] },
+    { name: 'Tần',            pts: 1100,  seats: 6, outfit: 'tan', extra: ['tan_tim'] },
+    { name: 'Phi',            pts: 1800,  seats: 4, outfit: 'phi', extra: ['phi_lam'] },
+    { name: 'Quý phi',        pts: 3000,  seats: 2, outfit: 'quyphi', extra: ['quyphi_phuong'] },
     { name: 'Hoàng quý phi',  pts: 4500, seats: 1, outfit: 'hoangquyphi', extra: ['hoangquyphi_kim'] },
   ],
   FIGHT_RANK: 4,               // từ Quý nhân mới được hãm hại / bị hãm hại
