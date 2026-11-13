@@ -103,7 +103,7 @@ const yKey = () => new Date(vnNow().getTime() - 864e5).toISOString().slice(0, 10
 const weekIdx = () => Math.floor((Math.floor(vnNow().getTime() / 864e5) + 3) / 7); // tuần bắt đầu thứ Hai
 const curEvent = () => (DB.state.evForce && C.EVENTS.find(e => e.id === DB.state.evForce)) || C.EVENTS[weekIdx() % C.EVENTS.length];
 const evOn = id => curEvent().id === id;
-const cnt = (p, k, n = 1) => { p.cnt = p.cnt || {}; p.cnt[k] = (p.cnt[k] || 0) + n; };
+const cnt = (p, k, n = 1) => { p.cnt = p.cnt || {}; p.cnt[k] = (p.cnt[k] || 0) + n; if (p.sis) gTask(p, k, n); };
 const title = p => `${p.name} ${rankName(p)}`;
 
 // ---------------- Hoàng thượng mỗi ngày ----------------
@@ -133,6 +133,25 @@ function relAdd(p, n, d, memo) {
 const caseHoursFor = (v, h) => h + (rel(v, 'mama') >= 30 ? 6 : rel(v, 'mama') <= -30 ? -6 : 0);
 // tỷ muội
 const GROUP_MAX = 10;
+// cấp nhóm: mới lập 4 người, ngân khố đủ bạc thì chủ nhóm nâng cấp
+const G_LV = [{ max: 4 }, { max: 6, cost: 300 }, { max: 10, cost: 700 }];
+const gMax = g => G_LV[g.lv || 0].max;
+// nhiệm vụ nhóm mỗi ngày: cả nhóm cùng làm, xong thì triều đình thưởng bạc vào ngân khố
+const G_TASKS = [
+  { k: 'thinhan', t: 'Tỷ muội thỉnh an Thái hậu', need: 3, r: 40 },
+  { k: 'fish', t: 'Câu cá ở Ngự hoa viên', need: 10, r: 30 },
+  { k: 'cook', t: 'Nấu món ở Ngự thiện phòng', need: 3, r: 30 },
+  { k: 'det', t: 'Phá án giúp Quế ma ma', need: 1, r: 40 },
+  { k: 'feast', t: 'Dâng tiết mục ở yến tiệc', need: 2, r: 40 },
+];
+function gDay(g) { if (g.day?.k !== dayKey()) g.day = { k: dayKey(), c: {}, done: {} }; return g.day; }
+function gTask(p, k, n) {
+  const T = G_TASKS.find(x => x.k === k); if (!T) return; const g = DB.state.groups?.[p.sis]; if (!g) return; const D = gDay(g);
+  if (D.done[k]) return; D.c[k] = (D.c[k] || 0) + n;
+  if (D.c[k] >= T.need) { D.done[k] = 1; g.bank = (g.bank || 0) + T.r;
+    for (const id of g.members) { const q = P(id); if (q) toast(q, `🏮 Nhiệm vụ nhóm xong: ${T.t}. Ngân khố tỷ muội +${T.r} bạc (${g.bank}).`, 'good'); } }
+  setTimeout(() => pushGroup(g), 0);
+}
 // tên nhóm tỷ muội không được trùng nhau (so không phân biệt hoa thường, bỏ khoảng trắng thừa)
 const gNorm = n => String(n || '').trim().replace(/\s+/g, ' ').toLowerCase();
 const gNameTaken = (n, exceptId) => Object.values(DB.state.groups || {}).some(g => g.id !== exceptId && gNorm(g.name) === gNorm(n));
@@ -145,7 +164,7 @@ function gRenameTick() { for (const g of Object.values(DB.state.groups || {})) i
   for (const id of g.members) { const q = P(id); if (q) { addMail(q, { kind: 'he', fromName: '🌸 Nội vụ phủ', text: `Quá hạn 24 giờ nhóm chưa đổi tên, Nội vụ phủ đặt tên mới cho nhóm tỷ muội (trước là "${old}"): "${g.name}".` }); push(q); } } save(); } }
 const grp = p => p.sis && DB.state.groups?.[p.sis];
 const sisters = (a, b) => a.sis && a.sis === b.sis;
-function groupView(g) { if (!g) return null; return { id: g.id, name: g.name, founder: g.members[0], renameUntil: (g.renameUntil || 0) > now() ? g.renameUntil : 0, fund: g.fund, goal: gGoal(g), members: g.members.map(id => { const q = P(id); return q && { id, name: q.name, rankName: C.RANKS[q.rank].name, online: seenOn(id), loc: q.loc, lanh: !!q.lanh, camTuc: (q.camTucUntil || 0) > now() }; }).filter(Boolean) }; }
+function groupView(g) { if (!g) return null; return { id: g.id, name: g.name, founder: g.members[0], renameUntil: (g.renameUntil || 0) > now() ? g.renameUntil : 0, fund: g.fund, goal: gGoal(g), lv: g.lv || 0, max: gMax(g), bank: g.bank || 0, next: G_LV[(g.lv || 0) + 1] || null, tasks: (D => G_TASKS.map(T => ({ t: T.t, need: T.need, r: T.r, cur: Math.min(T.need, D.c[T.k] || 0), done: !!D.done[T.k] })))(gDay(g)), members: g.members.map(id => { const q = P(id); return q && { id, name: q.name, rankName: C.RANKS[q.rank].name, online: seenOn(id), loc: q.loc, lanh: !!q.lanh, camTuc: (q.camTucUntil || 0) > now() }; }).filter(Boolean) }; }
 function pushGroup(g) { if (!g) return; for (const id of g.members) { const q = P(id); if (q) push(q); } }
 function freshDay(p) {
   const k = dayKey();
@@ -2028,7 +2047,7 @@ io.on('connection', sock => {
       const t = P(d.who); if (!t || t.id === me.id) return;
       if (sisters(me, t)) return toast(me, 'Đã là tỷ muội rồi.');
       if (t.sis) return toast(me, `${t.name} đã kết nghĩa với nhóm khác.`, 'bad');
-      const g = grp(me); if (g && g.members.length >= GROUP_MAX) return toast(me, `Nhóm tỷ muội tối đa ${GROUP_MAX} người.`, 'bad');
+      const g = grp(me); if (g && g.members.length >= gMax(g)) return toast(me, `Nhóm đang tối đa ${gMax(g)} người. Góp ngân khố để nâng cấp nhóm.`, 'bad');
       if (!g) { const nm = String(d.name || '').trim().slice(0, 20); if (!nm) return toast(me, 'Đặt tên cho nhóm tỷ muội trước đã.', 'bad'); if (gNameTaken(nm)) return toast(me, `Tên "${nm}" đã có nhóm tỷ muội khác dùng, chọn tên khác nhé.`, 'bad'); }
       const sk = sockOf(t.id);
       if (!sk) { const gname = g ? g.name : String(d.name || '').trim().slice(0, 20) || 'Kim Lan'; addMail(t, { kind: 'moi', from: me.id, fromName: title(me), text: `Muội muốn cùng tỷ kết nghĩa tỷ muội "${gname}". Tỷ đồng ý thì bấm Nhận lời.`, group: gname }); sendPush(t, 'Lời mời kết nghĩa', `${me.name} muốn kết nghĩa tỷ muội với bổn cung.`, 'moi'); return toast(me, `${t.name} đang offline, đã gửi lời mời qua thư.`, 'good'); }
@@ -2042,8 +2061,8 @@ io.on('connection', sock => {
       if (op === 'decline') { toast(f, `${me.name} khéo léo từ chối lời kết nghĩa.`); return; }
       if (me.sis) return toast(me, 'Đã ở nhóm khác.');
       let g = grp(f);
-      if (!g) { DB.state.groups = DB.state.groups || {}; const id = 'g' + now().toString(36); let nm = inv.name || 'Kim Lan'; if (gNameTaken(nm)) { let k = 2; while (gNameTaken(nm + ' ' + k)) k++; nm = nm + ' ' + k; } g = DB.state.groups[id] = { id, name: nm, members: [f.id], fund: 0, goal: 300, created: now() }; f.sis = id; }
-      if (g.members.length >= GROUP_MAX) return toast(me, 'Nhóm đã đủ người.', 'bad');
+      if (!g) { DB.state.groups = DB.state.groups || {}; const id = 'g' + now().toString(36); let nm = inv.name || 'Kim Lan'; if (gNameTaken(nm)) { let k = 2; while (gNameTaken(nm + ' ' + k)) k++; nm = nm + ' ' + k; } g = DB.state.groups[id] = { id, name: nm, members: [f.id], fund: 0, goal: 300, lv: 0, bank: 0, created: now() }; f.sis = id; }
+      if (g.members.length >= gMax(g)) return toast(me, 'Nhóm đã đủ người.', 'bad');
       g.members.push(me.id); me.sis = g.id; cnt(me, 'sis'); if (f.cnt?.sis == null) cnt(f, 'sis');
       news(`🌸 ${g.members.map(id => P(id)?.name).join(', ')} thắp hương kết nghĩa tỷ muội: "${g.name}".`);
       pushGroup(g); save();
@@ -2067,6 +2086,18 @@ io.on('connection', sock => {
         for (const id of g.members) { const q = P(id); if (q) { q.haiLong = Math.min(100, q.haiLong + 10); addPts(q, 30); relAdd(q, 'thaihau', 8, 'cùng tỷ muội may áo dâng ai gia'); toast(q, '🧵 Áo gấm tỷ muội may xong, dâng Thái hậu: hài lòng +10, công trạng +30.', 'good'); } }
         news(`🧵 Tỷ muội "${g.name}" góp lụa may áo gấm dâng Thái hậu. Thái hậu khen ngợi cả nhóm.`, 'an');
       } else toast(me, `Đã góp ${amt} bạc. Quỹ may áo: ${g.fund}/${gGoal(g)}.`, 'good');
+      pushGroup(g); save();
+    } else if (op === 'nap') { // góp bạc vào ngân khố nhóm
+      const g = grp(me); if (!g) return; const amt = Math.max(10, Math.min(500, Math.floor(+d.amount || 0)));
+      if (me.silver < amt) return toast(me, 'Không đủ bạc.', 'bad'); me.silver -= amt; g.bank = (g.bank || 0) + amt;
+      for (const id of g.members) { const q = P(id); if (q && q.id !== me.id) toast(q, `🏮 ${me.name} góp ${amt} bạc vào ngân khố tỷ muội (${g.bank}).`); }
+      toast(me, `Đã góp ${amt} bạc vào ngân khố. Ngân khố: ${g.bank} bạc.`, 'good'); pushGroup(g); save();
+    } else if (op === 'upgrade') {
+      const g = grp(me); if (!g) return; if (g.members[0] !== me.id) return toast(me, 'Chỉ chủ nhóm mới nâng cấp được.');
+      const nx = G_LV[(g.lv || 0) + 1]; if (!nx) return toast(me, 'Nhóm đã đạt cấp cao nhất.');
+      if ((g.bank || 0) < nx.cost) return toast(me, `Ngân khố cần ${nx.cost} bạc (đang có ${g.bank || 0}).`, 'bad');
+      g.bank -= nx.cost; g.lv = (g.lv || 0) + 1;
+      for (const id of g.members) { const q = P(id); if (q) toast(q, `🏮 Nhóm tỷ muội "${g.name}" nâng cấp: nay được tối đa ${nx.max} người.`, 'good'); }
       pushGroup(g); save();
     } else if (op === 'cautinh') {
       const t = P(d.who); if (!t || !sisters(me, t)) return;
@@ -2504,6 +2535,8 @@ loadDB().then(() => {
   // nhóm tỷ muội trùng tên: nhóm lập sớm nhất giữ tên, các nhóm sau thêm số (Kim Lan 2, Kim Lan 3…)
   { const seen = {}; for (const g of Object.values(DB.state.groups || {}).sort((a, b) => (a.created || 0) - (b.created || 0))) { const k = gNorm(g.name); if (!seen[k]) { seen[k] = 1; continue; } const base = String(g.name).trim().replace(/\s+/g, ' '); let n = 2; while (gNameTaken(base + ' ' + n, g.id)) n++; console.log('đổi tên nhóm trùng:', g.name, '->', base + ' ' + n); g.name = base + ' ' + n; } }
   // nhóm bị đổi tên vì trùng (thêm số phía sau): gửi thư cho chủ nhóm, cho 24 giờ tự đổi tên
+  // cấp nhóm: nhóm cũ đã đông người giữ đủ chỗ hiện có
+  for (const g of Object.values(DB.state.groups || {})) if (g.lv == null) { g.lv = g.members.length > 6 ? 2 : g.members.length > 4 ? 1 : 0; g.bank = g.bank || 0; }
   if (!DB.state.gRenameMail1) { DB.state.gRenameMail1 = 1; const G = Object.values(DB.state.groups || {});
     for (const g of G) { const m = String(g.name).match(/^(.*) (\d+)$/); if (!m || !G.some(x => x.id !== g.id && gNorm(x.name) === gNorm(m[1]))) continue;
       g.renameUntil = now() + 24 * 3600e3; const f = P(g.members[0]);
