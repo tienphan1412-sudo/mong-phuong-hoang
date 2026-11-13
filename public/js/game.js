@@ -302,7 +302,10 @@ $('chatin').addEventListener('keydown', e => { if (e.isComposing || e.keyCode ==
 socket.on('newsAll', list => { $('newslist').innerHTML = ''; list.slice().reverse().forEach(addNews); });
 socket.on('news', n => { addNews(n); if (['phong', 'latthe', 'an', 'latan', 'phat'].includes(n.kind)) toast('📜 ' + n.text); });
 function addNews(n) { const d = document.createElement('div'); d.className = 'n'; d.innerHTML = `<time>${new Date(n.t).toLocaleString('vi-VN', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit' })}</time>${esc(n.text)}`; $('newslist').prepend(d); }
-$('newsbtn').onclick = () => $('news').classList.toggle('hidden');
+$('newsbtn').onclick = e => { e.stopPropagation(); $('news').classList.toggle('hidden'); };
+$('newsX').onclick = e => { e.stopPropagation(); $('news').classList.add('hidden'); };
+// bấm ra ngoài bảng tin thì đóng
+addEventListener('pointerdown', e => { const n = $('news'); if (n && !n.classList.contains('hidden') && !n.contains(e.target) && !e.target.closest('#newsbtn')) n.classList.add('hidden'); }, true);
 socket.on('toast', t => toast(t.text, t.kind));
 socket.on('npcSay', d => { const n = world?.npcs.find(x => x.name === d.who); if (d.long) { say(n?.model || 'aongu', d.who, esc(d.text), [['Đa tạ', 0, 'gold']]).then(dlgClose); return; } if (n?.label) bubble(n.label, d.text); else toast(`${d.who}: ${d.text}`); });
 function toast(text, kind = 'info') {
