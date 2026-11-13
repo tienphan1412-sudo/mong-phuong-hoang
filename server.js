@@ -1007,13 +1007,14 @@ function feastLive() {
     roomSay(`TỬU LỆNH! Nối tiếp câu: "${q} …" Ai gõ đúng vào ô chat trước được Hoàng thượng thưởng rượu!`, '🍶 Tửu lệnh'); io.to('yentiec').emit('tuulenh', { q, end: f.tl.end });
   }
   if (!f.showAt) f.showAt = f.start + 150e3;
-  if (!f.show && now() >= f.showAt && now() < f.end - 60e3) startNpcShow(f);
+  // đoàn ca vũ diễn 3 lần mỗi buổi yến tiệc, cách nhau khoảng 5 phút
+  if ((f.shows || 0) < 3 && now() >= (f.nextShow || f.showAt) && now() < f.end - 60e3) { f.shows = (f.shows || 0) + 1; f.nextShow = now() + 5 * 60e3; startNpcShow(f); }
   if (!f.htNext) f.htNext = now() + 60e3;
   if (now() >= f.htNext) { f.htNext = now() + (70 + rnd(50)) * 1000; htSay(pick(HT_FEAST)); }
 }
 function startNpcShow(f) {
-  f.show = { at: now() + 2500 };
-  roomSay('Đoàn ca vũ Giáo phường xin dâng tiết mục: Thị vệ kiếm vũ, cung nữ múa lụa! Mời các vị chủ tử thưởng thức.', '🎭 Giáo phường');
+  const n = f.shows || 1; f.show = { at: now() + 2500, n };
+  roomSay(n === 1 ? 'Đoàn ca vũ Giáo phường xin dâng tiết mục: Thị vệ kiếm vũ, cung nữ múa lụa! Mời các vị chủ tử thưởng thức.' : n === 2 ? 'Giáo phường xin dâng tiếp điệu múa mới: Thị vệ kiếm vũ, cung nữ múa Nghê Thường!' : 'Giáo phường xin dâng tiết mục cuối buổi: kiếm vũ và điệu múa Lạc Thần uyển chuyển!', '🎭 Giáo phường');
   io.to('yentiec').emit('npcShow', f.show); htSay('Tốt! Cho vào biểu diễn.');
 }
 function tuuLenhAnswer(p, text) {

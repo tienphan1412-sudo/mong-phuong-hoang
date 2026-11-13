@@ -30,7 +30,7 @@ module.exports = {
     { name: 'Tần',            pts: 1100,  seats: 6, outfit: 'tan', extra: ['tan_tim'] },
     { name: 'Phi',            pts: 1800,  seats: 4, outfit: 'phi', extra: ['phi_lam'] },
     { name: 'Quý phi',        pts: 3000,  seats: 2, outfit: 'quyphi', extra: ['quyphi_phuong'] },
-    { name: 'Hoàng quý phi',  pts: 4500, seats: 1, outfit: 'hoangquyphi_kim' }  // bộ vàng rồng phượng đã nhường cho Hoàng hậu; chờ mô hình mới cho Hoàng quý phi,
+    { name: 'Hoàng quý phi',  pts: 4500, seats: 1, outfit: 'hoangquyphi_kim', extra: ['hoangquyphi2'] }  // bộ vàng rồng phượng đã nhường cho Hoàng hậu; chờ mô hình mới cho Hoàng quý phi,
   ],
   FIGHT_RANK: 4,               // từ Quý nhân mới được hãm hại / bị hãm hại
   PALACE_RANK: 5,              // từ Tần được ban cung riêng
@@ -38,7 +38,7 @@ module.exports = {
   OUTFITS: {
     tunu: 'Tú nữ · xanh lá', thuongtai: 'Thường tại · tím mũ hoa', quynhan: 'Quý nhân · xanh dương',
     tan: 'Tần · cam áo khoác', phi: 'Phi · tím chuỗi ngọc', quyphi: 'Quý phi · đỏ vân kiên',
-    hoangquyphi: 'Hoàng quý phi · cam rồng phượng', hoanghau: 'Hoàng hậu · vàng mũ phượng', hoanghau2: 'Hoàng hậu · vàng rồng phượng', aongu: 'Áo ngủ · trắng',
+    hoangquyphi: 'Hoàng quý phi · cam rồng phượng', hoanghau: 'Hoàng hậu · vàng mũ phượng', hoanghau2: 'Hoàng hậu · vàng rồng phượng', hoangquyphi2: 'Hoàng quý phi · xanh phỉ thúy', aongu: 'Áo ngủ · trắng',
   },
 
   // lối sống: lợi thế riêng
@@ -71,7 +71,7 @@ module.exports = {
     tai: ['đàn', 'múa', 'thơ'],
     mood: ['vui', 'mệt', 'buồn'],
   },
-  OUTFIT_COLOR: { tunu: 'xanh', thuongtai: 'tím', thuongtai_hong: 'hồng', quynhan: 'xanh', quynhan_lam: 'xanh', tan: 'cam', tan_tim: 'tím', phi: 'tím', phi_lam: 'xanh', quyphi: 'đỏ', quyphi_phuong: 'đỏ', hoangquyphi: 'cam', hoangquyphi_kim: 'đỏ', hoanghau: 'vàng', hoanghau2: 'vàng', aongu: '' },
+  OUTFIT_COLOR: { tunu: 'xanh', thuongtai: 'tím', thuongtai_hong: 'hồng', quynhan: 'xanh', quynhan_lam: 'xanh', tan: 'cam', tan_tim: 'tím', phi: 'tím', phi_lam: 'xanh', quyphi: 'đỏ', quyphi_phuong: 'đỏ', hoangquyphi: 'cam', hoangquyphi_kim: 'đỏ', hoanghau: 'vàng', hoanghau2: 'vàng', hoangquyphi2: 'xanh', aongu: '' },
   // tiệm Nội vụ phủ
   SHOP: {
     sam:   { name: 'Nhân sâm bồi bổ', desc: '+1 lượt (mỗi ngày mua 1 lần)', price: 80 },

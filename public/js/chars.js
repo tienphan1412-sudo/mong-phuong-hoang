@@ -6,11 +6,14 @@ import { asset, cdnFail } from './cdn.js';
 
 const loader = new GLTFLoader();
 const cache = {};
-let FEMALE = null, MALE = null;
+let FEMALE = null, MALE = null, EXTRA = null, CRADLE = null;
+// động tác thêm: tải sau, không bắt người chơi chờ
+export function loadExtra() { return loadModel('hoangquyphi2').catch(() => null); }
+export const MALE_ONLY = new Set(['om_nam']), FEMALE_ONLY = new Set(['om_nu', 'bebe', 'mua2', 'mua_nhe', 'xoadau']);
 export const MALE_MODELS = new Set(['hoangthuong', 'hoangthuong_dem', 'thaigiam', 'thive', 'thaiy', 'hoangtu1', 'hoangtu2', 'hoangtu3']);
 
 function lock(clips) {
-  const LOCK = ['di', 'chay', 'mua', 'dung_cho', 'vo_tay', 'khoc', 'gian', 'nga', 'cuoi', 'ngoi', 'khoanh_tay', 'gio_tay', 'nam_tay', 'dung_cho_nam'];
+  const LOCK = ['mua2', 'mua_nhe', 'om_nu', 'om_nam', 'bebe', 'xoadau', 'di', 'chay', 'mua', 'dung_cho', 'vo_tay', 'khoc', 'gian', 'nga', 'cuoi', 'ngoi', 'khoanh_tay', 'gio_tay', 'nam_tay', 'dung_cho_nam'];
   for (const c of clips) if (LOCK.includes(c.name)) for (const t of c.tracks) if (/Hips\.position$/.test(t.name)) {
     const v = t.values, x0 = v[0], z0 = v[2]; for (let i = 0; i < v.length; i += 3) { v[i] = x0; v[i + 2] = z0; }
   }
@@ -19,6 +22,14 @@ function lock(clips) {
 export function loadModel(name) {
   if (!cache[name]) cache[name] = loader.loadAsync(asset(`models/${name}.glb`)).catch(() => loader.loadAsync(cdnFail(`models/${name}.glb`))).then(g => {
     if (name === 'hoangtu1' || name === 'congchua3' || name === 'phi_bau') { const REN = { 'walk.001': 'di', 'female walk.001': 'di', 'run.001': 'chay', 'sit.001': 'ngoi', 'cry.001': 'khoc', 'laugh_01.001': 'cuoi', 'dance_01.001': 'mua' }; g.animations = g.animations.filter(a => REN[a.name]); g.animations.forEach(a => a.name = REN[a.name]); }
+    if (name === 'hoangquyphi2') { // gói động tác mới đi kèm bộ áo Hoàng quý phi xanh phỉ thúy
+      const EX = [['From standing', 'quy1chan'], ['cradling a swaddled baby', 'bebe'], ['dance_01', 'mua2'], ['female hug', 'om_nu'], ['hug.001', 'om_nam'], ['lean forward slightly', 'phuphuc'], ['pole dance', 'mua_nhe'], ['young child stands', 'xoadau']];
+      for (const a of g.animations) { const m = EX.find(([k]) => a.name.includes(k)); if (m) a.name = m[1]; }
+      g.animations = g.animations.filter(a => EX.some(([, n]) => n === a.name));
+      EXTRA = {}; for (const a of g.animations) EXTRA[a.name] = a;
+      // tư thế bế em bé: lấy góc xoay tay ở giữa động tác ru con, dùng khi vừa bế vừa đi
+      const bb = EXTRA.bebe; if (bb) { CRADLE = {}; for (const t of bb.tracks) { const m2 = t.name.match(/([^.]+)\.quaternion$/); if (!m2 || !/(Shoulder|Arm|ForeArm|Hand|Spine2|Neck|Head)$/.test(m2[1].replace(/^mixamorig:?/, ''))) continue; const out = t.createInterpolant().evaluate(bb.duration * .45); CRADLE[m2[1]] = new THREE.Quaternion().fromArray(out); } }
+    }
     if (name === 'thuongtai') FEMALE = lock(g.animations);
     if (name === 'hoangthuong') MALE = lock(g.animations); else lock(g.animations);
     g.scene.traverse(o => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; o.frustumCulled = false; } });
@@ -32,6 +43,7 @@ export async function ready() {
   await Promise.all([loadModel('thuongtai'), loadModel('hoangthuong')]);
   // dáng đi yểu điệu (lấy từ model phi tần mang thai) dùng cho mọi nhân vật nữ
   try { GRACE = (await loadModel('phi_bau')).animations.find(a => a.name === 'di') || null; } catch {}
+  loadExtra();
 }
 
 const MAPB = { Hips: 'hips', Spine: 'spine', Spine1: 'spine1', Spine2: 'spine2', Head: 'head', LeftArm: 'lArm', LeftForeArm: 'lFore', LeftHand: 'lHand', RightArm: 'rArm', RightForeArm: 'rFore', RightHand: 'rHand', LeftLeg: 'kneeL', RightLeg: 'kneeR', LeftShoulder: 'lSh', RightShoulder: 'rSh', Neck: 'neck', LeftUpLeg: 'hipL', RightUpLeg: 'hipR', LeftFoot: 'footL', RightFoot: 'footR' };
@@ -69,6 +81,8 @@ function maleStance(c) {
   aim(r, B.kneeL, B.footL, v3([.06, -1, -.02])); aim(r, B.kneeR, B.footR, v3([-.06, -1, -.02]));
 }
 export { aim, v3 };
+// đặt tay theo tư thế bế em bé (lấy từ động tác ru con); trả về false nếu chưa tải xong
+export function cradleArms(c) { if (!CRADLE) return false; c._cradleOk = true; c.root.traverse(o => { if (o.isBone && CRADLE[o.name] && !/Spine2|Neck|Head/.test(o.name)) o.quaternion.copy(CRADLE[o.name]); }); c.root.updateMatrixWorld(true); return true; }
 
 let HT_IDLE = null, HT_G = []; // Hoàng thượng đứng khoanh tay (cắt đoạn giữa của động tác, lặp mượt)
 export async function spawn(modelName) {
@@ -101,11 +115,13 @@ export async function spawn(modelName) {
   const c = { root, B, mixer, actions, idlePose, male, model: modelName, cur: null, curName: '', pose: null, t: 0, sitFix: false };
   c.play = (name, opts = {}) => {
     let pose = null;
+    if (name === 'om') name = male ? 'om_nam' : 'om_nu';
     if (POSES[name]) { pose = name; name = 'dung_cho'; }
+    if (!actions[name] && EXTRA?.[name] && !(male && FEMALE_ONLY.has(name)) && !(!male && MALE_ONLY.has(name))) actions[name] = mixer.clipAction(EXTRA[name]);
     c.pose = pose;
     const a = actions[name] || actions.dung_cho;
     if (c.cur === a && !opts.restart) return;
-    const once = ['nga', 'quy', 'hanh_le', 'cui_chao'].includes(name);
+    const once = ['nga', 'quy', 'hanh_le', 'cui_chao', 'quy1chan', 'phuphuc'].includes(name);
     a.reset(); a.setLoop(once ? THREE.LoopOnce : THREE.LoopRepeat); a.clampWhenFinished = once;
     a.timeScale = name === 'di' ? (male ? 1.4 : oldWalk ? 1.25 : 1.15) : 1;
     if (c.cur && c.cur !== a) a.crossFadeFrom(c.cur, 0.3, false);
