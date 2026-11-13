@@ -176,7 +176,7 @@ function selfView(p) {
   return {
     ...publicView(p), path: p.path, pathName: C.PATHS[p.path].name, origin: C.ORIGINS[p.origin].name,
     mailUnread: (p.mail || []).filter(m => !m.read).length, pushOn: !!p.pushSubs?.length,
-    created: p.created || 0, pts: p.pts, nextPts: p.rank + 1 < C.RANKS.length ? RP(p, p.rank + 1) : null, silver: p.silver, turns: (regen(p), p.turns), turnCap: C.TURN_CAP, nextTurn: p.turns >= C.TURN_CAP ? null : p.turnAt + C.TURN_REGEN_MIN * 60e3, sung: p.sung, haiLong: p.haiLong,
+    created: p.created || 0, items: p.items || {}, pts: p.pts, nextPts: p.rank + 1 < C.RANKS.length ? RP(p, p.rank + 1) : null, silver: p.silver, turns: (regen(p), p.turns), turnCap: C.TURN_CAP, nextTurn: p.turns >= C.TURN_CAP ? null : p.turnAt + C.TURN_REGEN_MIN * 60e3, sung: p.sung, haiLong: p.haiLong,
     stats: p.stats, tasks: p.tasks, thinhAn: p.thinhAn, waiting: p.waiting || false, lanh: p.lanh || null,
     outfits: allowedOutfits(p), decor: p.decor || [], hasPalace: p.rank >= C.PALACE_RANK, cases: open,
     protectedUntil: p.protectUntil || 0, admin: !!p.admin, hamDay: p.hamDay === dayKey(), canFight: !p.lanh && p.rank >= C.FIGHT_RANK,
@@ -826,8 +826,9 @@ function caseOp(p, data) {
     if (data.kind === 'hoi' && (p.loyal ?? 50) < 30 && !data.bribe) return toast(p, 'Cung nữ ấp úng không dám nói. Thử ban thưởng cho nàng trước.', 'bad');
     if (data.kind === 'hoi' && data.bribe) { if (p.silver < 30) return toast(p, 'Không đủ bạc.', 'bad'); p.silver -= 30; }
     if (data.kind === 'theodoi' && data.fail) { if (p.turns < 1) return toast(p, 'Hết lượt.', 'bad'); p.turns -= 1; save(); push(p); return toast(p, 'Bị phát hiện, nghi phạm lẩn mất. Thử lại sau.', 'bad'); }
-    const freeMuu = p.path === 'muuke' && !c.muuFree;
-    if (!freeMuu) {
+    const freeMuu = p.path === 'muuke' && !c.muuFree, freeThu = !freeMuu && (p.items?.manhmoi || 0) > 0 && !data.bribe;
+    if (freeThu) { p.items.manhmoi--; toast(p, '📜 Dùng lá thư mật câu được ở hồ: lần tra này miễn phí.', 'good'); }
+    else if (!freeMuu) {
       if (p.turns < clue.turn) return toast(p, 'Hết lượt hôm nay.', 'bad');
       let cost = clue.cost; if (data.kind === 'thaiy' && rel(p, 'thaiy') >= 30) cost = Math.round(cost / 2); if (data.kind === 'so' && rel(p, 'tonggiam') >= 30) cost = 0;
       if (p.silver < cost) return toast(p, 'Không đủ bạc.', 'bad');
@@ -1707,8 +1708,8 @@ io.on('connection', sock => {
       if ((t.targeted || 0) >= C.TARGETED_PER_DAY || (t.protectUntil || 0) > now()) return toast(me, 'Người này đang được bảo hộ, chưa thể ra tay.', 'bad');
       if (Object.values(DB.state.cases).some(c => c.victim === t.id && c.status === 'open' && !c.det)) return toast(me, 'Người này đang dính một vụ án khác.', 'bad');
       if (C.THAI_METHODS.some(m => m.id === d.method) && !t.thai?.known) return toast(me, 'Người này không mang thai.', 'bad');
-      const cost = C.ACTIONS.ratay.silver - (me.path === 'muuke' ? 40 : 0) + (d.blur ? 100 : 0);
-      if (!useTurn(1, cost)) return;
+      const tv = (me.items?.tangvat || 0) > 0; const cost = (tv ? 0 : C.ACTIONS.ratay.silver - (me.path === 'muuke' ? 40 : 0)) + (d.blur ? 100 : 0);
+      if (!useTurn(1, cost)) return; if (tv) { me.items.tangvat--; toast(me, '🎁 Dùng túi gấm câu được ở hồ làm tang vật, không tốn bạc.', 'good'); }
       freshDay(t); me.attacks = (me.attacks || 0) + 1; t.targeted = (t.targeted || 0) + 1;
       const thaiM = C.THAI_METHODS.find(m => m.id === d.method);
       createCase(t, me, { method: d.method, blur: !!d.blur, thai: !!thaiM });
@@ -1795,6 +1796,15 @@ io.on('connection', sock => {
       else { const pay = me.fishN <= C.FISH_PAID ? F[1] : 0; me.silver += pay; toast(me, `Câu được ${F[0]}${pay ? `, bán cho ngự thiện phòng được ${pay} bạc` : ' (hôm nay đã bán đủ, thả lại hồ)'}.`, 'good'); }
       if (DB.state.fest && !DB.state.fest.done) { const dd = me.festDay = me.festDay?.d === dayKey() ? me.festDay : { d: dayKey() }; if ((dd.fish || 0) < 15) { dd.fish = (dd.fish || 0) + 1; festAdd(me, 2, 'câu cá'); } }
       const s = sockOf(me.id); if (s) s.emit('fishGot', { name: F[0], gold: F[2] === 'gold' });
+      // thỉnh thoảng lưỡi câu vướng được thứ có ích cho cung đấu (tối đa 2 lần/ngày)
+      const ff = me.fishFind = me.fishFind?.d === dayKey() ? me.fishFind : { d: dayKey(), n: 0 };
+      if (ff.n < 2 && Math.random() < .08) { ff.n++; me.items = me.items || {};
+        const myCase = Object.values(DB.state.cases).find(c => c.victim === me.id && c.status === 'open' && !c.det && !c.big);
+        const left = myCase ? Object.keys(C.CLUES).filter(k => !myCase.found.some(f => f.kind === k)) : [];
+        if (left.length && Math.random() < .6) { const k = pick(left); revealClue(myCase, k, me); setTimeout(() => toast(me, `📜 Lưỡi câu vướng một mảnh thư ướt sũng… là manh mối vụ ${myCase.methodName || 'án'}: ${C.CLUES[k].name}! Đã ghi vào hồ sơ.`, 'good'), 900); }
+        else if (Math.random() < .5) { me.items.tangvat = (me.items.tangvat || 0) + 1; setTimeout(() => toast(me, '🎁 Câu được một túi gấm trôi dạt, trong có xạ hương và bùa yểm. Lần ra tay tới không tốn bạc mua tang vật.', 'good'), 900); }
+        else { me.items.manhmoi = (me.items.manhmoi || 0) + 1; setTimeout(() => toast(me, '📜 Câu được một lá thư mật ai đó vứt xuống hồ. Lần tra manh mối tới (khi bị hãm hại) không tốn lượt, không tốn bạc.', 'good'), 900); }
+      }
     } else if (a === 'dangca') {
       if (me.loc !== 'duongtam') return toast(me, 'Phải đến Dưỡng Tâm điện.'); if (!(me.goldFish > 0)) return toast(me, 'Chưa có cá chép vàng.');
       me.goldFish--; me.sung += 10; addPts(me, 10); news(`${me.name} dâng cá chép vàng, Hoàng thượng khen là điềm lành.`, 'an');
