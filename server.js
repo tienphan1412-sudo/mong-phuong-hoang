@@ -138,9 +138,14 @@ const gNorm = n => String(n || '').trim().replace(/\s+/g, ' ').toLowerCase();
 const gNameTaken = (n, exceptId) => Object.values(DB.state.groups || {}).some(g => g.id !== exceptId && gNorm(g.name) === gNorm(n));
 // quỹ may áo tăng theo số người trong nhóm (mốc gốc tính cho 4 người)
 const gGoal = g => Math.round(g.goal * Math.max(1, g.members.length / 4));
+// tên mặc định khi nhóm bị trùng tên mà quá 24 giờ không đổi
+const G_NAMES = ['Đào Viên', 'Tam Hoa', 'Ngọc Lan', 'Mẫu Đơn', 'Thanh Liên', 'Tử Đằng', 'Hải Đường', 'Thủy Tiên', 'Lan Đình', 'Nguyệt Quế', 'Hàm Tiếu', 'Bích Ngọc', 'Tuyết Mai', 'Phù Dung', 'Thược Dược', 'Uyên Ương', 'Hồng Nhạn', 'Lưu Ly', 'Cẩm Tú', 'Kim Phượng'];
+const gDefaultName = () => G_NAMES.find(n => !gNameTaken(n)) || ('Đồng Tâm ' + (Object.keys(DB.state.groups || {}).length + 1));
+function gRenameTick() { for (const g of Object.values(DB.state.groups || {})) if (g.renameUntil && now() > g.renameUntil) { const old = g.name; g.name = gDefaultName(); g.renameUntil = 0;
+  for (const id of g.members) { const q = P(id); if (q) { addMail(q, { kind: 'he', fromName: '🌸 Nội vụ phủ', text: `Quá hạn 24 giờ nhóm chưa đổi tên, Nội vụ phủ đặt tên mới cho nhóm tỷ muội (trước là "${old}"): "${g.name}".` }); push(q); } } save(); } }
 const grp = p => p.sis && DB.state.groups?.[p.sis];
 const sisters = (a, b) => a.sis && a.sis === b.sis;
-function groupView(g) { if (!g) return null; return { id: g.id, name: g.name, fund: g.fund, goal: gGoal(g), members: g.members.map(id => { const q = P(id); return q && { id, name: q.name, rankName: C.RANKS[q.rank].name, online: seenOn(id), loc: q.loc, lanh: !!q.lanh, camTuc: (q.camTucUntil || 0) > now() }; }).filter(Boolean) }; }
+function groupView(g) { if (!g) return null; return { id: g.id, name: g.name, founder: g.members[0], renameUntil: (g.renameUntil || 0) > now() ? g.renameUntil : 0, fund: g.fund, goal: gGoal(g), members: g.members.map(id => { const q = P(id); return q && { id, name: q.name, rankName: C.RANKS[q.rank].name, online: seenOn(id), loc: q.loc, lanh: !!q.lanh, camTuc: (q.camTucUntil || 0) > now() }; }).filter(Boolean) }; }
 function pushGroup(g) { if (!g) return; for (const id of g.members) { const q = P(id); if (q) push(q); } }
 function freshDay(p) {
   const k = dayKey();
@@ -1551,7 +1556,7 @@ function nightTick() {
     if (days >= C.ABSENT_SICK_DAYS && days < C.ABSENT_LOSE_DAYS && !p.sick && !online.has(p.id)) { p.sick = true; news(`${p.name} cáo bệnh, đã ${Math.floor(days)} ngày không ra khỏi cung.`); }
     if (days >= C.ABSENT_LOSE_DAYS && !online.has(p.id)) { p.sick = false; const r = p.rank; p.rank = C.PALACE_RANK - 1; p.waiting = true; p.trend = { dir: -1, t: now() }; p.outfit = C.RANKS[p.rank].outfit; news(`${p.name} vắng mặt quá lâu, nhường ghế ${C.RANKS[r].name}.`); freeSeatCheck(); }
   }
-  checkDeadlines(); thaiTick(); kidTick(); sinhTick(); hhcTick(); leTick(); housekeep(); hhTick(); eventTick(); npcDaily(); grudgeTick(); bigTick(); festTick(); if (v.getUTCHours() >= 3) backup();
+  checkDeadlines(); thaiTick(); kidTick(); sinhTick(); hhcTick(); gRenameTick(); leTick(); housekeep(); hhTick(); eventTick(); npcDaily(); grudgeTick(); bigTick(); festTick(); if (v.getUTCHours() >= 3) backup();
   // vụ án do hệ thống dàn dựng khi cung vắng người
   for (const p of Object.values(DB.players)) {
     if (!online.has(p.id) || p.lanh || p.rank < C.FIGHT_RANK) continue;
@@ -2042,6 +2047,13 @@ io.on('connection', sock => {
       g.members.push(me.id); me.sis = g.id; cnt(me, 'sis'); if (f.cnt?.sis == null) cnt(f, 'sis');
       news(`🌸 ${g.members.map(id => P(id)?.name).join(', ')} thắp hương kết nghĩa tỷ muội: "${g.name}".`);
       pushGroup(g); save();
+    } else if (op === 'rename') { // chủ nhóm đổi tên khi được Nội vụ phủ cho phép (nhóm bị trùng tên)
+      const g = grp(me); if (!g || g.members[0] !== me.id) return toast(me, 'Chỉ chủ nhóm mới đổi được tên.');
+      if (!((g.renameUntil || 0) > now())) return toast(me, 'Hiện không được đổi tên nhóm.');
+      const nm = String(d.name || '').trim().replace(/\s+/g, ' ').slice(0, 20); if (!nm) return toast(me, 'Hãy nhập tên mới.', 'bad');
+      if (gNameTaken(nm, g.id)) return toast(me, `Tên "${nm}" đã có nhóm khác dùng, chọn tên khác nhé.`, 'bad');
+      g.name = nm; g.renameUntil = 0; for (const id of g.members) { const q = P(id); if (q && q.id !== me.id) toast(q, `🌸 Chủ nhóm đổi tên nhóm tỷ muội thành "${nm}".`, 'good'); }
+      toast(me, `Đã đổi tên nhóm thành "${nm}".`, 'good'); pushGroup(g); save();
     } else if (op === 'leave') {
       const g = grp(me); if (!g) return; g.members = g.members.filter(x => x !== me.id); me.sis = null;
       news(`✂️ ${me.name} cắt áo đoạn nghĩa, rời nhóm tỷ muội "${g.name}".`);
@@ -2491,6 +2503,12 @@ loadDB().then(() => {
       console.log('Khôi phục kỳ bầu (lần 3): xong'); } else console.log('Khôi phục kỳ bầu (lần 3): thiếu người', !!T, !!N, !!A); }
   // nhóm tỷ muội trùng tên: nhóm lập sớm nhất giữ tên, các nhóm sau thêm số (Kim Lan 2, Kim Lan 3…)
   { const seen = {}; for (const g of Object.values(DB.state.groups || {}).sort((a, b) => (a.created || 0) - (b.created || 0))) { const k = gNorm(g.name); if (!seen[k]) { seen[k] = 1; continue; } const base = String(g.name).trim().replace(/\s+/g, ' '); let n = 2; while (gNameTaken(base + ' ' + n, g.id)) n++; console.log('đổi tên nhóm trùng:', g.name, '->', base + ' ' + n); g.name = base + ' ' + n; } }
+  // nhóm bị đổi tên vì trùng (thêm số phía sau): gửi thư cho chủ nhóm, cho 24 giờ tự đổi tên
+  if (!DB.state.gRenameMail1) { DB.state.gRenameMail1 = 1; const G = Object.values(DB.state.groups || {});
+    for (const g of G) { const m = String(g.name).match(/^(.*) (\d+)$/); if (!m || !G.some(x => x.id !== g.id && gNorm(x.name) === gNorm(m[1]))) continue;
+      g.renameUntil = now() + 24 * 3600e3; const f = P(g.members[0]);
+      if (f) addMail(f, { kind: 'he', fromName: '🌸 Nội vụ phủ', text: `Do sơ suất của Nội vụ phủ, nhóm tỷ muội của chủ tử bị trùng tên với nhóm khác nên tạm gọi là "${g.name}". Xin chủ tử đặt tên mới cho nhóm trong vòng 24 giờ (mở 💞 Tỷ muội, bấm Đổi tên nhóm). Quá hạn, Nội vụ phủ sẽ tự đặt một tên khác.` });
+      console.log('cho đổi tên nhóm:', g.name); } }
   // gỡ các tin về sự cố kỳ bầu phượng ấn khỏi bảng tin (chủ game không muốn thông báo cả cung)
   DB.state.news = (DB.state.news || []).filter(x => !/Kỳ bầu phượng ấn tiếp tục như cũ|Đính chính kỳ bầu phượng ấn/.test(x.text));
   // đại án rút còn 3 ngày: vụ đang mở cũng rút theo

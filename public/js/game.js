@@ -1564,7 +1564,9 @@ const LOCN = { hoavien: 'Ngự hoa viên', tuninh: 'Từ Ninh cung', duongtam: '
 function openSis() {
   const g = me.group;
   if (!g) { modal(`<button class="close" onclick="window._close()">✕</button><h3>💞 Tỷ muội</h3><div style="line-height:1.6;color:var(--muted)">Chưa kết nghĩa với ai. Mở <b>Danh sách hậu cung</b>, bấm <b>💞 Kết nghĩa</b> cạnh người muốn kết thân (họ cần đang online). Nhóm tối đa 10 người, tên nhóm không được trùng nhóm khác.</div><div class="btns"><button class="gold" id="sisRoster">Mở danh sách hậu cung</button></div>`); $('sisRoster').onclick = () => { closeModal(); openRoster(); }; return; }
-  modal(`<button class="close" onclick="window._close()">✕</button><h3>💞 Tỷ muội "${esc(g.name)}"</h3>
+  const rh = g.renameUntil ? Math.max(1, Math.ceil((g.renameUntil - Date.now()) / 3600e3)) : 0;
+  const ren = !rh ? '' : g.founder === me.id ? `<div style="border:1px solid #f3a6c8;border-radius:10px;padding:8px 10px;margin:6px 0"><b>🌸 Đổi tên nhóm</b> <small style="color:var(--muted)">tên đang bị trùng với nhóm khác · còn khoảng ${rh} giờ, quá hạn Nội vụ phủ tự đặt tên</small><div style="display:flex;gap:6px;margin-top:6px"><input id="gNewName" maxlength="20" placeholder="Tên mới, không trùng nhóm khác" style="flex:1"><button class="gold" id="gRen">Đổi tên</button></div></div>` : `<div style="color:#f3a6c8;font-size:12.5px;margin:4px 0">🌸 Tên nhóm đang bị trùng, chủ nhóm còn khoảng ${rh} giờ để đặt tên mới.</div>`;
+  modal(`<button class="close" onclick="window._close()">✕</button><h3>💞 Tỷ muội "${esc(g.name)}"</h3>${ren}
   <table>${g.members.map(m => `<tr><td>${m.online ? '🟢' : '⚪'} ${esc(m.name)}${m.id === me.id ? ' (bổn cung)' : ''}</td><td>${esc(m.rankName)}</td><td style="color:var(--muted)">${m.lanh ? '⛓ lãnh cung' : m.camTuc ? '🔒 cấm túc' : m.online ? 'ở ' + (LOCN[m.loc] || '') : ''}</td></tr>`).join('')}</table>
   <div style="margin-top:8px"><b>🧵 Quỹ may áo dâng Thái hậu</b> <small style="color:var(--muted)">đủ quỹ thì cả nhóm được Thái hậu hài lòng +10, công trạng +30</small>
   <div style="height:10px;background:rgba(255,255,255,.1);border-radius:6px;margin:5px 0;overflow:hidden"><div style="height:100%;width:${Math.min(100, g.fund / g.goal * 100)}%;background:linear-gradient(90deg,#e2bf6b,#f3dc96)"></div></div>${g.fund}/${g.goal} bạc
@@ -1572,6 +1574,7 @@ function openSis() {
   <div style="color:var(--muted);font-size:12.5px;margin-top:6px">• Trò chuyện riêng: bấm nút <b>💞</b> cạnh khung chat để chuyển kênh.<br>• Tỷ muội bị lãnh cung hoặc cấm túc: đến <b>Từ Ninh cung</b> bấm "Cầu tình".<br>• Cùng dâng tiết mục trong một buổi yến tiệc: mỗi người được cộng thêm điểm hợp tấu.</div>
   <div class="btns"><button id="sisLeave" style="border-color:#c0503a">✂️ Cắt áo đoạn nghĩa</button></div>`);
   $('mcard').querySelectorAll('[data-don]').forEach(b => b.onclick = () => { socket.emit('sis', { op: 'donate', amount: +b.dataset.don }); setTimeout(openSis, 500); });
+  const gr = $('gRen'); if (gr) gr.onclick = () => { socket.emit('sis', { op: 'rename', name: $('gNewName').value }); setTimeout(openSis, 600); };
   $('sisLeave').onclick = () => { if (confirm('Rời nhóm tỷ muội? Cả cung sẽ biết chuyện này.')) { socket.emit('sis', { op: 'leave' }); closeModal(); } };
 }
 // nút đổi kênh chat
