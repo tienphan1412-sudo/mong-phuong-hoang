@@ -1142,7 +1142,7 @@ function chooseTai(cb) {
 }
 // nhịp phách: nốt chạy sang phải, bấm khi nốt vào ô vàng
 function gameRhythm(tai, done) {
-  if (selfC) { selfC.target = null; taiStart(selfC, tai); socket.emit('emote', 'tai:' + tai); camYaw = selfC.root.rotation.y + (tai === 'đàn' ? .5 : 0); }
+  if (selfC) { selfC.target = null; const tv = danceVar(tai); taiStart(selfC, tv); socket.emit('emote', 'tai:' + tv); camYaw = selfC.root.rotation.y + (tai === 'đàn' ? .5 : 0); }
   if (tai === 'thơ') poemShow();
   const N = 8, notes = []; let t0 = performance.now() + 900, hits = 0, judged = 0, raf;
   for (let i = 0; i < N; i++) notes.push({ t: t0 + i * (520 + Math.random() * 380), st: 0 });
@@ -1273,7 +1273,11 @@ function applyAnim(o, anim, once) {
 // =====================================================================
 // ĐẠO CỤ BIỂU DIỄN
 // =====================================================================
+// các điệu múa nữ đã có: múa cũ, điệu múa mới, múa nhẹ; 'múa#1' = múa quạt với điệu số 1
+const DANCES = ['mua', 'mua2', 'mua_nhe'];
+const danceVar = tai => (tai === 'múa' || tai === 'lụa') ? tai + '#' + Math.floor(Math.random() * DANCES.length) : tai;
 function taiStart(c, tai) {
+  let dv = 0; if (String(tai).includes('#')) { const sp = String(tai).split('#'); tai = sp[0]; dv = +sp[1] || 0; } const dance = c.male ? 'mua' : DANCES[dv % DANCES.length];
   taiEnd(c); if (c === selfC) taiOn = true;
   const r = c.root, P = r.position.clone(), ry = r.rotation.y, fx = Math.sin(ry), fz = Math.cos(ry);
   c._taiHome = { x: P.x, z: P.z, y: P.y, ry };
@@ -1294,7 +1298,7 @@ function taiStart(c, tai) {
       aim(cc.root, cc.B.rArm, cc.B.rFore, v3([-.25, -.55, .75])); aim(cc.root, cc.B.rFore, cc.B.rHand, v3([.35 + Math.sin(t * 9 + 1) * .15, -.2, .9]));
     };
   } else if (tai === 'múa') {
-    c.play('mua', { restart: true });
+    c.play(dance, { restart: true });
     const fan = makeFan(); world.group.add(fan); c._taiProp = fan;
     const hp = new THREE.Vector3(), q = new THREE.Quaternion();
     c.post = (cc, t) => { cc.B.rHand.getWorldPosition(hp); cc.B.rHand.getWorldQuaternion(q); fan.position.copy(hp); fan.quaternion.copy(q); fan.rotateX(-Math.PI / 2); fan.rotateZ(Math.PI / 2 + Math.sin(t * 3) * .3); fan.translateY(.02); };
@@ -1308,7 +1312,7 @@ function taiStart(c, tai) {
     c.play('dung_cho'); const rr = RECIPES[+tai.split(':')[1]] || RECIPES[0]; const b = makeDish(rr.name); b.scale.setScalar(.6); world.group.add(b); c._taiProp = b; dishLabel(b, rr.name); const a = new THREE.Vector3(), b2 = new THREE.Vector3();
     c.post = (cc) => { aim(cc.root, cc.B.rArm, cc.B.rFore, v3([-.15, -.5, .85])); aim(cc.root, cc.B.rFore, cc.B.rHand, v3([.5, .1, .85])); aim(cc.root, cc.B.lArm, cc.B.lFore, v3([.15, -.5, .85])); aim(cc.root, cc.B.lFore, cc.B.lHand, v3([-.5, .1, .85])); cc.root.updateMatrixWorld(true); cc.B.rHand.getWorldPosition(a); cc.B.lHand.getWorldPosition(b2); b.position.copy(a).add(b2).multiplyScalar(.5); b.position.y += .05; };
   } else if (tai === 'lụa') {
-    c.play('mua', { restart: true });
+    c.play(dance, { restart: true });
     const g = new THREE.Group(); world.group.add(g); c._taiProp = g;
     const r1 = makeRibbon(0xe0457b), r2 = makeRibbon(0xf2c14e); g.add(r1, r2); const a = new THREE.Vector3(), b = new THREE.Vector3();
     c.post = (cc, t) => { cc.B.rHand.getWorldPosition(a); cc.B.lHand.getWorldPosition(b); r1.userData.update(a, t, 1); r2.userData.update(b, t + 1.3, -1); };
@@ -1755,7 +1759,7 @@ async function danceTogether() {
   const walk = (x, z) => new Promise(res => { selfC.target = { x, z }; let n = 0; const iv = setInterval(() => { if (!selfC?.target || ++n > 80) { selfC && (selfC.target = null); clearInterval(iv); res(); } }, 100); });
   const S = world.stage; await walk(S.x + (Math.random() - .5) * 1.6, S.z + (Math.random() - .5) * .8);
   selfC.root.rotation.y = S.ry; const tai = ['múa', 'lụa', 'kiếm', 'lụa'][Math.floor(Math.random() * 4)];
-  taiStart(selfC, tai); socket.emit('emote', 'tai:' + tai); act('dance');
+  const tv = danceVar(tai); taiStart(selfC, tv); socket.emit('emote', 'tai:' + tv); act('dance');
   setTimeout(async () => {
     taiEnd(selfC); socket.emit('emote', 'dung_cho'); dancing = false;
     if (world?.loc === 'yentiec' && home) { await walk(Math.sign(home.x) * .55, home.z); socket.emit('sit', { seat: home.id }); }
@@ -1867,7 +1871,7 @@ async function runNpcShow(at, n = 1) {
     // 3) cung nữ múa lụa phía trước
     const girls = Gi.map(put);
     // lần 1 múa lụa, lần 2 điệu múa mới, lần 3 múa nhẹ uyển chuyển
-    girls.forEach(c => { if (!c) return; if (n === 1) taiStart(c, 'lụa'); else c.play(n === 2 ? 'mua2' : 'mua_nhe', { restart: true }); });
+    girls.forEach(c => { if (!c) return; taiStart(c, 'lụa#' + (n - 1)); });
     await sleepUntil(32000); if (!alive()) return;
     // 4) cúi chào, pháo hoa
     [...whites, ...girls].forEach(c => { if (!c) return; taiEnd(c); c.play('hanh_le', { restart: true }); });
