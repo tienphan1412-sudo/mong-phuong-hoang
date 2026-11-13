@@ -3125,3 +3125,24 @@ socket.on('lcCom', async () => {
     else if (t > 5.2 && t < 9.5) { if (c.curName !== 'di') { c.play('di'); r.rotation.y = 0; } r.position.z += dt * 1.6; }
     else if (t >= 9.5) { c.dispose(); return false; } });
 });
+
+// ---------------- bảo trì có hẹn giờ ----------------
+let maintSt = null, maintWasOn = false, maintTimer = null;
+function maintRender() {
+  let ov = document.getElementById('maintOv'), bn = document.getElementById('maintBn');
+  const m = maintSt, hm = m ? new Date(m.at + 7 * 3600e3).toISOString().slice(11, 16).replace(':', 'h') : '';
+  const on = m && (m.on || Date.now() >= m.at), soon = m && !on && m.at - Date.now() <= 30 * 60e3;
+  if (on) { maintWasOn = true;
+    if (!ov) { ov = document.createElement('div'); ov.id = 'maintOv'; ov.style.cssText = 'position:fixed;inset:0;z-index:99999;background:radial-gradient(circle at 50% 40%,#3a1414,#120606);color:#f3dc96;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:24px;font-family:inherit'; document.body.appendChild(ov); }
+    ov.innerHTML = `<div style="font-size:54px">⚙️</div><h2 style="margin:10px 0 6px;font-size:22px">Hiện tại hệ thống đang bảo trì</h2><div style="color:#e9d8b0;line-height:1.6;max-width:420px">Nội vụ phủ đang tu sửa hậu cung, vui lòng quay lại sau ít phút.<br>Trang sẽ tự tải lại khi bảo trì xong.</div>`;
+  } else if (ov) ov.remove();
+  if (soon) { const left = Math.max(1, Math.ceil((m.at - Date.now()) / 60e3));
+    if (!bn) { bn = document.createElement('div'); bn.id = 'maintBn'; bn.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:9999;background:#8a2a1e;color:#fff;text-align:center;font-size:13px;padding:6px 10px;box-shadow:0 2px 8px rgba(0,0,0,.4)'; document.body.appendChild(bn); toast(`⚙️ Hệ thống bảo trì vào lúc ${hm}. Vui lòng hoàn tất và thoát game trước giờ bảo trì.`, 'bad'); }
+    bn.textContent = `⚙️ Hệ thống bảo trì vào lúc ${hm} (còn ${left} phút). Vui lòng hoàn tất và thoát game trước giờ bảo trì.`;
+  } else if (bn) bn.remove();
+  clearTimeout(maintTimer); if (m && !on) maintTimer = setTimeout(maintRender, 20e3);
+}
+socket.on('maint', m => { if (!m && maintWasOn) return location.reload(); maintSt = m; maintRender(); });
+socket.on('connect', () => { if (maintWasOn) setTimeout(() => { if (!maintSt) location.reload(); }, 4000); });
+// bản mới lên (máy chủ khởi động lại) thì tự tải lại trang để dùng giao diện mới
+let bootSeen = null; socket.on('build', b => { if (bootSeen && bootSeen !== b) return location.reload(); bootSeen = b; });

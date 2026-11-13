@@ -1578,7 +1578,7 @@ function nightTick() {
     if (days >= C.ABSENT_SICK_DAYS && days < C.ABSENT_LOSE_DAYS && !p.sick && !online.has(p.id)) { p.sick = true; news(`${p.name} cáo bệnh, đã ${Math.floor(days)} ngày không ra khỏi cung.`); }
     if (days >= C.ABSENT_LOSE_DAYS && !online.has(p.id)) { p.sick = false; const r = p.rank; p.rank = C.PALACE_RANK - 1; p.waiting = true; p.trend = { dir: -1, t: now() }; p.outfit = C.RANKS[p.rank].outfit; news(`${p.name} vắng mặt quá lâu, nhường ghế ${C.RANKS[r].name}.`); freeSeatCheck(); }
   }
-  checkDeadlines(); thaiTick(); kidTick(); sinhTick(); hhcTick(); gRenameTick(); leTick(); housekeep(); hhTick(); eventTick(); npcDaily(); grudgeTick(); bigTick(); festTick(); if (v.getUTCHours() >= 3) backup();
+  checkDeadlines(); thaiTick(); kidTick(); sinhTick(); hhcTick(); gRenameTick(); maintTick(); leTick(); housekeep(); hhTick(); eventTick(); npcDaily(); grudgeTick(); bigTick(); festTick(); if (v.getUTCHours() >= 3) backup();
   // vụ án do hệ thống dàn dựng khi cung vắng người
   for (const p of Object.values(DB.players)) {
     if (!online.has(p.id) || p.lanh || p.rank < C.FIGHT_RANK) continue;
@@ -2528,7 +2528,12 @@ function top5() {
 }
 let lastTop = '';
 setInterval(() => { const t = JSON.stringify(top5()); if (t !== lastTop) { lastTop = t; io.emit('top5', JSON.parse(t)); } }, 2000);
-io.on('connection', s => s.emit('top5', top5()));
+const BOOT = String(Date.now());
+io.on('connection', s => { s.emit('top5', top5()); s.emit('maint', maintPub()); s.emit('build', BOOT); });
+// bảo trì có hẹn giờ: báo trước 30 phút, tới giờ hiện màn hình chờ; bản mới khởi động sau giờ hẹn thì tự xoá
+const maintPub = () => { const m = DB.state.maint; return m ? { at: m.at, on: now() >= m.at } : null; };
+let maintPhase = -1;
+function maintTick() { const m = DB.state.maint; const ph = !m ? -1 : now() >= m.at ? 2 : now() >= m.at - 30 * 60e3 ? 1 : 0; if (ph !== maintPhase) { maintPhase = ph; io.emit('maint', maintPub()); } }
 
 const PORT = process.env.PORT || 3000;
 loadDB().then(() => {
@@ -2559,6 +2564,8 @@ loadDB().then(() => {
   // nhóm tỷ muội trùng tên: nhóm lập sớm nhất giữ tên, các nhóm sau thêm số (Kim Lan 2, Kim Lan 3…)
   { const seen = {}; for (const g of Object.values(DB.state.groups || {}).sort((a, b) => (a.created || 0) - (b.created || 0))) { const k = gNorm(g.name); if (!seen[k]) { seen[k] = 1; continue; } const base = String(g.name).trim().replace(/\s+/g, ' '); let n = 2; while (gNameTaken(base + ' ' + n, g.id)) n++; console.log('đổi tên nhóm trùng:', g.name, '->', base + ' ' + n); g.name = base + ' ' + n; } }
   // nhóm bị đổi tên vì trùng (thêm số phía sau): gửi thư cho chủ nhóm, cho 24 giờ tự đổi tên
+  if (DB.state.maint && now() >= DB.state.maint.at) { console.log('bảo trì xong'); DB.state.maint = null; }
+  if (!DB.state.maint1113) { DB.state.maint1113 = 1; const at = Date.UTC(2026, 10, 13, 16, 30); if (now() < at) DB.state.maint = { at }; }
   // cấp nhóm: nhóm cũ đã đông người giữ đủ chỗ hiện có
   for (const g of Object.values(DB.state.groups || {})) { if (g.lv == null) g.lv = g.members.length > 6 ? 2 : g.members.length > 4 ? 1 : 0; g.bank = (g.bank || 0) + (g.fund || 0); g.fund = 0; }
   if (!DB.state.gRenameMail1) { DB.state.gRenameMail1 = 1; const G = Object.values(DB.state.groups || {});
