@@ -159,7 +159,10 @@ function freshDay(p) {
   p.cnt = p.cnt || {}; p.cnt.streakMax = Math.max(p.cnt.streakMax || 0, p.streak);
   setTimeout(() => toast(p, `📅 Điểm danh ngày ${sd}/7 (chuỗi ${p.streak} ngày): +${gift} bạc${sd === 7 ? ', +1 lượt, +10 sủng ái' : ''}.${sd < 7 ? ` Ngày 7 được ${C.LOGIN_REWARD[6]} bạc.` : ''}`, 'good'), 4000);
 }
+// mọi bộ đồ nữ trong game: tài khoản quản trị được thay thử tất cả (lệnh /thudo hoặc tủ đồ)
+const ALL_OUTFITS = [...new Set([...C.RANKS.flatMap(r => [r.outfit, ...(r.extra || [])]), 'hoanghau', 'hoanghau2', 'hoangquyphi', 'phi_bau', 'aongu'])];
 function allowedOutfits(p) {
+  if (p.admin) return ALL_OUTFITS;
   const s = new Set(['aongu']); if (isHH(p)) { s.add('hoanghau'); s.add('hoanghau2'); }
   for (let r = 0; r <= p.rank; r++) { s.add(C.RANKS[r].outfit); for (const x of C.RANKS[r].extra || []) s.add(x); }
   return [...s];
@@ -2237,6 +2240,11 @@ function adminRaw(p, text) {
   else if (cmd === '/cothai') { const who = [arg, ...rest].filter(Boolean).join(' ').toLowerCase(); const q = who ? findP(who) : p; if (!q) return toast(p, 'Không tìm thấy.', 'bad'); q.thai = { since: now() - 1000, known: false, test: true }; revealThai(q, 'mach'); }
   else if (cmd === '/lon') { const who = [arg, ...rest].filter(Boolean).join(' ').toLowerCase(); const q = who ? findP(who) : p; if (!q?.children?.length) return toast(p, 'Người này chưa có con.', 'bad'); for (const c of kidFix(q)) { c.born -= 3 * 864e5; c.cry = null; c.cryAt = 0; } push(q); kidEmit(q); return toast(p, `Các con của ${q.name} lớn thêm 3 ngày.`, 'good'); }
   else if (cmd === '/khoc') { for (const c of kidFix(p)) c.cryAt = 1; return toast(p, 'Các bé sẽ khóc ngay.', 'good'); }
+  else if (cmd === '/thudo') {
+    if (!arg) return toast(p, 'Gõ /thudo + tên bộ. Các bộ: ' + ALL_OUTFITS.join(', '));
+    if (!ALL_OUTFITS.includes(arg)) return toast(p, 'Không có bộ ' + arg + '. Các bộ: ' + ALL_OUTFITS.join(', '), 'bad');
+    p.outfit = arg; push(p); const sk = sockOf(p.id); if (sk) rTo(p, sk).emit('poutfit', { id: p.id, outfit: arg }); save(); return toast(p, 'Đang mặc thử: ' + (C.OUTFITS[arg] || arg), 'good');
+  }
   else if (cmd === '/hien') { p.stealthOff = true; save(); return toast(p, 'Đã tắt tàng hình: người chơi khác thấy nhân vật của bà (vào lại khu vực để áp dụng).', 'good'); }
   else if (cmd === '/an') { p.stealthOff = false; save(); return toast(p, 'Đã bật tàng hình: người chơi khác không thấy bà (vào lại khu vực để áp dụng).', 'good'); }
   else if (cmd === '/xoacon') { const nm = [arg, ...rest].filter(Boolean).join(' ').toLowerCase(); const before = (p.children || []).length; p.children = (p.children || []).filter(c => nm ? c.name.toLowerCase() !== nm : !c.test); if (DB.state.thaitu?.mother === p.id && !p.children.some(c => c.id === DB.state.thaitu.cid)) DB.state.thaitu = null; p.carry = null; p.follow = null; push(p); kidEmit(p); return toast(p, `Đã xoá ${before - p.children.length} bé${nm ? '' : ' sinh ra từ lệnh thử'}.`, 'good'); }
