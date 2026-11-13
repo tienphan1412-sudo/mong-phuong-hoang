@@ -400,7 +400,7 @@ function renderMenu() {
   m.innerHTML = ''; for (const [ic, lb, fn, badge] of items) { const b = document.createElement('button'); b.innerHTML = `<span class="ic">${ic}</span><span class="lb">${lb}</span>${badge ? `<i class="bd">${badge}</i>` : ''}`; b.title = lb; b.onclick = fn; m.appendChild(b); }
 }
 function openEmotes() {
-  const E = [['hanh_le', 'Hành lễ'], ['cui_chao', 'Cúi chào'], ['chap_tay', 'Chắp tay'], ['che_mieng', 'Che miệng cười'], ['mua', 'Múa'], ['mua2', 'Múa điệu mới'], ['om', 'Ôm'], ['vo_tay', 'Vỗ tay'], ['quy', 'Quỳ'], ['quy1chan', 'Quỳ một chân'], ['phuphuc', 'Phủ phục'], ['xoadau', 'Xoa đầu'], ['khoc', 'Khóc'], ['gian', 'Giận'], ['nga', 'Ngất xỉu'], ['chong_eo', 'Đứng chống eo'], ['dung_cho', 'Đứng thẳng']];
+  const E = [['hanh_le', 'Hành lễ'], ['cui_chao', 'Cúi chào'], ['chap_tay', 'Chắp tay'], ['che_mieng', 'Che miệng cười'], ['mua', 'Múa'], ['mua2', 'Múa điệu mới'], ['om', 'Ôm'], ['vo_tay', 'Vỗ tay'], ['quy', 'Quỳ'], ['quy1chan', 'Quỳ một chân'], ['xoadau', 'Xoa đầu'], ['khoc', 'Khóc'], ['gian', 'Giận'], ['nga', 'Ngất xỉu'], ['chong_eo', 'Đứng chống eo'], ['dung_cho', 'Đứng thẳng']];
   modal(`<button class="close" onclick="window._close()">✕</button><h3>Động tác</h3><div class="btns">${E.map(([k, n]) => `<button data-e="${k}">${n}</button>`).join('')}</div>`);
   $('mcard').querySelectorAll('[data-e]').forEach(b => b.onclick = () => { emote(b.dataset.e); closeModal(); });
 }
