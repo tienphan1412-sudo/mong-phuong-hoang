@@ -400,7 +400,7 @@ function renderMenu() {
   m.innerHTML = ''; for (const [ic, lb, fn, badge] of items) { const b = document.createElement('button'); b.innerHTML = `<span class="ic">${ic}</span><span class="lb">${lb}</span>${badge ? `<i class="bd">${badge}</i>` : ''}`; b.title = lb; b.onclick = fn; m.appendChild(b); }
 }
 function openEmotes() {
-  const E = [['hanh_le', 'Hành lễ'], ['cui_chao', 'Cúi chào'], ['chap_tay', 'Chắp tay'], ['che_mieng', 'Che miệng cười'], ['mua', 'Múa'], ['mua2', 'Múa điệu mới'], ['mua_nhe', 'Múa nhẹ'], ['om', 'Ôm'], ['vo_tay', 'Vỗ tay'], ['quy', 'Quỳ'], ['quy1chan', 'Quỳ một chân'], ['phuphuc', 'Phủ phục'], ['xoadau', 'Xoa đầu'], ['khoc', 'Khóc'], ['gian', 'Giận'], ['nga', 'Ngất xỉu'], ['dung_cho', 'Đứng thẳng']];
+  const E = [['hanh_le', 'Hành lễ'], ['cui_chao', 'Cúi chào'], ['chap_tay', 'Chắp tay'], ['che_mieng', 'Che miệng cười'], ['mua', 'Múa'], ['mua2', 'Múa điệu mới'], ['om', 'Ôm'], ['vo_tay', 'Vỗ tay'], ['quy', 'Quỳ'], ['quy1chan', 'Quỳ một chân'], ['phuphuc', 'Phủ phục'], ['xoadau', 'Xoa đầu'], ['khoc', 'Khóc'], ['gian', 'Giận'], ['nga', 'Ngất xỉu'], ['chong_eo', 'Đứng chống eo'], ['dung_cho', 'Đứng thẳng']];
   modal(`<button class="close" onclick="window._close()">✕</button><h3>Động tác</h3><div class="btns">${E.map(([k, n]) => `<button data-e="${k}">${n}</button>`).join('')}</div>`);
   $('mcard').querySelectorAll('[data-e]').forEach(b => b.onclick = () => { emote(b.dataset.e); closeModal(); });
 }
@@ -1273,8 +1273,8 @@ function applyAnim(o, anim, once) {
 // =====================================================================
 // ĐẠO CỤ BIỂU DIỄN
 // =====================================================================
-// các điệu múa nữ đã có: múa cũ, điệu múa mới, múa nhẹ; 'múa#1' = múa quạt với điệu số 1
-const DANCES = ['mua', 'mua2', 'mua_nhe'];
+// các điệu múa nữ đã có: múa cũ, điệu múa mới; 'múa#1' = múa quạt với điệu số 1
+const DANCES = ['mua', 'mua2'];
 const danceVar = tai => (tai === 'múa' || tai === 'lụa') ? tai + '#' + Math.floor(Math.random() * DANCES.length) : tai;
 function taiStart(c, tai) {
   let dv = 0; if (String(tai).includes('#')) { const sp = String(tai).split('#'); tai = sp[0]; dv = +sp[1] || 0; } const dance = c.male ? 'mua' : DANCES[dv % DANCES.length];
@@ -1846,7 +1846,7 @@ async function runNpcShow(at, n = 1) {
   if (showOn || world?.loc !== 'yentiec') return; showOn = true;
   const w = world, S = world.stage || { x: 0, z: -2.6, ry: Math.PI }, base = S.z + 1.1;
   let t0 = at; const sleepUntil = ms => new Promise(r => setTimeout(r, Math.max(0, t0 + ms - Date.now())));
-  watchStage(base, 60000); toast(n === 1 ? '🎭 Đoàn ca vũ Giáo phường vào diễn: thị vệ kiếm vũ, cung nữ múa lụa!' : `🎭 Giáo phường diễn lần ${n}: ${n === 2 ? 'cung nữ múa điệu mới' : 'điệu múa uyển chuyển cuối buổi'}!`, 'good');
+  watchStage(base, 60000); toast(n === 1 ? '🎭 Đoàn ca vũ Giáo phường vào diễn: thị vệ kiếm vũ, cung nữ múa lụa!' : `🎭 Giáo phường diễn lần ${n}: ${n === 2 ? 'cung nữ múa điệu mới' : 'múa lụa tiễn khách cuối buổi'}!`, 'good');
   const alive = () => world === w;
   // tải trước toàn bộ diễn viên (ẩn), tới lượt thì hiện ra
   const gx = [-.9, 0, .9], cx = [-.55, .55, 0], cz = [base + .9, base + .9, base + 1.5];

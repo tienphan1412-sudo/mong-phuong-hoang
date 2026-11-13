@@ -1014,7 +1014,7 @@ function feastLive() {
 }
 function startNpcShow(f) {
   const n = f.shows || 1; f.show = { at: now() + 2500, n };
-  roomSay(n === 1 ? 'Đoàn ca vũ Giáo phường xin dâng tiết mục: Thị vệ kiếm vũ, cung nữ múa lụa! Mời các vị chủ tử thưởng thức.' : n === 2 ? 'Giáo phường xin dâng tiếp điệu múa mới: Thị vệ kiếm vũ, cung nữ múa Nghê Thường!' : 'Giáo phường xin dâng tiết mục cuối buổi: kiếm vũ và điệu múa Lạc Thần uyển chuyển!', '🎭 Giáo phường');
+  roomSay(n === 1 ? 'Đoàn ca vũ Giáo phường xin dâng tiết mục: Thị vệ kiếm vũ, cung nữ múa lụa! Mời các vị chủ tử thưởng thức.' : n === 2 ? 'Giáo phường xin dâng tiếp điệu múa mới: Thị vệ kiếm vũ, cung nữ múa Nghê Thường!' : 'Giáo phường xin dâng tiết mục cuối buổi: kiếm vũ và múa lụa tiễn khách!', '🎭 Giáo phường');
   io.to('yentiec').emit('npcShow', f.show); htSay('Tốt! Cho vào biểu diễn.');
 }
 function tuuLenhAnswer(p, text) {

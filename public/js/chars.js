@@ -9,11 +9,11 @@ const cache = {};
 let FEMALE = null, MALE = null, EXTRA = null, CRADLE = null;
 // động tác thêm: tải sau, không bắt người chơi chờ
 export function loadExtra() { return loadModel('hoangquyphi2').catch(() => null); }
-export const MALE_ONLY = new Set(['om_nam']), FEMALE_ONLY = new Set(['om_nu', 'bebe', 'mua2', 'mua_nhe', 'xoadau']);
+export const MALE_ONLY = new Set(['om_nam']), FEMALE_ONLY = new Set(['om_nu', 'bebe', 'mua2', 'chong_eo', 'xoadau']);
 export const MALE_MODELS = new Set(['hoangthuong', 'hoangthuong_dem', 'thaigiam', 'thive', 'thaiy', 'hoangtu1', 'hoangtu2', 'hoangtu3']);
 
 function lock(clips) {
-  const LOCK = ['mua2', 'mua_nhe', 'om_nu', 'om_nam', 'bebe', 'xoadau', 'di', 'chay', 'mua', 'dung_cho', 'vo_tay', 'khoc', 'gian', 'nga', 'cuoi', 'ngoi', 'khoanh_tay', 'gio_tay', 'nam_tay', 'dung_cho_nam'];
+  const LOCK = ['mua2', 'chong_eo', 'om_nu', 'om_nam', 'bebe', 'xoadau', 'di', 'chay', 'mua', 'dung_cho', 'vo_tay', 'khoc', 'gian', 'nga', 'cuoi', 'ngoi', 'khoanh_tay', 'gio_tay', 'nam_tay', 'dung_cho_nam'];
   for (const c of clips) if (LOCK.includes(c.name)) for (const t of c.tracks) if (/Hips\.position$/.test(t.name)) {
     const v = t.values, x0 = v[0], z0 = v[2]; for (let i = 0; i < v.length; i += 3) { v[i] = x0; v[i + 2] = z0; }
   }
@@ -23,7 +23,7 @@ export function loadModel(name) {
   if (!cache[name]) cache[name] = loader.loadAsync(asset(`models/${name}.glb`)).catch(() => loader.loadAsync(cdnFail(`models/${name}.glb`))).then(g => {
     if (name === 'hoangtu1' || name === 'congchua3' || name === 'phi_bau') { const REN = { 'walk.001': 'di', 'female walk.001': 'di', 'run.001': 'chay', 'sit.001': 'ngoi', 'cry.001': 'khoc', 'laugh_01.001': 'cuoi', 'dance_01.001': 'mua' }; g.animations = g.animations.filter(a => REN[a.name]); g.animations.forEach(a => a.name = REN[a.name]); }
     if (name === 'hoangquyphi2') { // gói động tác mới đi kèm bộ áo Hoàng quý phi xanh phỉ thúy
-      const EX = [['From standing', 'quy1chan'], ['cradling a swaddled baby', 'bebe'], ['dance_01', 'mua2'], ['female hug', 'om_nu'], ['hug.001', 'om_nam'], ['lean forward slightly', 'phuphuc'], ['pole dance', 'mua_nhe'], ['young child stands', 'xoadau']];
+      const EX = [['From standing', 'quy1chan'], ['cradling a swaddled baby', 'bebe'], ['dance_01', 'mua2'], ['female hug', 'om_nu'], ['hug.001', 'om_nam'], ['lean forward slightly', 'phuphuc'], ['pole dance', 'chong_eo'], ['young child stands', 'xoadau']];
       for (const a of g.animations) { const m = EX.find(([k]) => a.name.includes(k)); if (m) a.name = m[1]; }
       g.animations = g.animations.filter(a => EX.some(([, n]) => n === a.name));
       EXTRA = {}; for (const a of g.animations) EXTRA[a.name] = a;
