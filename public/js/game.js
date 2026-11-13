@@ -372,6 +372,7 @@ function renderActs() {
     add('📒 Hiệp lý lục cung', (cc.so || 0) >= 5 ? 'Hôm nay đã duyệt đủ 5 lần' : `Tìm khoản chi khai khống · còn ${5 - (cc.so || 0)}/5 lần hôm nay`, () => socket.emit('caocap', { op: 'so' }), (cc.so || 0) >= 5);
     add('📚 Dạy dỗ người mới', (cc.day || 0) >= 5 ? 'Hôm nay đã dạy đủ 5 lần' : `Người được dạy +15 công trạng · còn ${5 - (cc.day || 0)}/5 lần hôm nay`, openDay, (cc.day || 0) >= 5);
     add('🎎 Thiết yến', me.ccFeastOk ? '150 bạc · 15 phút · mỗi tiết mục +4 công trạng cho chủ tiệc · mỗi ngày 1 lần' : 'Hôm nay đã thiết yến', () => socket.emit('caocap', { op: 'yentiec' }), !me.ccFeastOk); }
+  if (L === 'phong' && me.camTuc && me.hhPhat) add('📜 Dâng biểu kêu oan lên Thái hậu', `Bị Hoàng hậu ${esc(me.hhPhat.by)} phạt cấm túc · 1 lượt, 50 bạc · Thái hậu minh xét thì được thả`, () => socket.emit('hh', { op: 'kieuoan' }));
   if (L === 'phong' && me.hhId && me.visit === me.hhId) add('🙇 Thỉnh an Hoàng hậu', me.thinhanHH ? 'Hôm nay đã thỉnh an' : 'Mỗi sáng 1 lần · công trạng +8', () => socket.emit('hh', { op: 'thinhan' }), me.thinhanHH);
   if (L === 'phong') { if (!me.visit) { add('🍵 Mời bạn bè thưởng trà', 'Mời sang cung riêng, ngồi đôn uống trà', inviteTra); add('🫖 Pha trà mời khách', 'Khách mới đến được +5 công trạng (mỗi người 1 lần/ngày)', () => socket.emit('tra', { op: 'serve' })); } else add('🚪 Cáo từ về cung', '', () => socket.emit('goto', 'phong'));
     if (world?.myBed && !me.visit) add(lying ? '🧍 Ngồi dậy' : '🛏 Lên giường', lying ? (me.selfSick ? 'Ngồi dậy là khỏi bệnh' : '') : 'Ngồi mép giường · nằm nghỉ · cáo bệnh', lying ? getUp : openMyBed); }
@@ -386,11 +387,12 @@ function renderActs() {
   if (me.night && L !== 'tamcung' && !me.lanh) add('🌸 Chuẩn bị thị tẩm', me.night.prep ? `Đã chuẩn bị: ${esc(me.night.prep.text)}` : 'Tắm hoa, chọn áo ngủ, xông hương hợp tâm trạng Hoàng thượng', openPrep, !!me.night.prep);
   if (L === 'phong') { add('📔 Nhật ký sủng hạnh', `${(me.diary || []).length} trang`, openDiary); add('🎁 Tín vật được ban', `${Object.keys(me.tinvat || {}).length}/8 món`, openTinVat); }
   if (L === 'lanhcung' && me.lanh) { const hp = me.lanh.hp ?? 70, vh = (new Date(Date.now() + 7 * 3600e3)).getUTCHours();
-    add('🧹 Làm việc lãnh cung', hp < 15 ? 'Kiệt sức, chờ tỷ muội gửi đồ vào' : `Phục vị ${me.lanh.tasks || 0}/3 · mỗi ngày 1 lần · sức khỏe -10${lcList.some(q => q.online && q.id !== me.id) ? ' · có người cùng cảnh, làm chung được thêm tiến độ' : ''}`, gameLanh, hp < 15);
+    add('🧹 Làm việc lãnh cung', hp < 10 ? 'Kiệt sức, chờ tỷ muội gửi đồ vào' : `Phục vị ${me.lanh.tasks || 0}/3 · mỗi ngày 1 lần · sức khỏe -10${lcList.some(q => q.online && q.id !== me.id) ? ' · có người cùng cảnh, làm chung được thêm tiến độ' : ''}`, gameLanh, hp < 10);
+    if (me.hhPhat) add('📜 Dâng biểu kêu oan lên Thái hậu', `Bị Hoàng hậu ${esc(me.hhPhat.by)} xử · 1 lượt, 50 bạc · Thái hậu minh xét thì được phục vị`, () => socket.emit('hh', { op: 'kieuoan' }));
     add('🕯 Hỏi chuyện phế phi', me.lanh.food > 0 ? `Mang đồ ăn cho bà (còn ${me.lanh.food} phần) · bà kể một bí mật trong cung` : 'Bà đói lắm, phải có đồ ăn mới chịu kể', () => act('phephi'));
     add('🌙 Gảy đàn đêm trăng', vh >= 19 ? (me.lanh.hatDay ? 'Đêm nay đã gảy' : 'Mỗi đêm 1 lần · đàn hay thì có thể Hoàng thượng đi ngang nghe thấy') : 'Từ 19h, khi trăng lên', () => gameRhythm('đàn', q => socket.emit('lc', { op: 'hat', q })), vh < 19 || !!me.lanh.hatDay);
     if (me.lanh.caseId) add('📜 Kêu oan', 'Điều tra lại vụ án cũ', () => openCase(me.lanh.caseId)); }
-  if (L === 'lanhcung' && !me.lanh) { for (const q of lcList) { add(`🧺 Thăm ${q.name}`, `20 bạc · mang đồ ăn, hỏi han · công trạng +5 · sức khỏe người đó ${q.hp}/100`, () => socket.emit('lc', { op: 'tham', who: q.id })); add(`😏 Chế giễu ${q.name}`, 'Hả dạ… nhưng người đó sẽ ghi thù, ra khỏi đây sẽ trả gấp đôi', () => socket.emit('lc', { op: 'che', who: q.id })); }
+  if (L === 'lanhcung' && !me.lanh) { for (const q of lcList) { add(`🧺 Thăm ${q.name}`, `20 bạc · mang đồ ăn, hỏi han · công trạng +5 · sức khỏe người đó ${q.hp}/100`, () => socket.emit('lc', { op: 'tham', who: q.id })); add(`😏 Chế giễu ${q.name}`, '50 bạc · mỗi ngày 1 người · Thái hậu không vui · người đó ghi thù, ra ngoài trả gấp đôi', () => socket.emit('lc', { op: 'che', who: q.id })); }
     if (!lcList.length) add('🍂 Lãnh cung vắng tanh', 'Hiện không có ai bị đày', () => {}, true); add('🚪 Rời lãnh cung', '', () => socket.emit('goto', 'hoavien')); }
   const ev = me.event; if (ev?.loc && ev.loc === L && !me.lanh) add(ev.act, ev.done ? 'Hôm nay đã tham gia · mai quay lại' : `${ev.sub} · sự kiện tuần`, () => act('event'), ev.done);
   if (L === 'tuninh' && me.hhVote) add('👑 Bầu phượng ấn', me.hhVote.mine ? 'Đã tiến cử · có thể đổi' : 'Tiến cử người xứng làm Hoàng hậu', openVote);
@@ -1592,7 +1594,7 @@ function openHH() {
   if (!me.isHH) return; const d = me.hhDay || {}, N = me.hhUses || 3;
   const btn = (op, title, sub, lim = N) => { const u = d[op] || 0, out = u >= lim; return `<button data-h="${op}" ${out ? 'disabled' : ''}>${title}<small style="display:block;color:var(--muted)">${sub} · hôm nay ${u}/${lim} lần</small></button>`; };
   modal(`<button class="close" onclick="window._close()">✕</button><h3>👑 Quyền Hoàng hậu</h3>
-  <div style="color:var(--muted);font-size:12.5px">Mỗi quyền dùng ${N} lần mỗi ngày. Mỗi ngày được thêm 500 bạc và 5 lượt. Sáng ${me.hhThinhan?.[0] ?? 6}h–${me.hhThinhan?.[1] ?? 12}h lục cung tới cung Hoàng hậu thỉnh an. Hoàng hậu bị giáng cấp hay vào lãnh cung thì mất phượng ấn.</div>
+  <div style="color:var(--muted);font-size:12.5px">Mỗi quyền dùng ${N} lần mỗi ngày. Mỗi ngày được thêm 500 bạc và 5 lượt. Lưu ý: xử phạt (cấm túc, đày lãnh cung) từ 4 người khác nhau trong 7 ngày thì Thái hậu cảnh cáo, kỳ bầu phượng ấn sau bị trừ điểm. Người bị phạt được dâng biểu kêu oan lên Thái hậu.${me.hhStrike ? ` <b style="color:#ff9b9b">Hiện bị trừ uy tín ${me.hhStrike} lần.</b>` : ''} Sáng ${me.hhThinhan?.[0] ?? 6}h–${me.hhThinhan?.[1] ?? 12}h lục cung tới cung Hoàng hậu thỉnh an. Hoàng hậu bị giáng cấp hay vào lãnh cung thì mất phượng ấn.</div>
   <div class="btns" style="flex-direction:column;align-items:stretch">
     ${btn('anxa', '🕊 Ân xá', 'Cho một người ra khỏi cấm túc hoặc lãnh cung')}
     ${btn('phat', '🔒 Phạt cấm túc 6 giờ', 'Không phạt được người mang long thai hay đang được bảo hộ')}
@@ -2292,8 +2294,9 @@ function openDay() {
 // =====================================================================
 // THÁNH CHỈ CẬP NHẬT: hiện một lần cho mỗi bản mới
 // =====================================================================
-const UPDATE_VER = 'u2026-11-13h';
+const UPDATE_VER = 'u2026-11-13i';
 const UPDATE_NOTES = [
+  ['📜 Kêu oan lên Thái hậu', 'Bị Hoàng hậu phạt cấm túc hay đày lãnh cung thì được dâng biểu kêu oan một lần (1 lượt, 50 bạc). Thái hậu minh xét thì được thả, Hoàng hậu bị trách xử oan. Hoàng hậu xử phạt quá nhiều người trong tuần cũng bị Thái hậu cảnh cáo, kỳ bầu phượng ấn sau bị trừ điểm.'],
   ['❄️ Lãnh cung mới', 'Trong lãnh cung đói rét, sức khỏe giảm mỗi ngày. Tỷ muội có thể lén gửi cơm, áo ấm, thuốc vào (nút 🧺 Gửi đồ trong danh sách Hậu cung). Bà phế phi già phải có đồ ăn mới kể bí mật. Đêm trăng gảy đàn, may ra Hoàng thượng đi ngang nghe thấy mà đón về. Hai phế phi cùng cảnh làm việc chung được thêm tiến độ.'],
   ['🚪 Vào thăm lãnh cung', 'Lót tay thị vệ 30 bạc là vào được lãnh cung để thăm hỏi (được thêm công trạng) hoặc chế giễu người bị đày. Coi chừng: người bị chế giễu sẽ ghi thù, ra ngoài trả gấp đôi.'],
   ['🔥 Phượng hoàng tái sinh', 'Ai được phục vị từ lãnh cung: sủng ái +10, 3 ngày công trạng ×1,5 và danh hiệu Phượng hoàng tái sinh.'],

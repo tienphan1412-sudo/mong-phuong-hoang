@@ -178,7 +178,7 @@ function selfView(p) {
     ...publicView(p), path: p.path, pathName: C.PATHS[p.path].name, origin: C.ORIGINS[p.origin].name,
     mailUnread: (p.mail || []).filter(m => !m.read).length, pushOn: !!p.pushSubs?.length,
     created: p.created || 0, items: p.items || {}, pts: p.pts, nextPts: p.rank + 1 < C.RANKS.length ? RP(p, p.rank + 1) : null, silver: p.silver, turns: (regen(p), p.turns), turnCap: C.TURN_CAP, nextTurn: p.turns >= C.TURN_CAP ? null : p.turnAt + C.TURN_REGEN_MIN * 60e3, sung: p.sung, haiLong: p.haiLong,
-    stats: p.stats, tasks: p.tasks, thinhAn: p.thinhAn, waiting: p.waiting || false, lanh: p.lanh || null, reborn: (p.rebornUntil || 0) > now() ? p.rebornUntil : 0, lanhVisit: p.lanhVisit === dayKey(),
+    stats: p.stats, tasks: p.tasks, thinhAn: p.thinhAn, waiting: p.waiting || false, lanh: p.lanh || null, reborn: (p.rebornUntil || 0) > now() ? p.rebornUntil : 0, hhPhat: p.hhPhat && !p.hhPhat.used ? { kind: p.hhPhat.kind, by: P(p.hhPhat.by)?.name || '' } : null, hhStrike: p.hhStrike || 0, lanhVisit: p.lanhVisit === dayKey(),
     outfits: allowedOutfits(p), decor: p.decor || [], hasPalace: p.rank >= C.PALACE_RANK, cases: open,
     protectedUntil: p.protectUntil || 0, admin: !!p.admin, hamDay: p.hamDay === dayKey(), canFight: !p.lanh && p.rank >= C.FIGHT_RANK,
     rel: { thaihau: rel(p, 'thaihau'), mama: rel(p, 'mama'), thaiy: rel(p, 'thaiy'), tonggiam: rel(p, 'tonggiam') }, goldFish: p.goldFish || 0, fishN: p.fishN || 0, group: groupView(grp(p)), relDay: p.relDay || {},
@@ -216,7 +216,7 @@ function news(text, kind = 'tin') {
   DB.state.news.unshift(n); DB.state.news = DB.state.news.slice(0, 60);
   io.emit('news', n); save();
 }
-function seatCount(r) { return Object.values(DB.players).filter(p => !p.lanh && !p.admin && p.rank === r).length + NPCF().filter(n => n.rank === r).length; }
+function seatCount(r) { return Object.values(DB.players).filter(p => !p.lanh && !p.admin && !isOwnerAcc(p) && p.rank === r).length + NPCF().filter(n => n.rank === r).length; }
 // ---------------- phi tần NPC ----------------
 function NPCF() { if (!DB.state.npcFei) DB.state.npcFei = C.NPC_FEI.map(n => ({ ...n }));
   // mốc công trạng từ Tần trở lên được nâng: kéo điểm NPC theo cùng tỉ lệ để việc vượt mặt giành ghế vẫn công bằng
@@ -261,6 +261,8 @@ function npcDaily() {
 const RP = (p, r) => p?.moc?.[r] ?? C.RANKS[r].pts;
 // 4 tài khoản của chủ game: mốc riêng Tần 500, Phi 900, Quý phi 2.000, Hoàng quý phi 3.000
 const MOC_RIENG = { names: ['An An', 'Nhược Hy', 'Tạ Nguyệt Khanh', 'Tiểu Mỹ An'], moc: { 5: 500, 6: 900, 7: 2000, 8: 3000 } };
+// 4 tài khoản của chủ game: vẫn lên chức theo mốc riêng nhưng không chiếm ghế, không ứng cử Hoàng hậu, để người chơi có cửa
+const isOwnerAcc = p => !!p && MOC_RIENG.names.includes(p.name);
 function applyMocRieng() { for (const p of Object.values(DB.players)) if (MOC_RIENG.names.includes(p.name) && JSON.stringify(p.moc) !== JSON.stringify(MOC_RIENG.moc)) { p.moc = { ...MOC_RIENG.moc }; console.log('mốc riêng:', p.name); } }
 function tryPromote(p) {
   if (p.lanh) return;
@@ -413,10 +415,10 @@ function thaiOne(p) {
 }
 
 // ---------------- Hoàng hậu ----------------
-function hhEligible() { return Object.values(DB.players).filter(p => !p.lanh && !p.admin && p.rank >= C.HH_MIN_RANK && !((p.camTucUntil || 0) > now())); }
+function hhEligible() { return Object.values(DB.players).filter(p => !p.lanh && !p.admin && !isOwnerAcc(p) && p.rank >= C.HH_MIN_RANK && !((p.camTucUntil || 0) > now())); }
 function hhScore(p, v) {
   const votes = Object.values(v.votes).filter(x => x === p.id).length;
-  return { votes, total: Math.round(votes * 15 + p.haiLong + rel(p, 'thaihau') / 2 + p.sung / 3 + (p.children || []).length * 25 + (DB.state.thaitu?.mother === p.id ? 60 : 0) + p.pts / 20) };
+  return { votes, total: Math.round(-(p.hhStrike || 0) * 30 + votes * 15 + p.haiLong + rel(p, 'thaihau') / 2 + p.sung / 3 + (p.children || []).length * 25 + (DB.state.thaitu?.mother === p.id ? 60 : 0) + p.pts / 20) };
 }
 function hhVoteView(viewer) {
   const v = DB.state.hhVote; if (!v) return null;
@@ -439,7 +441,7 @@ function endHHVote() {
   const ranked = v.cands.map(P).filter(q => q && !q.lanh).map(q => ({ q, ...hhScore(q, v) })).sort((a, b) => b.total - a.total);
   DB.state.hhNext = now() + C.HH_CYCLE_DAYS * 864e5;
   if (!ranked.length) return save();
-  const w = ranked[0].q, prev = DB.state.hh && P(DB.state.hh.id);
+  const w = ranked[0].q, prev = DB.state.hh && P(DB.state.hh.id); for (const r of ranked) r.q.hhStrike = 0; if (prev) prev.hhStrike = 0;
   if (prev && prev.id !== w.id) { news(`Phượng ấn đổi chủ: ${prev.name} trở lại ngôi ${C.RANKS[prev.rank].name}.`, 'phat'); if (/^hoanghau/.test(prev.outfit)) prev.outfit = C.RANKS[prev.rank].outfit; push(prev); }
   DB.state.hh = { id: w.id, since: now() }; cnt(w, 'hh');
   if (!prev || prev.id !== w.id) {
@@ -457,8 +459,8 @@ function loseHH(p, reason) {
 function hhTick() {
   // tài khoản quản trị không giữ phượng ấn, không ứng cử: nhường ngôi cho kỳ bầu chọn của người chơi
   const hq = DB.state.hh && P(DB.state.hh.id);
-  if (hq?.admin) { DB.state.hh = null; if (/^hoanghau/.test(hq.outfit)) hq.outfit = C.RANKS[hq.rank].outfit; DB.state.hhNext = now() + 3600e3; news('👑 Ngôi Hoàng hậu đang bỏ trống. Một canh giờ nữa Thái hậu sẽ truyền chỉ bầu phượng ấn, các phi tần từ bậc Tần trở lên chuẩn bị ứng cử.', 'phong'); push(hq); save(); }
-  if (DB.state.hhVote) { const vv = DB.state.hhVote; vv.cands = vv.cands.filter(id => !P(id)?.admin); }
+  if (hq?.admin || isOwnerAcc(hq)) { DB.state.hh = null; if (/^hoanghau/.test(hq.outfit)) hq.outfit = C.RANKS[hq.rank].outfit; DB.state.hhNext = now() + 3600e3; news('👑 Ngôi Hoàng hậu đang bỏ trống. Một canh giờ nữa Thái hậu sẽ truyền chỉ bầu phượng ấn, các phi tần từ bậc Tần trở lên chuẩn bị ứng cử.', 'phong'); push(hq); save(); }
+  if (DB.state.hhVote) { const vv = DB.state.hhVote; vv.cands = vv.cands.filter(id => !P(id)?.admin && !isOwnerAcc(P(id))); if (!vv.cands.length) { DB.state.hhVote = null; DB.state.hhNext = now() + 3600e3; } }
   const v = DB.state.hhVote;
   if (v && now() >= v.end) endHHVote();
   else if (!v && now() >= (DB.state.hhNext || 0) && hhEligible().length) startHHVote();
@@ -472,7 +474,7 @@ const lcList = () => Object.values(DB.players).filter(q => q.lanh).map(q => ({ i
 function lanhSock(sock, getMe) {
   sock.on('lc', d => { const me = getMe(); if (!me || !d) return; freshDay(me); const t = d.who && P(d.who);
     if (d.op === 'list') return sock.emit('lcList', lcList());
-    if (d.op === 'com') { if (!me.lanh || me.lanh.comDay === dayKey()) return; me.lanh.comDay = dayKey(); me.lanh.hp = Math.min(100, (me.lanh.hp ?? 70) + 10); sock.emit('lcCom'); push(me); return save(); }
+    if (d.op === 'com') { if (!me.lanh || me.lanh.comDay === dayKey()) return; me.lanh.comDay = dayKey(); me.lanh.hp = Math.min(100, (me.lanh.hp ?? 70) + 20); sock.emit('lcCom'); push(me); return save(); }
     if (d.op === 'gui') { const it = LC_ITEMS[d.item]; if (!it || !t?.lanh || t.id === me.id || me.lanh) return;
       me.lcGui = me.lcGui?.d === dayKey() ? me.lcGui : { d: dayKey(), n: 0 }; if (me.lcGui.n >= 3) return toast(me, 'Hôm nay đã gửi đồ 3 lần, thị vệ không cho gửi thêm.');
       if (me.silver < it.price) return toast(me, `Cần ${it.price} bạc.`, 'bad'); me.silver -= it.price; me.lcGui.n++;
@@ -484,9 +486,10 @@ function lanhSock(sock, getMe) {
       if (d.op === 'tham') { if (me.silver < 20) return toast(me, 'Cần 20 bạc mua chút đồ ăn mang vào.', 'bad'); me.silver -= 20; me.lcDid.k.push(key);
         t.lanh.hp = Math.min(100, (t.lanh.hp ?? 70) + 15); t.lanh.food = (t.lanh.food || 0) + 1; (t.lanh.on = t.lanh.on || []).includes(me.name) || t.lanh.on.push(me.name); addPts(me, 5); relAdd(me, 'thaihau', 1, 'có lòng nhân hậu');
         io.to('lanhcung').emit('chat', { id: null, name: '🧺', text: `${me.name} tới thăm ${t.name}, mang theo bánh trái và lời hỏi han.` }); toast(t, `🧺 ${me.name} tới thăm: sức khỏe +15, có thêm đồ ăn.`, 'good'); toast(me, 'Thăm hỏi người trong lãnh cung: công trạng +5, Thái hậu khen có lòng nhân hậu.', 'good'); }
-      else { me.lcDid.k.push(key); t.hanLC = t.hanLC || {}; t.hanLC[me.id] = now() + 7 * 864e5;
+      else { if (me.lcDid.k.some(k => k.startsWith('che:'))) return toast(me, 'Hôm nay đã chế giễu một người rồi, đừng quá đáng.'); if (me.silver < 50) return toast(me, 'Cần 50 bạc mua chuộc thị vệ làm ngơ cho mà chế giễu.', 'bad');
+        me.silver -= 50; me.lcDid.k.push(key); t.hanLC = t.hanLC || {}; t.hanLC[me.id] = now() + 7 * 864e5; relAdd(me, 'thaihau', -3, 'chế giễu người sa cơ');
         io.to('lanhcung').emit('chat', { id: null, name: '😏', text: `${me.name}: ${pick(['Chậc chậc, ngày trước oai phong lắm mà, giờ quét sân cũng không xong.', 'Tưởng ai, hóa ra là phế phi. Lãnh cung hợp với ngươi lắm.', 'Áo vải thô này mới đúng thân phận của ngươi.'])}` });
-        toast(t, `😤 ${me.name} tới chế giễu bổn cung. Mối nhục này ghi tạc, ra khỏi đây sẽ đòi lại gấp đôi.`, 'bad'); notify(t, '😤 Bị chế giễu', `${me.name} tới lãnh cung chế giễu bổn cung.`, 'phat'); toast(me, 'Hả dạ rồi… nhưng cẩn thận, người ta sẽ nhớ.'); }
+        toast(t, `😤 ${me.name} tới chế giễu bổn cung. Mối nhục này ghi tạc, ra khỏi đây sẽ đòi lại gấp đôi.`, 'bad'); notify(t, '😤 Bị chế giễu', `${me.name} tới lãnh cung chế giễu bổn cung.`, 'phat'); toast(me, 'Hả dạ rồi (-50 bạc, Thái hậu không vui: hài lòng -3)… và người ta sẽ nhớ.'); }
       push(t); push(me); sock.emit('lcList', lcList()); return save(); }
     if (d.op === 'hat') { if (!me.lanh || me.loc !== 'lanhcung') return; const h = vnNow().getUTCHours();
       if (h < 19 || h >= 24) return toast(me, 'Chờ trăng lên (từ 19h) hãy gảy đàn, giờ này Hoàng thượng không đi ngang.'); if (me.lanh.hatDay === dayKey()) return toast(me, 'Đêm nay đã gảy đàn rồi.');
@@ -501,6 +504,14 @@ function lanhSock(sock, getMe) {
 // chờ tân Hoàng hậu online → báo trước 3 phút → công bố kết quả (1 phút) → sắc phong (100 giây) → xong
 const HHC = { LEAD: 5 * 60e3, CONGBO: 60e3, SAC: 100e3, WAIT_MAX: 24 * 3600e3 };
 const hhcPub = () => { const h = DB.state.hhc; if (!h) return null; return { id: h.id, name: h.name, ranked: h.ranked, phase: h.phase, at: h.at || null, t: h.t || null, dur: { congbo: HHC.CONGBO, sac: HHC.SAC }, cheer: (h.cheer || []).length, test: !!h.test }; };
+// phanh cho Hoàng hậu: xử phạt quá nhiều người khác nhau trong 7 ngày thì Thái hậu cảnh cáo, uy tín (điểm bầu kỳ sau) giảm
+function hhBrake(hq, t, kind) {
+  t.hhPhat = { by: hq.id, kind, at: now(), used: false };
+  hq.hhPun = (hq.hhPun || []).filter(x => now() - x.t < 7 * 864e5); hq.hhPun.push({ t: now(), who: t.id });
+  const n = new Set(hq.hhPun.map(x => x.who)).size;
+  if (n >= 4 && !((hq.hhWarnAt || 0) > now() - 7 * 864e5)) { hq.hhWarnAt = now(); hq.hhStrike = (hq.hhStrike || 0) + 1; hq.haiLong = Math.max(0, hq.haiLong - 10); relAdd(hq, 'thaihau', -10, 'xử phạt quá nhiều người');
+    news(`👑 Thái hậu không hài lòng: Hoàng hậu ${hq.name} trong một tuần đã xử phạt ${n} người. Uy tín phượng ấn sụt giảm, kỳ bầu tới khó giữ ngôi.`, 'phat'); toast(hq, 'Thái hậu cảnh cáo: xử phạt quá nhiều người. Hài lòng -10, kỳ bầu phượng ấn sau bị trừ điểm.', 'bad'); }
+}
 function hhcEmit() { emitSplit('hhc', hhcPub(), DB.state.hhc?.test); }
 function hhcStart(w, ranked, test) {
   DB.state.hhc = { id: w.id, name: w.name, ranked: ranked.slice(0, 3).map(r => ({ name: r.q.name, votes: r.votes })), phase: 'cho', at: null, created: now(), cheer: [], test: !!test };
@@ -1959,7 +1970,7 @@ io.on('connection', sock => {
     } else if (a === 'lanh') {
       if (!me.lanh) return;
       if (me.lanhToday) return toast(me, 'Hôm nay đã làm xong việc ở lãnh cung.');
-      if ((me.lanh.hp ?? 70) < 15) return toast(me, 'Kiệt sức rồi, không nhấc nổi chổi. Chờ tỷ muội gửi đồ ăn, áo ấm, thuốc vào.', 'bad');
+      if ((me.lanh.hp ?? 70) < 10) return toast(me, 'Kiệt sức rồi, không nhấc nổi chổi. Ăn bát cơm nguội hôm nay hoặc chờ tỷ muội gửi đồ vào.', 'bad');
       if ((+d.q || 0) < .4) return toast(me, 'Làm chưa đạt, lão ma ma bắt làm lại.', 'bad');
       me.lanhToday = true; me.lanh.tasks++; me.lanh.hp = Math.max(0, (me.lanh.hp ?? 70) - 10);
       // phế phi cùng cảnh: có người khác cùng ở lãnh cung thì làm chung, mỗi người thêm tiến độ (mỗi ngày 1 lần)
@@ -2270,6 +2281,17 @@ io.on('connection', sock => {
       io.to(roomOf(me)).emit('chat', { id: null, name: '🙇', text: `${title(me)} thỉnh an: Hoàng hậu nương nương vạn phúc kim an.` }); toast(me, 'Đã thỉnh an Hoàng hậu: công trạng +8.', 'good');
       const hs = sockOf(h.id); if (hs) toast(h, `${me.name} tới thỉnh an Hoàng hậu.`, 'good'); push(me); save(); return;
     }
+    if (op === 'kieuoan') { // người bị Hoàng hậu phạt dâng biểu kêu oan lên Thái hậu (mỗi lần bị phạt được 1 lần)
+      const k = me.hhPhat; if (!k || k.used) return toast(me, 'Không có gì để kêu oan.');
+      const still = k.kind === 'lanh' ? !!me.lanh : (me.camTucUntil || 0) > now(); if (!still) { me.hhPhat = null; push(me); return toast(me, 'Hình phạt đã hết rồi.'); }
+      if (me.turns < 1 || me.silver < 50) return toast(me, 'Dâng biểu kêu oan cần 1 lượt và 50 bạc lo lót.', 'bad'); me.turns--; me.silver -= 50; k.used = true;
+      const h = P(k.by), ch = Math.max(.15, Math.min(.75, .35 + (rel(me, 'thaihau') - (h ? rel(h, 'thaihau') : 0)) / 200 + (me.haiLong - (h?.haiLong || 50)) / 300));
+      if (Math.random() < ch) { if (k.kind === 'lanh') phucVi(me, me.lanh.from, 'nhờ Thái hậu minh xét, gỡ oan cho'); else { me.camTucUntil = 0; toast(me, 'Thái hậu minh xét, cho bổn cung ra khỏi cấm túc.', 'good'); }
+        if (h) { h.hhStrike = (h.hhStrike || 0) + 1; relAdd(h, 'thaihau', -5, 'xử oan ' + me.name); toast(h, `Thái hậu gỡ tội cho ${me.name}, trách Hoàng hậu xử oan. Uy tín phượng ấn giảm.`, 'bad'); push(h); }
+        news(`📜 ${me.name} dâng biểu kêu oan, Thái hậu minh xét gỡ tội. Hoàng hậu ${h?.name || ''} bị trách xử oan.`, 'an'); }
+      else toast(me, 'Thái hậu đọc biểu nhưng cho rằng Hoàng hậu xử đúng. Đành chịu phạt tiếp…', 'bad');
+      me.hhPhat = null; push(me); save(); return;
+    }
     if (!isHH(me)) return toast(me, 'Chỉ Hoàng hậu mới có quyền này.', 'bad');
     const lim = op === 'daylanh' ? C.HH_LANH_PER_DAY : C.HH_USES;
     if ((me.hhDay[op] || 0) >= lim) return toast(me, `Hôm nay đã dùng quyền này đủ ${lim} lần rồi.`);
@@ -2285,7 +2307,7 @@ io.on('connection', sock => {
       if (!t || t.id === me.id || t.lanh) return;
       if (t.thai?.known) return toast(me, 'Không thể phạt người đang mang long thai.', 'bad');
       if ((t.protectUntil || 0) > now() || (t.camTucUntil || 0) > now()) return toast(me, 'Người này đang được bảo hộ hoặc đã bị phạt.', 'bad');
-      used(); t.camTucUntil = now() + 6 * 3600e3; t.protectUntil = Math.max(t.protectUntil || 0, t.camTucUntil);
+      used(); t.camTucUntil = now() + 6 * 3600e3; t.protectUntil = Math.max(t.protectUntil || 0, t.camTucUntil); hhBrake(me, t, 'camtuc');
       news(`👑 Hoàng hậu ${me.name} phạt ${t.name} cấm túc 6 giờ vì ${String(d.why || 'thất lễ').slice(0, 40)}.`, 'phat');
       const sk = sockOf(t.id); if (sk) { toast(t, `Hoàng hậu phạt bổn cung cấm túc 6 giờ.`, 'bad'); if (t.loc !== 'phong') enter(t, 'phong', sk); }
       push(t);
@@ -2294,7 +2316,7 @@ io.on('connection', sock => {
       if (t.thai?.known) return toast(me, 'Không thể đày người đang mang long thai.', 'bad');
       if ((t.protectUntil || 0) > now()) return toast(me, 'Người này đang được bảo hộ, chưa thể xử.', 'bad');
       used(); const why = String(d.why || 'phạm thượng, bất kính với Hoàng hậu').slice(0, 40);
-      sendToLanhCung(t, `bị Hoàng hậu ${me.name} xử tội ${why}`, null); relAdd(me, 'thaihau', -5, 'xử phạt hậu cung quá nặng tay');
+      sendToLanhCung(t, `bị Hoàng hậu ${me.name} xử tội ${why}`, null); relAdd(me, 'thaihau', -5, 'xử phạt hậu cung quá nặng tay'); hhBrake(me, t, 'lanh');
       toast(me, `Đã đày ${t.name} vào lãnh cung. Thái hậu cho rằng Hoàng hậu quá nặng tay: hài lòng -5.`, 'bad');
     } else if (op === 'thuong') { // ban thưởng 100 bạc từ quỹ cung
       if (!t || t.id === me.id) return; used(); t.silver += 100; addPts(t, 5); relAdd(me, 'thaihau', 1, 'ban ân cho hậu cung');
