@@ -418,7 +418,7 @@ function thaiOne(p) {
 // ---------------- Hoàng hậu ----------------
 function hhEligible() { return Object.values(DB.players).filter(p => !p.lanh && !p.admin && !isOwnerAcc(p) && p.rank >= C.HH_MIN_RANK && !((p.camTucUntil || 0) > now())); }
 function hhScore(p, v) {
-  const votes = Object.values(v.votes).filter(x => x === p.id).length;
+  const votes = (v.base?.[p.id] || 0) + Object.values(v.votes).filter(x => x === p.id).length; // base: số phiếu khôi phục từ kỳ bầu bị gián đoạn
   return { votes, total: Math.round(-(p.hhStrike || 0) * 30 + votes * 15 + p.haiLong + rel(p, 'thaihau') / 2 + p.sung / 3 + (p.children || []).length * 25 + (DB.state.thaitu?.mother === p.id ? 60 : 0) + p.pts / 20) };
 }
 function hhVoteView(viewer) {
@@ -2479,6 +2479,13 @@ loadDB().then(() => {
       news(`👑 Kỳ bầu phượng ấn tiếp tục như cũ. Ứng cử: ${cands.map(id => title(P(id))).join(', ')}. Do sự cố trong cung, ai đã tiến cử xin tới Từ Ninh cung tiến cử lại. Hạn bầu được kéo dài thêm 2 canh giờ.`, 'phong');
       console.log('Khôi phục kỳ bầu (lần 2): bắt đầu', new Date(start + 7 * 3600e3).toISOString(), 'ứng cử', cands.map(id => P(id)?.name).join(', ')); }
     else console.log('Khôi phục kỳ bầu (lần 2): không tìm thấy', ts.length, cands.length); }
+  // lần 3: chủ game xác nhận ứng cử viên cũ là Tạ Nguyệt Khanh, Nhược Hy, An An; số phiếu cũ Nhược Hy 35, Tạ Nguyệt Khanh 15
+  if (!DB.state.hhRestore3 && DB.state.hhVote) { DB.state.hhRestore3 = 1; const v = DB.state.hhVote, by = n => Object.values(DB.players).find(q => q.name === n);
+    const T = by('Tạ Nguyệt Khanh'), N = by('Nhược Hy'), A = by('An An');
+    if (T && N && A) { v.cands = [T.id, N.id, A.id]; v.base = { [N.id]: 35, [T.id]: 15 };
+      for (const k of Object.keys(v.votes)) if (!v.cands.includes(v.votes[k])) delete v.votes[k];
+      news(`👑 Đính chính kỳ bầu phượng ấn: ứng cử viên là ${title(T)}, ${title(N)}, ${title(A)}. Số phiếu cũ đã được khôi phục (Nhược Hy 35, Tạ Nguyệt Khanh 15). Ai đã tiến cử trước đó thì không cần tiến cử lại.`, 'phong');
+      console.log('Khôi phục kỳ bầu (lần 3): xong'); } else console.log('Khôi phục kỳ bầu (lần 3): thiếu người', !!T, !!N, !!A); }
   // đại án rút còn 3 ngày: vụ đang mở cũng rút theo
   { const B = DB.state.bigCase; if (B && !B.done && B.end - B.start > C.BIG_HOURS * 3600e3) B.end = B.start + C.BIG_HOURS * 3600e3; }
   // người đã nhận 1 vụ tra án hôm nay theo luật cũ: tính là 1/3
