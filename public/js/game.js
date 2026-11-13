@@ -3260,3 +3260,4 @@ function gardenTime(force) {
   world.setNight(night); applyLights(night ? world.nightLights : world.lights);
 }
 setInterval(() => gardenTime(false), 30e3);
+socket.on('demTest', v => { window.__forceNight = v ?? undefined; gardenTime(true); });

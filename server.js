@@ -2498,6 +2498,14 @@ function adminRaw(p, text) {
   else if (cmd === '/daian') { const B = DB.state.bigCase; if (B && !B.done) { B.end = now(); endBigCase(); } else startBigCase(+arg || C.BIG_HOURS); }
   else if (cmd === '/daile') { const F = DB.state.fest; if (F && !F.done) festFinish(F.pts >= F.goal); else startFest(+arg || C.FEST_HOURS); }
   else if (cmd === '/dailediem') { if (!DB.state.fest || DB.state.fest.done) return toast(p, 'Chưa có đại lễ.'); festAdd(p, +arg || 100, 'quản trị'); }
+  else if (cmd === '/dem') { // quản trị: xem thử Ngự hoa viên ban đêm / ban ngày, chỉ máy mình thấy
+    const v = arg === 'tat' || arg === 'ngay' ? false : arg === 'tudong' ? null : true; sockOf(p.id)?.emit('demTest', v);
+    return toast(p, v === null ? 'Ngự hoa viên: theo giờ thật (19h–6h tối).' : v ? 'Ngự hoa viên: thử ban đêm (chỉ máy mình).' : 'Ngự hoa viên: thử ban ngày (chỉ máy mình).', 'good'); }
+  else if (cmd === '/ngamtrang') { // quản trị: gọi Hoàng thượng ra cầu hồ lớn thả hoa đăng, chỉ admin thấy, không đăng tin
+    const v = VS(); if (arg === 'tat') { if (v.den?.test) v.den = null; vuaEmit(); return toast(p, 'Đã kết thúc ngắm trăng thử.', 'good'); }
+    if (v.den && !v.den.test) return toast(p, 'Đang có buổi ngắm trăng thật, không thử chồng lên được.', 'bad');
+    v.den = { test: true, start: now(), end: now() + (+arg || 20) * 60e3, list: [] }; vuaEmit(); sockOf(p.id)?.emit('demTest', true);
+    return toast(p, `Hoàng thượng đã ra cầu hồ lớn (thử ${+arg || 20} phút, chỉ admin thấy). Tới Ngự hoa viên → 🌕 Ngắm trăng cùng Hoàng thượng.`, 'good'); }
   else if (cmd === '/sukien') { DB.state.evForce = C.EVENTS.some(e => e.id === arg) ? arg : null; for (const id of online.keys()) { const q = P(id); if (q) push(q); } toast(p, 'Sự kiện: ' + curEvent().name + (DB.state.evForce ? ' (ép)' : ' (theo tuần)')); }
   else if (cmd === '/xoaacc') {
     const who = [arg, ...rest].filter(Boolean).join(' ').toLowerCase(); const q = findP(who);
