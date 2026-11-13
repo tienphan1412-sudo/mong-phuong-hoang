@@ -193,7 +193,7 @@ function selfView(p) {
     big: bigView(p), fest: festView(p), night: nightView(p), diary: (p.diary || []).slice(0, 30), tinvat: p.tinvat || {}, keoDay: p.keoDay === dayKey(),
     dish: p.dish ? { name: p.dish.name, q: p.dish.q, t: p.dish.t, dish: p.dish.dish } : null, cookN: p.cookDay?.d === dayKey() ? p.cookDay.n : 0,
     quest: questView(p), jewels: p.jewels || [], mcDay: p.mcDay === dayKey(),
-    relDayMach: !!(p.relDay || {})['thaiy:mach'], vuaDay: p.vuaDay?.d === dayKey() ? { co: !!p.vuaDay.co, mai: !!p.vuaDay.mai, tho: !!p.vuaDay.tho, peek: !!p.vuaDay.peek } : {}, meal: inMeal(), detDay: p.detDay === dayKey(),
+    relDayMach: !!(p.relDay || {})['thaiy:mach'], vuaDay: p.vuaDay?.d === dayKey() ? { co: !!p.vuaDay.co, mai: !!p.vuaDay.mai, tho: !!p.vuaDay.tho, peek: !!p.vuaDay.peek } : {}, meal: inMeal(), detDay: p.detDay === dayKey(), detLeft: Math.max(0, C.DET_PER_DAY - (p.detN?.d === dayKey() ? p.detN.n : 0)),
   };
 }
 function push(p) { checkAch(p); checkQuest(p); const s = sockOf(p.id); if (s) s.emit('me', selfView(p)); }
@@ -1992,9 +1992,9 @@ io.on('connection', sock => {
       const k = n + ':talk'; const first = !me.relDay[k]; if (first) { me.relDay[k] = 1; relAdd(me, n, 3); } cnt(me, 'npctalk');
       sock.emit('npcTalk', { npc: n, rel: rel(me, n), line: npcLine(me, n), first });
     } else if (d.op === 'tran' && n === 'mama') {
-      if (me.lanh) return; if (me.detDay === dayKey()) return toast(me, 'Hôm nay đã nhận tra án rồi, mai lão nô lại nhờ.');
+      if (me.lanh) return; const dn = me.detN?.d === dayKey() ? me.detN.n : 0; if (dn >= C.DET_PER_DAY) return toast(me, `Hôm nay đã tra đủ ${C.DET_PER_DAY} vụ rồi, mai lão nô lại nhờ.`);
       if (Object.values(DB.state.cases).some(c => c.victim === me.id && c.status === 'open')) return toast(me, 'Đang có vụ án chưa xong.');
-      me.detDay = dayKey(); createCase(me, null, { det: true }); return;
+      me.detN = { d: dayKey(), n: dn + 1 }; me.detDay = dn + 1 >= C.DET_PER_DAY ? dayKey() : null; createCase(me, null, { det: true }); return;
     } else if (d.op === 'mach' && n === 'thaiy') {
       if (me.relDay['thaiy:mach']) return toast(me, 'Hôm nay Thái y đã bắt mạch rồi.'); me.relDay['thaiy:mach'] = 1;
       if (me.thai && !me.thai.known) { save(); return revealThai(me, 'mach'); }
@@ -2459,6 +2459,10 @@ io.on('connection', s => s.emit('top5', top5()));
 const PORT = process.env.PORT || 3000;
 loadDB().then(() => {
   applyMocRieng(); for (const p of Object.values(DB.players)) if (p.moc) tryPromote(p);
+  // đại án rút còn 3 ngày: vụ đang mở cũng rút theo
+  { const B = DB.state.bigCase; if (B && !B.done && B.end - B.start > C.BIG_HOURS * 3600e3) B.end = B.start + C.BIG_HOURS * 3600e3; }
+  // người đã nhận 1 vụ tra án hôm nay theo luật cũ: tính là 1/3
+  for (const p of Object.values(DB.players)) if (p.detDay === dayKey() && !p.detN) { p.detN = { d: dayKey(), n: 1 }; p.detDay = null; }
   // bộ cam rồng phượng cũ của Hoàng quý phi đã bỏ (trùng áo Hoàng hậu): ai đang mặc thì đổi về áo hợp lệ
   for (const p of Object.values(DB.players)) if (p.outfit === 'hoangquyphi') p.outfit = isHH(p) ? 'hoanghau2' : C.RANKS[p.rank].outfit;
   save();

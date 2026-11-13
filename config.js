@@ -135,7 +135,8 @@ module.exports = {
   DET_HOURS: 2,                // thời hạn tra án giúp Quế ma ma
   DET_REWARD: { pts: 20, silver: 50 },
   // ---------- đại án (cả cung cùng tra) ----------
-  BIG_HOURS: 96,               // hạn tra đại án (giờ)
+  BIG_HOURS: 72,               // hạn tra đại án (giờ): 3 ngày
+  DET_PER_DAY: 3,              // số vụ tra án giúp Quế ma ma mỗi ngày
   BIG_REWARD: { silver: 100, pts: 40, haiLong: 5, right: 20 }, // thưởng mỗi người góp sức, +right nếu bỏ phiếu đúng
   BIG_CASES: [
     { title: 'Ngọc tỷ của Hoàng thượng bị đánh cắp', intro: 'Sáng nay thái giám mở hộp ngọc tỷ thì thấy trống không. Đêm qua chỉ có 6 người từng đi ngang Dưỡng Tâm điện.' },
