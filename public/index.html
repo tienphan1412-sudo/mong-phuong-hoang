@@ -373,6 +373,39 @@ body.staging #cookbar { display:none !important; }
 .updhead .ut { font-family:'Noto Serif',serif; font-size:26px; font-weight:900; letter-spacing:.3em; color:#8a1a17; } .updhead h3 { margin:2px 0; color:#5a1408; } .updhead small { color:#7a3a14; font-style:italic; }
 .updlist { max-height:56vh; overflow-y:auto; display:flex; flex-direction:column; gap:7px; } .ud { border:1px solid var(--line); border-radius:10px; padding:7px 11px; background:rgba(255,255,255,.04); }
 .ud b { color:var(--gold2); } .ud div { font-size:13px; line-height:1.5; margin-top:2px; }
+
+/* ---- điện thoại: thu gọn / mở rộng ---- */
+#mchips, #rotbtn { display:none; }
+body.mob #mchips { display:flex; gap:5px; position:fixed; left:6px; bottom:52px; z-index:7; }
+body.mob #mchips button { padding:6px 11px; font-size:12.5px; border-radius:999px; position:relative; background:var(--panel); }
+body.mob #mchips button.on { border-color:var(--gold); }
+body.mob #mchips .bd { position:absolute; top:-5px; right:-5px; background:#d23b2a; color:#fff; font-style:normal; font-size:10px; font-weight:700; border-radius:999px; min-width:16px; height:16px; line-height:16px; text-align:center; padding:0 3px; }
+body.mob.f-map #map { display:none !important; }
+body.mob:not(.f-map) #map { flex-direction:row !important; flex-wrap:wrap; left:6px !important; right:6px !important; top:auto !important; bottom:92px !important; transform:none !important; background:var(--panel); border:1px solid var(--line); border-radius:12px; padding:6px; gap:4px; z-index:8; }
+body.mob:not(.f-map) #map button { min-width:0; flex:1 1 30%; padding:7px 6px; font-size:12px; text-align:center; }
+body.mob.f-chat #chat { display:none; }
+body.mob #acts { bottom:92px !important; } body.mob #chat { bottom:92px !important; }
+body.mob #acts .ttl { cursor:pointer; } body.mob #acts .ttl::after { content:' ▾'; font-size:11px; opacity:.7; } body.mob.f-acts #acts .ttl::after { content:' ▸'; }
+body.mob.f-acts #acts > :not(.ttl) { display:none !important; } body.mob.f-acts #acts { overflow:visible; }
+body.mob.f-stats #stats > :not(.keep):not(#caseBtn):not(#hhBtn):not(.feast):not(#itBtn) { display:none; }
+.stfold { display:none; } body.mob .stfold { display:inline-block; padding:3px 9px !important; }
+body.mob.f-top5 #top5 { display:none; } body.mob:not(.f-top5) #top5 { top:auto !important; bottom:92px !important; left:6px !important; right:auto; width:auto; min-width:220px; max-width:80vw; max-height:44vh; overflow-y:auto; z-index:9; background:rgba(34,14,12,.97); } body.mob #top5 ol { display:block !important; }
+body.mob #rotbtn { display:block; position:fixed; right:6px; top:132px; width:42px; height:38px; padding:0; font-size:17px; z-index:6; }
+/* màn hình ngang của điện thoại (thấp) */
+@media (max-height:500px) and (min-width:761px) {
+  body { font-size:12.5px; } .lbl { display:none; }
+  #hud { gap:6px; top:4px; left:4px; right:52px; } #who { padding:5px 9px; } #who .nm { font-size:14px; }
+  #stats { max-width:calc(100vw - 300px); gap:4px; } #stats .pill { padding:3px 8px; font-size:11px; }
+  #newsbtn, #guidebtn, #musicbtn { position:fixed !important; right:4px !important; left:auto !important; bottom:auto !important; width:40px; height:34px; padding:0 !important; font-size:16px !important; }
+  #newsbtn { top:4px !important; } #guidebtn { top:42px !important; } #musicbtn { top:80px !important; } body.mob #rotbtn { top:118px; right:4px; width:40px; height:34px; }
+  #news { top:4px; right:50px; max-height:80vh; }
+  #top5 { font-size:11px; width:200px; } #top5 .rk { display:none; }
+  #menubar { left:auto; right:50px; bottom:4px; padding:2px; } #menubar button { min-width:40px; padding:3px 4px; } #menubar .lb { display:none; } #menubar .ic { font-size:16px; }
+  body.mob #mchips { bottom:4px; left:4px; } body.mob:not(.f-top5) #top5 { bottom:40px !important; max-height:70vh; } body.mob:not(.f-map) #map { bottom:40px !important; right:auto !important; max-width:60vw; }
+  body.mob #acts { top:auto; bottom:48px !important; right:50px; transform:none; max-height:62vh; overflow-y:auto; max-width:38vw; } #acts button { padding:5px 8px; font-size:12px; } #acts button small { display:none; }
+  body.mob #chat { bottom:40px !important; left:4px; width:34vw; } #chatlog { max-height:70px; font-size:11px; } #chatin { font-size:12px; padding:6px 8px; }
+  #mcard { max-height:90vh; overflow-y:auto; }
+}
 </style>
 </head>
 <body>

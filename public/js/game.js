@@ -23,7 +23,7 @@ const scene = new THREE.Scene();
 const hemi = new THREE.HemisphereLight(0xffffff, 0x444444, 1.5); scene.add(hemi);
 const fill = new THREE.DirectionalLight(0xffe8d0, 1.0); fill.position.set(2, 3, 6); scene.add(fill);
 const camera = new THREE.PerspectiveCamera(45, 1, 0.05, 120);
-function resize() { const w = innerWidth, h = innerHeight; renderer.setSize(w, h, false); labels.setSize(w, h); camera.aspect = w / h; camera.updateProjectionMatrix(); }
+function resize() { const w = innerWidth, h = innerHeight; renderer.setSize(w, h, false); labels.setSize(w, h); camera.aspect = w / h; camera.fov = h > w ? 62 : 45; camera.updateProjectionMatrix(); }
 addEventListener('resize', resize); resize();
 
 let world = null;        // địa điểm hiện tại
@@ -322,11 +322,12 @@ function renderHud() {
   qd.innerHTML = me.quest ? `🎯 <b>${me.quest.i + 1}/${me.quest.n}</b> ${esc(me.quest.t)}${me.quest.need > 1 && me.quest.need < 50 && !/^Lên/.test(me.quest.t) ? ` (${me.quest.cur}/${me.quest.need})` : ''}${me.quest.go || me.quest.ui ? ' <button class="qgo">👉 Làm ngay</button>' : ''}` : ''; qd.style.display = me.quest ? '' : 'none';
   const qb = qd.querySelector('.qgo'); if (qb) qb.onclick = e => { e.stopPropagation(); questGo(); };
   // bảng xếp hạng luôn nằm ngay dưới khung tên, không che dòng nhiệm vụ; người mới đang làm nhiệm vụ tân thủ thì thu gọn bảng xếp hạng
-  requestAnimationFrame(() => { const w = $('who'), t5 = $('top5'); if (!w || !t5) return; t5.style.top = Math.round(w.getBoundingClientRect().bottom + 8) + 'px'; if (me.quest && !t5.dataset.user) t5.classList.add('min'); });
+  requestAnimationFrame(() => { const w = document.body.classList.contains('mob') && innerHeight > innerWidth ? $('hud') : $('who'), t5 = $('top5'); if (!w || !t5) return; t5.style.top = Math.round(w.getBoundingClientRect().bottom + 8) + 'px'; if (me.quest && !t5.dataset.user) t5.classList.add('min'); });
   const t = me.tasks || {};
   const IT = me.items || {}, itTxt = [IT.tangvat ? `🎁 Túi gấm ×${IT.tangvat}: lần ra tay tới không tốn bạc` : '', IT.manhmoi ? `📜 Thư mật ×${IT.manhmoi}: lần tra manh mối tới miễn phí` : ''].filter(Boolean);
-  $('stats').innerHTML = `${me.lanh ? `<span class="pill" title="Lãnh cung đói rét: mỗi ngày -20, làm việc -10, kiệt sức (dưới 10) thì không làm được. Tỷ muội gửi cơm, áo, thuốc vào để hồi sức." style="${(me.lanh.hp ?? 70) < 30 ? 'color:#ff9b9b' : ''}">❄️ Sức khỏe <b>${me.lanh.hp ?? 70}</b>/100</span>` : ''}${me.reborn ? `<span class="pill" title="Phượng hoàng tái sinh: công trạng ×1,5 tới ${new Date(me.reborn).toLocaleString('vi-VN')}">🔥 Tái sinh</span>` : ''}<span class="pill">💰 Bạc <b>${me.silver}</b></span>${itTxt.length ? `<button class="pill" id="itBtn" title="${itTxt.join(' · ')} (câu cá ở hồ thỉnh thoảng vớt được)">${CHEST_SVG} <b>${(IT.tangvat || 0) + (IT.manhmoi || 0)}</b></button>` : ''}<span class="pill" title="Cứ 60 phút hồi 1 lượt (tối đa ${me.turnCap}). Làm đủ 3 nhiệm vụ ngày, dự yến tiệc, được lật thẻ cũng được thêm lượt.">⏳ Lượt <b>${me.turns}</b>${me.nextTurn ? ` <small id="turnT" style="opacity:.75"></small>` : me.turns >= me.turnCap ? ` <small style="opacity:.75">· Đầy</small>` : ''}</span><span class="pill">💗 Sủng ái <b>${me.sung}</b></span><span class="pill">🍵 Thái hậu <b>${me.haiLong}</b></span><span class="pill" title="Nhiệm vụ ngày: thỉnh an, luyện tài nghệ, dò tin. Làm đủ 3 được thêm lượt và công trạng.">📋 ${t.thinhan ? '✅' : '⬜'}${t.luyen ? '✅' : '⬜'}${t.dotin ? '✅' : '⬜'}</span>${me.camTuc ? `<span class="pill" style="border-color:#c0503a">🔒 Cấm túc còn ${Math.max(1, Math.ceil((me.camTuc - Date.now()) / 3600e3))} giờ</span>` : ''}${me.thai ? `<span class="pill" style="border-color:#f3a6c8" title="Mỗi ngày uống thuốc an thai ở chỗ Thái y (Từ Ninh cung). Uống đủ 2 ngày trở lên thì sinh thuận.">🤰 Long thai · còn ${Math.max(0, Math.ceil((me.thai.due - Date.now()) / 3600e3))} giờ · an thai ${me.thai.antai ? '✅' : '⬜'}</span>` : ''}${me.isHH ? '<button class="pill" id="hhBtn" style="border-color:#e8c25a">👑 Hoàng hậu</button>' : ''}<button class="pill" id="todayBtn" style="position:relative">🗓 Hôm nay${todayNew() ? `<span class="rdot">${todayNew()}</span>` : ''}</button>${feast ? `<span class="pill feast">🎎 Yến tiệc · <b id="feastT"></b> · ${feast.n} tiết mục</span>` : ''}${me.cases.length ? `<button class="pill" id="caseBtn" style="border-color:#c0503a">${me.cases[0].det ? '🔍 Đang tra án' : '⚖️ Vụ án đang mở'}${me.cases.length > 1 ? ` (${me.cases.length})` : ''}</button>` : ''}`;
+  $('stats').innerHTML = `${me.lanh ? `<span class="pill" title="Lãnh cung đói rét: mỗi ngày -20, làm việc -10, kiệt sức (dưới 10) thì không làm được. Tỷ muội gửi cơm, áo, thuốc vào để hồi sức." style="${(me.lanh.hp ?? 70) < 30 ? 'color:#ff9b9b' : ''}">❄️ Sức khỏe <b>${me.lanh.hp ?? 70}</b>/100</span>` : ''}${me.reborn ? `<span class="pill" title="Phượng hoàng tái sinh: công trạng ×1,5 tới ${new Date(me.reborn).toLocaleString('vi-VN')}">🔥 Tái sinh</span>` : ''}<span class="pill keep">💰 Bạc <b>${me.silver}</b></span>${itTxt.length ? `<button class="pill" id="itBtn" title="${itTxt.join(' · ')} (câu cá ở hồ thỉnh thoảng vớt được)">${CHEST_SVG} <b>${(IT.tangvat || 0) + (IT.manhmoi || 0)}</b></button>` : ''}<span class="pill keep" title="Cứ 60 phút hồi 1 lượt (tối đa ${me.turnCap}). Làm đủ 3 nhiệm vụ ngày, dự yến tiệc, được lật thẻ cũng được thêm lượt.">⏳ Lượt <b>${me.turns}</b>${me.nextTurn ? ` <small id="turnT" style="opacity:.75"></small>` : me.turns >= me.turnCap ? ` <small style="opacity:.75">· Đầy</small>` : ''}</span><span class="pill">💗 Sủng ái <b>${me.sung}</b></span><span class="pill">🍵 Thái hậu <b>${me.haiLong}</b></span><span class="pill" title="Nhiệm vụ ngày: thỉnh an, luyện tài nghệ, dò tin. Làm đủ 3 được thêm lượt và công trạng.">📋 ${t.thinhan ? '✅' : '⬜'}${t.luyen ? '✅' : '⬜'}${t.dotin ? '✅' : '⬜'}</span>${me.camTuc ? `<span class="pill" style="border-color:#c0503a">🔒 Cấm túc còn ${Math.max(1, Math.ceil((me.camTuc - Date.now()) / 3600e3))} giờ</span>` : ''}${me.thai ? `<span class="pill" style="border-color:#f3a6c8" title="Mỗi ngày uống thuốc an thai ở chỗ Thái y (Từ Ninh cung). Uống đủ 2 ngày trở lên thì sinh thuận.">🤰 Long thai · còn ${Math.max(0, Math.ceil((me.thai.due - Date.now()) / 3600e3))} giờ · an thai ${me.thai.antai ? '✅' : '⬜'}</span>` : ''}${me.isHH ? '<button class="pill" id="hhBtn" style="border-color:#e8c25a">👑 Hoàng hậu</button>' : ''}<button class="pill keep" id="todayBtn" style="position:relative">🗓 Hôm nay${todayNew() ? `<span class="rdot">${todayNew()}</span>` : ''}</button>${feast ? `<span class="pill feast">🎎 Yến tiệc · <b id="feastT"></b> · ${feast.n} tiết mục</span>` : ''}${me.cases.length ? `<button class="pill" id="caseBtn" style="border-color:#c0503a">${me.cases[0].det ? '🔍 Đang tra án' : '⚖️ Vụ án đang mở'}${me.cases.length > 1 ? ` (${me.cases.length})` : ''}</button>` : ''}`;
   const cb = $('caseBtn'); if (cb) cb.onclick = () => openCase(me.cases[0].id);
+  { const st = $('stats'), t = document.createElement('button'); t.className = 'pill keep stfold'; t.textContent = document.body.classList.contains('f-stats') ? '⋯' : '▴'; t.title = 'Thu gọn / mở rộng'; t.onclick = () => mobFold('stats'); st.appendChild(t); }
   const ib = $('itBtn'); if (ib) ib.onclick = () => modal(`<button class="close" onclick="window._close()">✕</button><h3>${CHEST_SVG} Rương báu</h3><div style="line-height:1.8">${itTxt.map(esc).join('<br>')}</div><div style="color:var(--muted);font-size:12.5px;margin-top:6px">Câu cá ở hồ Ngự hoa viên thỉnh thoảng vớt được báu vật. Món nào sẽ tự dùng ở lần tới.</div>`);
   const tb = $('todayBtn'); if (tb) tb.onclick = openToday; const bb = $('bigBtn'); if (bb) bb.onclick = openBig; const fb = $('festBtn'); if (fb) fb.onclick = openFest;
   const hb = $('hhBtn'); if (hb) hb.onclick = openHH; const vb = $('voteBtn'); if (vb) vb.onclick = openVote;
@@ -2308,8 +2309,9 @@ function openDay() {
 // =====================================================================
 // THÁNH CHỈ CẬP NHẬT: hiện một lần cho mỗi bản mới
 // =====================================================================
-const UPDATE_VER = 'u2026-11-13k';
+const UPDATE_VER = 'u2026-11-13m';
 const UPDATE_NOTES = [
+  ['📱 Chơi trên điện thoại gọn hơn', 'Màn hình dọc: các bảng tự thu gọn, nút 🗺 Đi đâu, 🏆 Xếp hạng, 💬 Chat ở góc dưới; bấm tên nơi đang đứng để thu/mở bảng việc làm; nút ⋯ để xem thêm chỉ số. Nút 🔄 bên phải để chơi màn hình ngang.'],
   ['🕯 Mật báo trong Thư', 'Bị ai nói xấu bên gối Hoàng thượng, hay bị phá đêm thị tẩm, Thư sẽ lưu lại. Muốn biết kẻ nào, lót tay Tổng quản 50 bạc để hỏi.'],
   ['🗓 Gọn thanh trên', 'Bầu phượng ấn, đại án, đại lễ, sở thích Hoàng thượng nay nằm trong nút 🗓 Hôm nay. Có việc mới thì hiện chấm đỏ.'],
   ['🏮 Ngân khố tỷ muội', 'Một quỹ chung cho cả nhóm: góp bạc hoặc làm nhiệm vụ nhóm mỗi ngày. Dùng để may áo dâng Thái hậu, hoặc chủ nhóm nâng cấp: 300 bạc lên 6 người, 700 bạc lên 10 người. Nhóm mới lập tối đa 4 người, tên không được trùng.'],
@@ -3146,3 +3148,43 @@ socket.on('maint', m => { if (!m && maintWasOn) return location.reload(); maintS
 socket.on('connect', () => { if (maintWasOn) setTimeout(() => { if (!maintSt) location.reload(); }, 4000); });
 // bản mới lên (máy chủ khởi động lại) thì tự tải lại trang để dùng giao diện mới
 let bootSeen = null; socket.on('build', b => { if (bootSeen && bootSeen !== b) return location.reload(); bootSeen = b; });
+
+// ---------------- điện thoại: thu gọn / mở rộng bảng, xoay ngang ----------------
+const MOBQ = matchMedia('(max-width:760px), (max-height:500px)');
+let mobPref = {}; try { mobPref = JSON.parse(localStorage.getItem('mph_fold') || '{}'); } catch {}
+const MOB_DEF = { stats: true, map: true, chat: false, acts: false, top5: true };
+function mobApply() {
+  const on = MOBQ.matches; document.body.classList.toggle('mob', on);
+  for (const k of Object.keys(MOB_DEF)) document.body.classList.toggle('f-' + k, on && (mobPref[k] ?? MOB_DEF[k]));
+  const sf = document.querySelector('.stfold'); if (sf) sf.textContent = document.body.classList.contains('f-stats') ? '⋯' : '▴';
+  const mc = $('mobMap'); if (mc) mc.classList.toggle('on', !document.body.classList.contains('f-map')); const mt = $('mobTop'); if (mt) mt.classList.toggle('on', !document.body.classList.contains('f-top5'));
+}
+function mobFold(k, v) { mobPref[k] = v ?? !document.body.classList.contains('f-' + k); try { localStorage.setItem('mph_fold', JSON.stringify(mobPref)); } catch {} mobApply(); }
+{ const bar = document.createElement('div'); bar.id = 'mchips';
+  bar.innerHTML = '<button id="mobMap">🗺 Đi đâu</button><button id="mobTop">🏆</button><button id="mobChat">💬<i class="bd hidden" id="mobChatN"></i></button>';
+  $('game').appendChild(bar);
+  $('mobMap').onclick = () => { mobFold('map'); if (!document.body.classList.contains('f-map')) mobFold('top5', true); };
+  $('mobTop').onclick = () => { mobFold('top5'); if (!document.body.classList.contains('f-top5')) mobFold('map', true); };
+  $('top5').addEventListener('click', e => { if (document.body.classList.contains('mob') && e.target.closest('.t')) { e.stopImmediatePropagation(); mobFold('top5', true); } }, true); $('mobChat').onclick = () => { mobFold('chat'); chatUnread = 0; mobChatBadge(); };
+  // chọn nơi đi xong thì thu bản đồ lại
+  $('map').addEventListener('click', e => { if (e.target.closest('button') && document.body.classList.contains('mob')) setTimeout(() => { if (!$('modal') || $('modal').classList.contains('hidden')) mobFold('map', true); }, 50); });
+  // bấm tên nơi đang đứng để thu / mở bảng việc làm
+  $('acts').addEventListener('click', e => { if (e.target.closest('.ttl') && document.body.classList.contains('mob')) mobFold('acts'); });
+  // tin nhắn mới khi khung chat đang thu gọn
+  let chatUnread = 0; const mobChatBadge = () => { const b = $('mobChatN'); if (b) { b.textContent = chatUnread > 9 ? '9+' : chatUnread; b.classList.toggle('hidden', !chatUnread); } };
+  new MutationObserver(ms => { if (!document.body.classList.contains('f-chat')) return; for (const m of ms) chatUnread += m.addedNodes.length; mobChatBadge(); }).observe($('chatlog'), { childList: true });
+  window._mobChatReset = () => { chatUnread = 0; mobChatBadge(); };
+}
+MOBQ.addEventListener?.('change', mobApply); addEventListener('orientationchange', () => setTimeout(() => { mobApply(); resize(); }, 300)); mobApply();
+// nút xoay ngang: Android khoá ngang toàn màn hình; iPhone không cho web tự xoay nên hướng dẫn xoay tay
+if (matchMedia('(pointer:coarse)').matches) {
+  const r = document.createElement('button'); r.id = 'rotbtn'; r.title = 'Xoay ngang màn hình'; r.innerHTML = '🔄<span class="lbl"> Xoay ngang</span>'; document.body.appendChild(r);
+  r.onclick = async () => {
+    const land = innerWidth > innerHeight;
+    if (document.fullscreenElement) { try { screen.orientation?.unlock?.(); await document.exitFullscreen(); } catch {} return; }
+    if (!land && screen.orientation?.lock && document.documentElement.requestFullscreen) {
+      try { await document.documentElement.requestFullscreen({ navigationUI: 'hide' }); await screen.orientation.lock('landscape'); return; } catch { try { if (document.fullscreenElement) await document.exitFullscreen(); } catch {} }
+    }
+    modal(`<button class="close" onclick="window._close()">✕</button><h3>🔄 Chơi màn hình ngang</h3><div style="line-height:1.7">${land ? 'Đang ở màn hình ngang rồi. Muốn về dọc thì xoay điện thoại lại.' : 'Điện thoại này không cho trang web tự xoay. Làm như sau:<br>1. Vuốt mở Trung tâm điều khiển, <b>tắt khoá xoay</b> 🔒.<br>2. <b>Xoay ngang</b> điện thoại, game tự đổi sang giao diện ngang.<br><small style="color:var(--muted)">iPhone: thêm game vào Màn hình chính (nút Chia sẻ → Thêm vào MH chính) để chơi toàn màn hình, không còn thanh địa chỉ.</small>'}</div>`);
+  };
+}
