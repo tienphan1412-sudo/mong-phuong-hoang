@@ -9,9 +9,10 @@ const C = require('./config');
 
 const app = express();
 const server = http.createServer(app);
-const io = new Server(server);
+const io = new Server(server, { pingInterval: 25000, pingTimeout: 30000, maxHttpBufferSize: 1e5 });
+app.use(require('compression')({ threshold: 1024, filter: (req, res) => !/\.(glb|png|jpg|webp|mp3|ogg)$/i.test(req.path) }));
 app.get('/ping', (req, res) => { res.set('Access-Control-Allow-Origin', '*'); res.set('Cache-Control', 'no-store'); res.send('ok'); });
-app.use(express.static(path.join(__dirname, 'public'), { maxAge: '1h', setHeaders: (res, f) => { if (/\.(js|html|css)$/.test(f)) res.setHeader('Cache-Control', 'no-cache'); } }));
+app.use(express.static(path.join(__dirname, 'public'), { maxAge: '1d', setHeaders: (res, f) => { if (/\.(js|html|css|json)$/.test(f)) res.setHeader('Cache-Control', 'no-cache'); } })); // mô hình, ảnh, nhạc: trình duyệt giữ 1 ngày
 app.get('/health', (_, res) => res.send('ok'));
 app.get('/api/stats', (req, res) => {
   const a = Object.values(DB.players).find(q => q.token && q.token === String(req.query.token || ''));
@@ -36,6 +37,17 @@ async function loadDB() {
   }
 }
 let saveTimer = null;
+// gom vị trí người chơi trong từng khu, mỗi 100ms gửi một lô thay vì từng tin lẻ
+const moveBuf = new Map();
+setInterval(() => { for (const [rm, m] of moveBuf) { if (m.size) io.to(rm).emit('pmoves', [...m.values()]); } moveBuf.clear(); }, 100);
+// dọn dữ liệu cũ để bản ghi không phình to theo thời gian
+let hkAt = 0;
+function housekeep() {
+  if (now() - hkAt < 10 * 60e3) return; hkAt = now();
+  for (const c of Object.values(DB.state.cases)) if (c.status !== 'open' && now() - (c.closedAt || c.deadline || c.created) > 3 * 864e5) delete DB.state.cases[c.id];
+  for (const p of Object.values(DB.players)) { if (p.ttLog?.length > 30) p.ttLog = p.ttLog.slice(-30); }
+  const kb = Math.round(JSON.stringify(DB).length / 1024); if (kb > 9000) console.warn(`⚠️ Dữ liệu game đã ${kb} KB, gần giới hạn 16 MB của MongoDB, cần tách bản ghi.`); else console.log(`dữ liệu game: ${kb} KB, ${Object.keys(DB.players).length} người chơi, ${online.size} online`);
+}
 function save() {
   if (saveTimer) return;
   saveTimer = setTimeout(async () => {
@@ -44,7 +56,7 @@ function save() {
       if (mongo) await mongo.updateOne({ _id: 'world' }, { $set: { data: DB } }, { upsert: true });
       else fs.writeFileSync(path.join(__dirname, 'data.json'), JSON.stringify(DB));
     } catch (e) { console.error('save failed', e.message); }
-  }, 1500);
+  }, mongo ? 4000 : 1500); // gom nhiều thay đổi thành một lần ghi
 }
 
 // ---------------- thời gian Việt Nam ----------------
@@ -1405,7 +1417,7 @@ function nightTick() {
     if (days >= C.ABSENT_SICK_DAYS && days < C.ABSENT_LOSE_DAYS && !p.sick && !online.has(p.id)) { p.sick = true; news(`${p.name} cáo bệnh, đã ${Math.floor(days)} ngày không ra khỏi cung.`); }
     if (days >= C.ABSENT_LOSE_DAYS && !online.has(p.id)) { p.sick = false; const r = p.rank; p.rank = C.FIGHT_RANK - 1; p.trend = { dir: -1, t: now() }; p.outfit = C.RANKS[p.rank].outfit; news(`${p.name} vắng mặt quá lâu, nhường ghế ${C.RANKS[r].name}.`); freeSeatCheck(); }
   }
-  checkDeadlines(); thaiTick(); kidTick(); sinhTick(); leTick(); hhTick(); eventTick(); npcDaily(); grudgeTick(); bigTick(); festTick(); if (v.getUTCHours() >= 3) backup();
+  checkDeadlines(); thaiTick(); kidTick(); sinhTick(); leTick(); housekeep(); hhTick(); eventTick(); npcDaily(); grudgeTick(); bigTick(); festTick(); if (v.getUTCHours() >= 3) backup();
   // vụ án do hệ thống dàn dựng khi cung vắng người
   for (const p of Object.values(DB.players)) {
     if (!online.has(p.id) || p.lanh || p.rank < C.FIGHT_RANK) continue;
@@ -1511,10 +1523,12 @@ io.on('connection', sock => {
     else if (me.outfit === 'aongu' && loc !== 'phong') me.outfit = me.lanh ? 'tunu' : C.RANKS[me.rank].outfit;
     enter(me, loc, sock); push(me);
   });
+  let lastMove = 0;
   sock.on('move', d => {
-    if (!me) return;
+    if (!me) return; const tm = Date.now(); if (tm - lastMove < 50 && d.anim === me.anim) return; lastMove = tm; // chặn gửi dồn dập
     me.x = +d.x || 0; me.z = +d.z || 0; me.ry = +d.ry || 0; me.anim = String(d.anim || 'dung_cho').slice(0, 20); if (me.seat) freeSeat(me);
-    rTo(me, sock).emit('pmove', { id: me.id, x: me.x, z: me.z, ry: me.ry, anim: me.anim });
+    const mv = { id: me.id, x: +me.x.toFixed(2), z: +me.z.toFixed(2), ry: +me.ry.toFixed(2), anim: me.anim };
+    if (stealth(me)) rTo(me, sock).emit('pmove', mv); else { const rm = roomOf(me); if (!moveBuf.has(rm)) moveBuf.set(rm, new Map()); moveBuf.get(rm).set(me.id, mv); } // gom lại gửi theo lô
   });
   sock.on('sit', d => { if (!me) return; if (!takeSeat(me, String(d?.seat || ''))) return toast(me, 'Ghế này đã có người ngồi.'); sock.emit('sitOk', { seat: me.seat }); rTo(me, sock).emit('pmove', { id: me.id, x: me.x, z: me.z, ry: me.ry, anim: me.anim }); });
   sock.on('stand', () => { if (!me) return; if (me.lying) { me.lying = false; push(me); } if (!me.seat) return; freeSeat(me); me.anim = 'dung_cho'; rTo(me, sock).emit('pmove', { id: me.id, x: me.x, z: me.z, ry: me.ry, anim: 'dung_cho' }); });

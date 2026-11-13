@@ -284,7 +284,9 @@ socket.on('scene', async d => { pendingScene = d; sceneHost = d.host || null; ki
 let pendingScene = null;
 socket.on('pjoin', p => addOther(p));
 socket.on('pleave', id => removeOther(id));
-socket.on('pmove', d => { const o = others.get(d.id); if (!o) return; o.tx = d.x; o.tz = d.z; o.try = d.ry; o.p.x = d.x; o.p.z = d.z; if (o.c) applyAnim(o, d.anim, !!d.once); });
+function onPmove(d) { const o = others.get(d.id); if (!o) return; o.tx = d.x; o.tz = d.z; o.try = d.ry; o.p.x = d.x; o.p.z = d.z; if (o.c) applyAnim(o, d.anim, !!d.once); }
+socket.on('pmove', onPmove);
+socket.on('pmoves', L => { for (const d of L) if (d.id !== me?.id) onPmove(d); });
 socket.on('poutfit', async d => { const o = others.get(d.id); if (!o) return; o.p.outfit = d.outfit; const p = { ...o.p, x: o.tx, z: o.tz, ry: o.try }; removeOther(d.id); addOther(p); });
 socket.on('chat', m => {
   const log = $('chatlog'); const div = document.createElement('div'); if (m.ch === 'tm') div.className = 'tm'; div.innerHTML = `${m.ch === 'tm' ? '<i>[Tỷ muội]</i> ' : ''}<b>${esc(m.name)}:</b> ${esc(m.text)}`; log.appendChild(div); log.scrollTop = 1e6;
