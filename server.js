@@ -440,9 +440,8 @@ function endHHVote() {
   if (prev && prev.id !== w.id) { news(`Phượng ấn đổi chủ: ${prev.name} trở lại ngôi ${C.RANKS[prev.rank].name}.`, 'phat'); if (/^hoanghau/.test(prev.outfit)) prev.outfit = C.RANKS[prev.rank].outfit; push(prev); }
   DB.state.hh = { id: w.id, since: now() }; cnt(w, 'hh');
   if (!prev || prev.id !== w.id) {
-    w.outfit = 'hoanghau'; w.trend = { dir: 1, t: now() };
-    news(`👑 Sắc lập Hoàng hậu: ${w.name} được ${ranked[0].votes} người tiến cử, Thái hậu ưng thuận. Từ nay chủ quản lục cung!`, 'phong');
-    const s = sockOf(w.id); if (s) s.emit('cutscene', { type: 'sacphong', rank: w.rank, rankName: 'Hoàng hậu', outfit: 'hoanghau', palace: false, name: w.name });
+    w.trend = { dir: 1, t: now() };
+    hhcStart(w, ranked); // áo Hoàng hậu được thay ngay trong lễ sắc phong
   } else news(`👑 ${w.name} giữ vững phượng ấn thêm một kỳ.`, 'phong');
   for (const id of online.keys()) { const q = P(id); if (q) push(q); }
   save();
@@ -460,6 +459,45 @@ function hhTick() {
   const v = DB.state.hhVote;
   if (v && now() >= v.end) endHHVote();
   else if (!v && now() >= (DB.state.hhNext || 0) && hhEligible().length) startHHVote();
+}
+
+
+// ---------------- đại lễ công bố phượng ấn và sắc lập Hoàng hậu (Dưỡng Tâm điện) ----------------
+// chờ tân Hoàng hậu online → báo trước 3 phút → công bố kết quả (1 phút) → sắc phong (100 giây) → xong
+const HHC = { LEAD: 3 * 60e3, CONGBO: 60e3, SAC: 100e3, WAIT_MAX: 24 * 3600e3 };
+const hhcPub = () => { const h = DB.state.hhc; if (!h) return null; return { id: h.id, name: h.name, ranked: h.ranked, phase: h.phase, at: h.at || null, t: h.t || null, dur: { congbo: HHC.CONGBO, sac: HHC.SAC }, cheer: (h.cheer || []).length, test: !!h.test }; };
+function hhcEmit() { emitSplit('hhc', hhcPub(), DB.state.hhc?.test); }
+function hhcStart(w, ranked, test) {
+  DB.state.hhc = { id: w.id, name: w.name, ranked: ranked.slice(0, 3).map(r => ({ name: r.q.name, votes: r.votes })), phase: 'cho', at: null, created: now(), cheer: [], test: !!test };
+  quiet(test, () => news(`📜 Kết quả bầu phượng ấn: ${w.name} được nhiều người tiến cử nhất. Dưỡng Tâm điện sẽ cử hành đại lễ công bố và sắc lập Hoàng hậu.`, 'phong'));
+  hhcSchedule(); save();
+}
+function hhcSchedule() {
+  const h = DB.state.hhc; if (!h || h.phase !== 'cho' || h.at || !online.has(h.id)) return;
+  h.at = now() + (h.test ? 20e3 : HHC.LEAD);
+  quiet(h.test, () => { news(`👑 ${h.test ? 'Ít giây' : '3 phút'} nữa, Dưỡng Tâm điện cử hành đại lễ công bố phượng ấn và sắc lập Hoàng hậu ${h.name}. Mời cả hậu cung tới dự!`, 'phong');
+    if (!h.test) for (const q of Object.values(DB.players)) if (q.id !== h.id) notify(q, '👑 Đại lễ sắc lập Hoàng hậu', '3 phút nữa cử hành ở Dưỡng Tâm điện. Tới dự để hành lễ chúc mừng.', 'hh'); });
+  notify(P(h.id), '👑 Đại lễ sắc lập', 'Bổn cung được bầu làm Hoàng hậu. Mau tới Dưỡng Tâm điện nhận sắc phong.', 'hh');
+  hhcEmit(); save();
+}
+function hhcTick() {
+  const h = DB.state.hhc; if (!h) return;
+  if (h.phase === 'cho') { if (!h.at) { if (now() - h.created > HHC.WAIT_MAX) return hhcFinish(true); return hhcSchedule(); } if (now() >= h.at) { h.phase = 'congbo'; h.t = now(); hhcEmit(); save(); } return; }
+  if (h.phase === 'congbo' && now() - h.t >= (h.test ? 20e3 : HHC.CONGBO)) { h.phase = 'sacphong'; h.t = now(); hhcEmit(); save(); return; }
+  if (h.phase === 'sacphong' && now() - h.t >= 8000 && !h.robed) { h.robed = true; const w = P(h.id); if (w && (isHH(w) || h.test)) { w.outfit = 'hoanghau'; push(w); const sk = sockOf(w.id); if (sk) rTo(w, sk).emit('poutfit', { id: w.id, outfit: 'hoanghau' }); } save(); }
+  if (h.phase === 'sacphong' && now() - h.t >= (h.test ? 50e3 : HHC.SAC)) hhcFinish();
+}
+function hhcFinish(silent) {
+  const h = DB.state.hhc; if (!h) return; DB.state.hhc = null;
+  const w = P(h.id); if (w && isHH(w) && !/^hoanghau/.test(w.outfit)) { w.outfit = 'hoanghau'; push(w); }
+  if (!silent) quiet(h.test, () => news(`🎆 Đại lễ sắc lập hoàn tất. Hoàng hậu ${h.name} chính thức chủ quản lục cung${(h.cheer || []).length ? `, ${(h.cheer || []).length} phi tần hành lễ bái kiến` : ''}.`, 'phong'));
+  emitSplit('hhc', null, h.test); save();
+}
+function hhcSock(sock, getMe) {
+  setTimeout(() => { const me = getMe(); sock.emit('hhc', DB.state.hhc?.test && !me?.admin ? null : hhcPub()); }, 1600);
+  sock.on('hhc', d => { const me = getMe(), h = DB.state.hhc; if (!me || !h || h.phase !== 'sacphong' || me.loc !== 'duongtam') return;
+    if (d?.op === 'chuc' && me.id !== h.id && !h.cheer.includes(me.id)) { h.cheer.push(me.id); if (!h.test) { addPts(me, 6); me.haiLong = Math.min(100, me.haiLong + 2); const w = P(h.id); if (w) { w.silver += 10; push(w); } }
+      io.to('duongtam').emit('chat', { id: null, name: '🙇', text: `${me.name} hành lễ: Hoàng hậu nương nương thiên tuế, thiên tuế, thiên thiên tuế!` }); toast(me, 'Đã hành lễ bái kiến Hoàng hậu: công trạng +6, Thái hậu hài lòng +2.', 'good'); push(me); hhcEmit(); } });
 }
 
 // ---------------- sự kiện theo tuần ----------------
@@ -1458,7 +1496,7 @@ function nightTick() {
     if (days >= C.ABSENT_SICK_DAYS && days < C.ABSENT_LOSE_DAYS && !p.sick && !online.has(p.id)) { p.sick = true; news(`${p.name} cáo bệnh, đã ${Math.floor(days)} ngày không ra khỏi cung.`); }
     if (days >= C.ABSENT_LOSE_DAYS && !online.has(p.id)) { p.sick = false; const r = p.rank; p.rank = C.PALACE_RANK - 1; p.waiting = true; p.trend = { dir: -1, t: now() }; p.outfit = C.RANKS[p.rank].outfit; news(`${p.name} vắng mặt quá lâu, nhường ghế ${C.RANKS[r].name}.`); freeSeatCheck(); }
   }
-  checkDeadlines(); thaiTick(); kidTick(); sinhTick(); leTick(); housekeep(); hhTick(); eventTick(); npcDaily(); grudgeTick(); bigTick(); festTick(); if (v.getUTCHours() >= 3) backup();
+  checkDeadlines(); thaiTick(); kidTick(); sinhTick(); hhcTick(); leTick(); housekeep(); hhTick(); eventTick(); npcDaily(); grudgeTick(); bigTick(); festTick(); if (v.getUTCHours() >= 3) backup();
   // vụ án do hệ thống dàn dựng khi cung vắng người
   for (const p of Object.values(DB.players)) {
     if (!online.has(p.id) || p.lanh || p.rank < C.FIGHT_RANK) continue;
@@ -2101,7 +2139,7 @@ io.on('connection', sock => {
     rTo(me, null, true).emit('tt', { from: 'p:' + me.id, to, act, back, fname: me.name, tname });
     save(); push(me); if (t) push(t);
   });
-  vuaSock(sock, () => me); kidSock(sock, () => me); sinhSock(sock, () => me); leSock(sock, () => me);
+  vuaSock(sock, () => me); kidSock(sock, () => me); sinhSock(sock, () => me); leSock(sock, () => me); hhcSock(sock, () => me);
   sock.on('caocap', d => {
     if (!me || !d || me.lanh || me.rank < 6) return toast(me, 'Từ Phi trở lên mới được giao việc này.');
     me.ccDay = me.ccDay?.d === dayKey() ? me.ccDay : { d: dayKey() }; const C2 = me.ccDay;
@@ -2216,7 +2254,7 @@ io.on('connection', sock => {
 });
 
 const findP = who => Object.values(DB.players).find(x => x.name.toLowerCase() === who || x.user === who);
-const TEST_CMDS = ['/cothai', '/bung', '/chuyenda', '/tua', '/sinh', '/lon', '/khoc', '/xoacon', '/xoathai'];
+const TEST_CMDS = ['/lehau', '/cothai', '/bung', '/chuyenda', '/tua', '/sinh', '/lon', '/khoc', '/xoacon', '/xoathai'];
 function admin(p, text) { const cmd0 = text.split(/\s+/)[0]; return quiet(TEST_CMDS.includes(cmd0), () => adminRaw(p, text)); }
 function adminRaw(p, text) {
   const [cmd, arg, ...rest] = text.split(/\s+/);
@@ -2241,6 +2279,7 @@ function adminRaw(p, text) {
   else if (cmd === '/cothai') { const who = [arg, ...rest].filter(Boolean).join(' ').toLowerCase(); const q = who ? findP(who) : p; if (!q) return toast(p, 'Không tìm thấy.', 'bad'); q.thai = { since: now() - 1000, known: false, test: true }; revealThai(q, 'mach'); }
   else if (cmd === '/lon') { const who = [arg, ...rest].filter(Boolean).join(' ').toLowerCase(); const q = who ? findP(who) : p; if (!q?.children?.length) return toast(p, 'Người này chưa có con.', 'bad'); for (const c of kidFix(q)) { c.born -= 3 * 864e5; c.cry = null; c.cryAt = 0; } push(q); kidEmit(q); return toast(p, `Các con của ${q.name} lớn thêm 3 ngày.`, 'good'); }
   else if (cmd === '/khoc') { for (const c of kidFix(p)) c.cryAt = 1; return toast(p, 'Các bé sẽ khóc ngay.', 'good'); }
+  else if (cmd === '/lehau') { if (DB.state.hhc) { hhcFinish(true); return toast(p, 'Đã dừng lễ thử.'); } hhcStart(p, [{ q: p, votes: 9 }, ...Object.values(DB.players).filter(x => x.rank >= 5 && x.id !== p.id).slice(0, 2).map(q => ({ q, votes: 3 + rnd(4) }))], true); return toast(p, 'Lễ thử: 20 giây nữa bắt đầu ở Dưỡng Tâm điện (chỉ bà thấy).', 'good'); }
   else if (cmd === '/thudo') {
     if (!arg) return toast(p, 'Gõ /thudo + tên bộ. Các bộ: ' + ALL_OUTFITS.join(', '));
     if (!ALL_OUTFITS.includes(arg)) return toast(p, 'Không có bộ ' + arg + '. Các bộ: ' + ALL_OUTFITS.join(', '), 'bad');

@@ -2988,3 +2988,56 @@ window.__mph.kidIds = () => (me.children||[]).map(k => [k.id, k.name, k.stage]);
 window.__mph.spec = (p, l) => { specCam = p ? { loc: world.loc, keep: true, pos: new THREE.Vector3(...p), look: new THREE.Vector3(...l), until: Date.now() + 36e5 } : null; };
 window.__mph.gan = (cid, act) => { const k = (me.children || []).find(x => x.id === cid); if (k) ganPlay(k, act); };
 window.__mph.kl = () => JSON.stringify({kl: kidLesson, hug: selfC?._hug, gf: ganFx, pose: selfC?.pose, post: !!selfC?.post, cur: selfC?.curName, p2: String(selfC?.post2).slice(0, 120)});
+
+// ---------------- đại lễ công bố phượng ấn và sắc lập Hoàng hậu (Dưỡng Tâm điện) ----------------
+let hhc = null, hhcA = null; // hhcA: diễn viên trong điện (thái giám đọc chiếu), bảng chiếu thư
+const hhcBar = document.createElement('div'); hhcBar.id = 'hhcBar'; hhcBar.style.cssText = 'position:fixed;left:50%;top:132px;transform:translateX(-50%);z-index:30;background:linear-gradient(#5a1414ee,#3a0c0cee);border:1px solid #f3d27a;border-radius:12px;padding:8px 14px;color:#fde9b0;font-size:13.5px;display:none;text-align:center;box-shadow:0 4px 16px #0008;max-width:92vw';
+document.body.appendChild(hhcBar);
+const hhcPanel = document.createElement('div'); hhcPanel.id = 'hhcPanel'; hhcPanel.style.cssText = 'position:fixed;right:12px;top:50%;transform:translateY(-50%);z-index:30;width:min(330px,86vw);background:url(img/thanhchi.png) center/cover, #f6e2a8;color:#3a1a05;border:3px solid #c9973a;border-radius:10px;padding:18px 18px 14px;font-family:"Noto Serif",serif;font-size:14px;line-height:1.55;display:none;box-shadow:0 6px 24px #000a';
+document.body.appendChild(hhcPanel);
+socket.on('hhc', d => { const was = hhc?.phase; hhc = d; if (d && was !== d.phase) hhcPhase(d.phase); hhcRender(); hhcSync(); });
+function hhcLeft(ms) { const l = Math.max(0, ms - Date.now()); return `${Math.floor(l / 60000)}:${String(Math.floor(l / 1000) % 60).padStart(2, '0')}`; }
+function hhcRender() {
+  if (!hhc) { hhcBar.style.display = 'none'; hhcPanel.style.display = 'none'; return; }
+  const here = world?.loc === 'duongtam', mine = hhc.id === me?.id;
+  const go = here ? '' : ` <button class="gold" style="margin-left:8px;padding:3px 10px" onclick="window.__hhcGo()">🏯 Tới dự</button>`;
+  if (hhc.phase === 'cho') { if (!hhc.at) { hhcBar.style.display = 'none'; return; } hhcBar.innerHTML = `👑 <b>Đại lễ sắc lập Hoàng hậu ${esc(hhc.name)}</b> · Dưỡng Tâm điện · còn <b>${hhcLeft(hhc.at)}</b>${mine ? '<br><small>Chủ tử là tân Hoàng hậu, mau tới Dưỡng Tâm điện nhận sắc phong.</small>' : ''}${go}`; }
+  else hhcBar.innerHTML = `👑 <b>${hhc.phase === 'congbo' ? 'Đang công bố kết quả bầu phượng ấn' : `Đang sắc lập Hoàng hậu ${esc(hhc.name)}`}</b> · Dưỡng Tâm điện${go}`;
+  hhcBar.style.display = '';
+  if (!here || hhc.phase === 'cho') { hhcPanel.style.display = 'none'; return; }
+  const list = (hhc.ranked || []).map((r, i) => `<div style="display:flex;justify-content:space-between;${i === 0 ? 'font-weight:700;color:#8a1a0a' : ''}"><span>${['🥇', '🥈', '🥉'][i] || ''} ${esc(r.name)}</span><span>${r.votes} phiếu tiến cử</span></div>`).join('');
+  if (hhc.phase === 'congbo') hhcPanel.innerHTML = `<div style="text-align:center;font-weight:700;font-size:16px;margin-bottom:6px">📜 Công bố kết quả bầu phượng ấn</div><div style="margin-bottom:8px">Phụng mệnh Thái hậu, Tổng quản xin công bố kết quả tiến cử ngôi chủ lục cung kỳ này:</div>${list}<div style="margin-top:10px;font-style:italic">Người được tiến cử nhiều nhất là <b>${esc(hhc.name)}</b>. Mời nương nương bước lên trước điện nghe chỉ.</div>`;
+  else hhcPanel.innerHTML = `<div style="text-align:center;font-weight:700;font-size:16px;margin-bottom:6px">📜 Thánh chỉ sắc lập Hoàng hậu</div>Phụng thiên thừa vận, Hoàng đế chiếu viết: <b>${esc(hhc.name)}</b> đức hạnh đoan trang, được lục cung tiến cử, Thái hậu ưng thuận. Nay sắc lập làm <b>Hoàng hậu</b>, ban phượng ấn, chủ quản lục cung. Khâm thử!<div style="margin-top:10px;text-align:center">${mine ? '<i>Bổn cung quỳ nhận phượng ấn, tạ ơn Hoàng thượng.</i>' : `<button class="gold" onclick="window.__hhcChuc()">🙇 Hành lễ bái kiến Hoàng hậu</button>`}<div style="font-size:12px;margin-top:6px;opacity:.8">${hhc.cheer || 0} người đã hành lễ</div></div>`;
+  hhcPanel.style.display = '';
+}
+window.__hhcGo = () => socket.emit('goto', 'duongtam');
+window.__hhcChuc = () => { emote('hanh_le'); socket.emit('hhc', { op: 'chuc' }); };
+let hhcRobe = false;
+setInterval(async () => { if (!hhc) return; hhcRender(); hhcSync();
+  // tân Hoàng hậu: máy chủ vừa thay áo thì đổi ngay mô hình nhân vật, giữ nguyên chỗ quỳ trước ngai
+  if (hhc.phase === 'sacphong' && hhc.id === me?.id && selfC && !hhcRobe && world?.loc === 'duongtam' && selfC.outfit !== wear(me.outfit, me.kidPub)) { hhcRobe = true; const r = selfC.root; await respawnSelf(r.position.x, r.position.z, r.rotation.y); selfC?.play('hanh_le', { restart: true }); burst(r.position.x, 1.2, r.position.z, 80, 1.2, [0xffd77a, 0xffffff], 1.4, .3, .07); hhcRobe = false; } }, 1000);
+// chuyển cảnh trong lễ: khán giả nhìn về chính điện, tân Hoàng hậu bước lên quỳ nhận sắc
+function hhcPhase(ph) {
+  if (world?.loc !== 'duongtam' || !hhc) return;
+  if (ph === 'congbo' || ph === 'sacphong') { specCam = { loc: 'duongtam', pos: new THREE.Vector3(2.6, 1.8, 1.4), look: new THREE.Vector3(0, .7, -2.2), until: Date.now() + (ph === 'congbo' ? 15000 : 25000) }; music.gong?.(); }
+  if (ph === 'sacphong') {
+    const mine = hhc.id === me?.id, t0 = Date.now();
+    if (mine && selfC) { if (chairSeat) standChair(); if (seated) standUp(); selfC.target = null; selfC.root.position.set(0, 0, -1.5); selfC.root.rotation.y = Math.PI; selfC.play('quy', { restart: true }); sendMove('quy'); }
+    const htLb = world.npcs.find(n => n.model === 'hoangthuong' && n.sit)?.label;
+    setTimeout(async () => { if (world?.loc !== 'duongtam') return; burst(0, 1.2, -1.5, 120, 1.4, [0xffd77a, 0xffffff, 0xff6b6b], 1.6, .4, .08); fireworks(0, -1.6, true);
+ }, Math.max(0, 9000 - (Date.now() - t0)));
+    setTimeout(() => { if (htLb && world?.loc === 'duongtam') bubble(htLb, `Hoàng hậu ${hhc?.name || ''} bình thân. Từ nay lục cung giao cả cho nàng.`); }, 12000);
+    setTimeout(() => { if (world?.loc === 'duongtam') fireworks(0, -1, true); }, 40000);
+    setTimeout(() => { if (world?.loc === 'duongtam') fireworks(0, -1, true); }, 75000);
+  }
+}
+// thái giám đứng đọc chiếu trước ngai trong lúc công bố và sắc phong
+async function hhcSync() {
+  const want = hhc && (hhc.phase === 'congbo' || hhc.phase === 'sacphong') && world?.loc === 'duongtam';
+  if (!want) { if (hhcA) { hhcA.c?.dispose(); hhcA.edict?.parent?.remove(hhcA.edict); hhcA = null; } return; }
+  if (hhcA) return; const w = world; hhcA = { w, loading: true };
+  const c = await spawn('thaigiam'); if (world !== w || !hhcA || hhcA.w !== w) { c.dispose(); return; }
+  c.root.position.set(-1.1, 0, -2.1); c.root.rotation.y = .45; c.play('doc_chi'); w.group.add(c.root);
+  const edict = makeEdictProp(); w.group.add(edict); hhcA = { w, c, edict };
+  FX.push(dt => { if (hhcA?.c !== c) return false; c.update(dt); holdEdict(c, edict); });
+}
