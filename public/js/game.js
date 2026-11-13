@@ -94,6 +94,9 @@ async function enterScene(loc, players, venue, seatId) {
       o.throne.position.set(s.x, s.y - .04, s.z); o.throne.rotation.y = s.ry;
       for (const l of o.throne.userData.legs) { const h = s.y - .04 - o.dais.y; l.scale.y = h; l.position.y = -h / 2; }
       c.play('ngoi');
+      // phượng tọa của Hoàng hậu: ghế đỏ giống ngai rồng nhưng nhỏ hơn, đặt bên phải Hoàng thượng
+      if (o.loc === 'duongtam' && !o.hhThrone) { const h = s.y - .04 - o.dais.y, K = .85, t2 = o.throne.clone(true); t2.scale.setScalar(K); t2.position.set(s.x - 1.05, o.dais.y + K * h, s.z + .05); t2.rotation.y = s.ry; o.group.add(t2); o.hhThrone = t2;
+        o.seats = o.seats || []; o.seats.push({ id: 'hh0', x: s.x - 1.05, z: s.z + .05, ry: s.ry, top: t2.position.y + .034, kind: 'chair', obj: t2 }); }
     } else if (n.seat) { seatPose(c, n.seat); } else {
       c.root.position.set(n.x, 0, n.z); c.root.rotation.y = n.ry || 0;
       if (n.kneel) kneelOn(c, n.x, n.kneel, n.z, n.ry); else c.play(n.idle || (n.model === 'cungnu' || n.model === 'mama' ? 'chap_tay' : 'dung_cho'));
@@ -2583,7 +2586,10 @@ function makeBaby(sex) {
   const hat = new THREE.Mesh(new THREE.SphereGeometry(.066, 14, 10, 0, Math.PI * 2, 0, Math.PI * .55), kMat(wrap)); hat.rotation.x = -1.9; head.add(hat);
   for (const sx of [-1, 1]) { const e = new THREE.Mesh(new THREE.BoxGeometry(.016, .004, .006), kMat(0x222222)); e.position.set(sx * .022, .056, .012); head.add(e); const ck = new THREE.Mesh(new THREE.SphereGeometry(.012, 8, 6), kMat(0xf2a0a0)); ck.position.set(sx * .035, .045, .03); head.add(ck); }
   const mouth = new THREE.Mesh(new THREE.SphereGeometry(.009, 8, 6), kMat(0x9a3a3a)); mouth.position.set(0, .055, .035); mouth.scale.set(1, .4, 1); head.add(mouth);
-  g.userData = { head, mouth, baby: true }; return g;
+  g.userData = { head, mouth, baby: true };
+  // mô hình em bé quấn tã thật: tải xong thì thay hình nặn tạm (dài ~0,33 như trẻ sơ sinh so với người lớn cao ~1)
+  loadModel('embe').then(m => { const b = m.scene.clone(true); b.scale.setScalar(.34); b.rotation.y = -Math.PI / 2; b.position.y = -.06; g.children.forEach(ch => ch.visible = false); g.add(b); }).catch(() => {});
+  return g;
 }
 function makeKid(sex, stage) {
   const g = new THREE.Group(), body = new THREE.Group(); g.add(body); const s = stage === 'chap' ? .58 : .82; body.scale.setScalar(s);
@@ -3027,6 +3033,8 @@ function hhcPhase(ph) {
     setTimeout(async () => { if (world?.loc !== 'duongtam') return; burst(0, 1.2, -1.5, 120, 1.4, [0xffd77a, 0xffffff, 0xff6b6b], 1.6, .4, .08); fireworks(0, -1.6, true);
  }, Math.max(0, 9000 - (Date.now() - t0)));
     setTimeout(() => { if (htLb && world?.loc === 'duongtam') bubble(htLb, `Hoàng hậu ${hhc?.name || ''} bình thân. Từ nay lục cung giao cả cho nàng.`); }, 12000);
+    // sau khi nhận sắc: tân Hoàng hậu bước lên ngồi phượng tọa cạnh Hoàng thượng
+    setTimeout(() => { if (world?.loc !== 'duongtam' || !hhc) return; if (mine) socket.emit('sit', { seat: 'hh0' }); else toast(`👑 Hoàng hậu ${hhc.name} lên ngồi phượng tọa bên cạnh Hoàng thượng.`, 'good'); }, 30000);
     setTimeout(() => { if (world?.loc === 'duongtam') fireworks(0, -1, true); }, 40000);
     setTimeout(() => { if (world?.loc === 'duongtam') fireworks(0, -1, true); }, 75000);
   }

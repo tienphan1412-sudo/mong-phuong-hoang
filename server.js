@@ -464,7 +464,7 @@ function hhTick() {
 
 // ---------------- đại lễ công bố phượng ấn và sắc lập Hoàng hậu (Dưỡng Tâm điện) ----------------
 // chờ tân Hoàng hậu online → báo trước 3 phút → công bố kết quả (1 phút) → sắc phong (100 giây) → xong
-const HHC = { LEAD: 3 * 60e3, CONGBO: 60e3, SAC: 100e3, WAIT_MAX: 24 * 3600e3 };
+const HHC = { LEAD: 5 * 60e3, CONGBO: 60e3, SAC: 100e3, WAIT_MAX: 24 * 3600e3 };
 const hhcPub = () => { const h = DB.state.hhc; if (!h) return null; return { id: h.id, name: h.name, ranked: h.ranked, phase: h.phase, at: h.at || null, t: h.t || null, dur: { congbo: HHC.CONGBO, sac: HHC.SAC }, cheer: (h.cheer || []).length, test: !!h.test }; };
 function hhcEmit() { emitSplit('hhc', hhcPub(), DB.state.hhc?.test); }
 function hhcStart(w, ranked, test) {
@@ -475,8 +475,8 @@ function hhcStart(w, ranked, test) {
 function hhcSchedule() {
   const h = DB.state.hhc; if (!h || h.phase !== 'cho' || h.at || !online.has(h.id)) return;
   h.at = now() + (h.test ? 20e3 : HHC.LEAD);
-  quiet(h.test, () => { news(`👑 ${h.test ? 'Ít giây' : '3 phút'} nữa, Dưỡng Tâm điện cử hành đại lễ công bố phượng ấn và sắc lập Hoàng hậu ${h.name}. Mời cả hậu cung tới dự!`, 'phong');
-    if (!h.test) for (const q of Object.values(DB.players)) if (q.id !== h.id) notify(q, '👑 Đại lễ sắc lập Hoàng hậu', '3 phút nữa cử hành ở Dưỡng Tâm điện. Tới dự để hành lễ chúc mừng.', 'hh'); });
+  quiet(h.test, () => { news(`👑 ${h.test ? 'Ít giây' : '5 phút'} nữa, Dưỡng Tâm điện cử hành đại lễ công bố phượng ấn và sắc lập Hoàng hậu ${h.name}. Mời cả hậu cung tới dự!`, 'phong');
+    if (!h.test) for (const q of Object.values(DB.players)) if (q.id !== h.id) notify(q, '👑 Đại lễ sắc lập Hoàng hậu', '5 phút nữa cử hành ở Dưỡng Tâm điện. Tới dự để hành lễ chúc mừng.', 'hh'); });
   notify(P(h.id), '👑 Đại lễ sắc lập', 'Bổn cung được bầu làm Hoàng hậu. Mau tới Dưỡng Tâm điện nhận sắc phong.', 'hh');
   hhcEmit(); save();
 }
@@ -1510,7 +1510,7 @@ function nightTick() {
 // ---------------- vị trí, phòng ----------------
 const LOCS = ['tuninh', 'hoavien', 'duongtam', 'phong', 'tamcung', 'lanhcung', 'yentiec', 'ngutien', 'acaso', 'sansinh'];
 // ghế ngồi: loc -> { seatId: playerId }
-const SEATS = {}; const SEAT_IDS = { hoavien: ['hv0', 'hv1', 'hv2', 'hv3', 'hv4'], yentiec: ['f0', 'f1', 'f2', 'f3', 'f4', 'f5', 'f6', 'f7'] };
+const SEATS = {}; const SEAT_IDS = { duongtam: ['hh0'], hoavien: ['hv0', 'hv1', 'hv2', 'hv3', 'hv4'], yentiec: ['f0', 'f1', 'f2', 'f3', 'f4', 'f5', 'f6', 'f7'] };
 function freeSeat(p) { for (const loc in SEATS) for (const k in SEATS[loc]) if (SEATS[loc][k] === p.id) delete SEATS[loc][k]; p.seat = null; }
 function takeSeat(p, id) { const rk = roomOf(p), L = (SEATS[rk] = SEATS[rk] || {}); if (p.loc === 'phong' ? !/^(d\d{1,2}|b0|k\d{1,2}[ab])$/.test(id) : !(SEAT_IDS[p.loc] || []).includes(id)) return false; if (L[id] && L[id] !== p.id && online.has(L[id])) return false; freeSeat(p); L[id] = p.id; p.seat = id; p.anim = 'sit:' + id; return true; }
 function roomOf(p) { return p.loc === 'phong' ? 'phong:' + (p.visit || p.id) : p.loc === 'tamcung' ? 'tamcung:' + p.id : p.loc; }
@@ -1609,7 +1609,7 @@ io.on('connection', sock => {
     const mv = { id: me.id, x: +me.x.toFixed(2), z: +me.z.toFixed(2), ry: +me.ry.toFixed(2), anim: me.anim };
     if (stealth(me)) rTo(me, sock).emit('pmove', mv); else { const rm = roomOf(me); if (!moveBuf.has(rm)) moveBuf.set(rm, new Map()); moveBuf.get(rm).set(me.id, mv); } // gom lại gửi theo lô
   });
-  sock.on('sit', d => { if (!me) return; if (!takeSeat(me, String(d?.seat || ''))) return toast(me, 'Ghế này đã có người ngồi.'); sock.emit('sitOk', { seat: me.seat }); rTo(me, sock).emit('pmove', { id: me.id, x: me.x, z: me.z, ry: me.ry, anim: me.anim }); });
+  sock.on('sit', d => { if (!me) return; if (d?.seat === 'hh0' && !isHH(me) && !me.admin) return toast(me, 'Phượng tọa bên cạnh ngai rồng chỉ dành cho Hoàng hậu.'); if (!takeSeat(me, String(d?.seat || ''))) return toast(me, 'Ghế này đã có người ngồi.'); sock.emit('sitOk', { seat: me.seat }); rTo(me, sock).emit('pmove', { id: me.id, x: me.x, z: me.z, ry: me.ry, anim: me.anim }); });
   sock.on('stand', () => { if (!me) return; if (me.lying) { me.lying = false; push(me); } if (!me.seat) return; freeSeat(me); me.anim = 'dung_cho'; rTo(me, sock).emit('pmove', { id: me.id, x: me.x, z: me.z, ry: me.ry, anim: 'dung_cho' }); });
   sock.on('emote', a => { if (me) { me.anim = String(a).slice(0, 20); rTo(me, sock).emit('pmove', { id: me.id, x: me.x, z: me.z, ry: me.ry, anim: me.anim, once: true }); } });
   sock.on('chat', t => {
