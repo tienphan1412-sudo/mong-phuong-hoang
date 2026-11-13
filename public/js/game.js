@@ -1119,7 +1119,7 @@ function floatDeltas(a, b) {
 function htPill() {
   const k = me?.htKnown || {}; const parts = [];
   if (k.canh) parts.push('thèm ' + k.canh); if (k.mau) parts.push('thích áo ' + k.mau); if (k.tai) parts.push('muốn xem ' + k.tai); if (k.mood) parts.push('tâm trạng ' + k.mood);
-  return parts.length ? `<span class="pill ht" title="Dò tin ở Ngự hoa viên để biết thêm">👑 ${parts.join(' · ')}</span>` : '<span class="pill ht dim" title="Dò tin ở Ngự hoa viên để biết Hoàng thượng thèm canh gì, thích áo màu gì">👑 Sở thích HT: chưa dò</span>';
+  return parts.length ? `<span class="pill ht" title="Dò tin ở Ngự hoa viên để biết thêm">👑 Hoàng thượng: ${parts.join(' · ')}</span>` : '<span class="pill ht dim" title="Dò tin ở Ngự hoa viên để biết Hoàng thượng thèm canh gì, thích áo màu gì">👑 Sở thích Hoàng thượng: chưa dò</span>';
 }
 
 // =====================================================================
