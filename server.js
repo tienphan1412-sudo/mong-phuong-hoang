@@ -132,10 +132,15 @@ function relAdd(p, n, d, memo) {
 }
 const caseHoursFor = (v, h) => h + (rel(v, 'mama') >= 30 ? 6 : rel(v, 'mama') <= -30 ? -6 : 0);
 // tỷ muội
-const GROUP_MAX = 4;
+const GROUP_MAX = 10;
+// tên nhóm tỷ muội không được trùng nhau (so không phân biệt hoa thường, bỏ khoảng trắng thừa)
+const gNorm = n => String(n || '').trim().replace(/\s+/g, ' ').toLowerCase();
+const gNameTaken = (n, exceptId) => Object.values(DB.state.groups || {}).some(g => g.id !== exceptId && gNorm(g.name) === gNorm(n));
+// quỹ may áo tăng theo số người trong nhóm (mốc gốc tính cho 4 người)
+const gGoal = g => Math.round(g.goal * Math.max(1, g.members.length / 4));
 const grp = p => p.sis && DB.state.groups?.[p.sis];
 const sisters = (a, b) => a.sis && a.sis === b.sis;
-function groupView(g) { if (!g) return null; return { id: g.id, name: g.name, fund: g.fund, goal: g.goal, members: g.members.map(id => { const q = P(id); return q && { id, name: q.name, rankName: C.RANKS[q.rank].name, online: seenOn(id), loc: q.loc, lanh: !!q.lanh, camTuc: (q.camTucUntil || 0) > now() }; }).filter(Boolean) }; }
+function groupView(g) { if (!g) return null; return { id: g.id, name: g.name, fund: g.fund, goal: gGoal(g), members: g.members.map(id => { const q = P(id); return q && { id, name: q.name, rankName: C.RANKS[q.rank].name, online: seenOn(id), loc: q.loc, lanh: !!q.lanh, camTuc: (q.camTucUntil || 0) > now() }; }).filter(Boolean) }; }
 function pushGroup(g) { if (!g) return; for (const id of g.members) { const q = P(id); if (q) push(q); } }
 function freshDay(p) {
   const k = dayKey();
@@ -2019,6 +2024,7 @@ io.on('connection', sock => {
       if (sisters(me, t)) return toast(me, 'Đã là tỷ muội rồi.');
       if (t.sis) return toast(me, `${t.name} đã kết nghĩa với nhóm khác.`, 'bad');
       const g = grp(me); if (g && g.members.length >= GROUP_MAX) return toast(me, `Nhóm tỷ muội tối đa ${GROUP_MAX} người.`, 'bad');
+      if (!g) { const nm = String(d.name || '').trim().slice(0, 20); if (!nm) return toast(me, 'Đặt tên cho nhóm tỷ muội trước đã.', 'bad'); if (gNameTaken(nm)) return toast(me, `Tên "${nm}" đã có nhóm tỷ muội khác dùng, chọn tên khác nhé.`, 'bad'); }
       const sk = sockOf(t.id);
       if (!sk) { const gname = g ? g.name : String(d.name || '').trim().slice(0, 20) || 'Kim Lan'; addMail(t, { kind: 'moi', from: me.id, fromName: title(me), text: `Muội muốn cùng tỷ kết nghĩa tỷ muội "${gname}". Tỷ đồng ý thì bấm Nhận lời.`, group: gname }); sendPush(t, 'Lời mời kết nghĩa', `${me.name} muốn kết nghĩa tỷ muội với bổn cung.`, 'moi'); return toast(me, `${t.name} đang offline, đã gửi lời mời qua thư.`, 'good'); }
       INVITES[t.id] = { from: me.id, name: g ? g.name : String(d.name || '').trim().slice(0, 20) || 'Kim Lan', at: now() };
@@ -2031,7 +2037,7 @@ io.on('connection', sock => {
       if (op === 'decline') { toast(f, `${me.name} khéo léo từ chối lời kết nghĩa.`); return; }
       if (me.sis) return toast(me, 'Đã ở nhóm khác.');
       let g = grp(f);
-      if (!g) { DB.state.groups = DB.state.groups || {}; const id = 'g' + now().toString(36); g = DB.state.groups[id] = { id, name: inv.name, members: [f.id], fund: 0, goal: 300, created: now() }; f.sis = id; }
+      if (!g) { DB.state.groups = DB.state.groups || {}; const id = 'g' + now().toString(36); let nm = inv.name || 'Kim Lan'; if (gNameTaken(nm)) { let k = 2; while (gNameTaken(nm + ' ' + k)) k++; nm = nm + ' ' + k; } g = DB.state.groups[id] = { id, name: nm, members: [f.id], fund: 0, goal: 300, created: now() }; f.sis = id; }
       if (g.members.length >= GROUP_MAX) return toast(me, 'Nhóm đã đủ người.', 'bad');
       g.members.push(me.id); me.sis = g.id; cnt(me, 'sis'); if (f.cnt?.sis == null) cnt(f, 'sis');
       news(`🌸 ${g.members.map(id => P(id)?.name).join(', ')} thắp hương kết nghĩa tỷ muội: "${g.name}".`);
@@ -2044,11 +2050,11 @@ io.on('connection', sock => {
     } else if (op === 'donate') {
       const g = grp(me); if (!g) return; const amt = Math.max(10, Math.min(500, Math.floor(+d.amount || 0)));
       if (me.silver < amt) return toast(me, 'Không đủ bạc.', 'bad'); me.silver -= amt; g.fund += amt;
-      if (g.fund >= g.goal) {
-        g.fund -= g.goal; g.goal = Math.min(1000, g.goal + 100);
+      if (g.fund >= gGoal(g)) {
+        g.fund -= gGoal(g); g.goal = Math.min(1000, g.goal + 100);
         for (const id of g.members) { const q = P(id); if (q) { q.haiLong = Math.min(100, q.haiLong + 10); addPts(q, 30); relAdd(q, 'thaihau', 8, 'cùng tỷ muội may áo dâng ai gia'); toast(q, '🧵 Áo gấm tỷ muội may xong, dâng Thái hậu: hài lòng +10, công trạng +30.', 'good'); } }
         news(`🧵 Tỷ muội "${g.name}" góp lụa may áo gấm dâng Thái hậu. Thái hậu khen ngợi cả nhóm.`, 'an');
-      } else toast(me, `Đã góp ${amt} bạc. Quỹ may áo: ${g.fund}/${g.goal}.`, 'good');
+      } else toast(me, `Đã góp ${amt} bạc. Quỹ may áo: ${g.fund}/${gGoal(g)}.`, 'good');
       pushGroup(g); save();
     } else if (op === 'cautinh') {
       const t = P(d.who); if (!t || !sisters(me, t)) return;
@@ -2483,6 +2489,8 @@ loadDB().then(() => {
     if (T && N && A) { v.cands = [T.id, N.id, A.id]; v.base = { [N.id]: 35, [T.id]: 15 };
       for (const k of Object.keys(v.votes)) if (!v.cands.includes(v.votes[k])) delete v.votes[k];
       console.log('Khôi phục kỳ bầu (lần 3): xong'); } else console.log('Khôi phục kỳ bầu (lần 3): thiếu người', !!T, !!N, !!A); }
+  // nhóm tỷ muội trùng tên: nhóm lập sớm nhất giữ tên, các nhóm sau thêm số (Kim Lan 2, Kim Lan 3…)
+  { const seen = {}; for (const g of Object.values(DB.state.groups || {}).sort((a, b) => (a.created || 0) - (b.created || 0))) { const k = gNorm(g.name); if (!seen[k]) { seen[k] = 1; continue; } const base = String(g.name).trim().replace(/\s+/g, ' '); let n = 2; while (gNameTaken(base + ' ' + n, g.id)) n++; console.log('đổi tên nhóm trùng:', g.name, '->', base + ' ' + n); g.name = base + ' ' + n; } }
   // gỡ các tin về sự cố kỳ bầu phượng ấn khỏi bảng tin (chủ game không muốn thông báo cả cung)
   DB.state.news = (DB.state.news || []).filter(x => !/Kỳ bầu phượng ấn tiếp tục như cũ|Đính chính kỳ bầu phượng ấn/.test(x.text));
   // đại án rút còn 3 ngày: vụ đang mở cũng rút theo

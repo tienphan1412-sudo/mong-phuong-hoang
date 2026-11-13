@@ -478,7 +478,7 @@ socket.on('roster', r => {
   mc.querySelectorAll('[data-g]').forEach(b => b.onclick = () => act('tangqua', { target: b.dataset.g }));
   mc.querySelectorAll('[data-lc]').forEach(b => b.onclick = () => openGuiLC(b.dataset.lc));
   mc.querySelectorAll('[data-hh]').forEach(b => b.onclick = () => { const n = r.npcs.find(x => x.id === b.dataset.hh); if (confirm(`Bỏ 80 bạc và 1 lượt sai người hãm hại ${n.short}? 60% thành công, nếu bị bắt quả tang sẽ mất sủng ái.`)) { act('hamhai', { target: n.id }); closeModal(); } });
-  mc.querySelectorAll('tr').forEach(tr => { const g = tr.querySelector('[data-g]'); if (!g) return; const id = g.dataset.g; if (me.group?.members.some(m => m.id === id)) { g.insertAdjacentHTML('afterend', ' <span style="color:#f3a6c8">💞 tỷ muội</span>'); tr.querySelector('[data-r]')?.remove(); } else if (!me.group || me.group.members.length < 4) { const b = document.createElement('button'); b.textContent = '💞 Kết nghĩa'; b.onclick = () => inviteSis(id); g.after(' ', b); }
+  mc.querySelectorAll('tr').forEach(tr => { const g = tr.querySelector('[data-g]'); if (!g) return; const id = g.dataset.g; if (me.group?.members.some(m => m.id === id)) { g.insertAdjacentHTML('afterend', ' <span style="color:#f3a6c8">💞 tỷ muội</span>'); tr.querySelector('[data-r]')?.remove(); } else if (!me.group || me.group.members.length < 10) { const b = document.createElement('button'); b.textContent = '💞 Kết nghĩa'; b.onclick = () => inviteSis(id); g.after(' ', b); }
     const mb = document.createElement('button'); mb.textContent = '✉️ Thư'; mb.onclick = () => composeMail(id, r.list.find(x => x.id === id)?.name); g.parentNode.appendChild(mb);
     const rp = r.list.find(x => x.id === id); if (rp?.inTam && !me.keoDay && !me.group?.members.some(m => m.id === id)) { const kb = document.createElement('button'); kb.textContent = '🌙 Giả bệnh kéo Hoàng thượng'; kb.title = '1 lượt · 50 bạc · mỗi ngày 1 lần · phải ở phòng riêng'; kb.onclick = () => { if (confirm(`Sai cung nữ sang báo bổn cung đau bụng để kéo Hoàng thượng khỏi tẩm cung của ${rp.name}?`)) { act('keoht', { target: id }); closeModal(); } }; g.parentNode.appendChild(kb); }
     const cb = document.createElement('button'); cb.textContent = '🕵️ Mua chuộc'; cb.title = `${80} bạc · mỗi ngày 1 lần · dò bí mật cung này`; cb.disabled = !!me.mcDay; cb.onclick = () => { if (confirm(`Bỏ 80 bạc mua chuộc cung nữ nhà ${r.list.find(x => x.id === id)?.name}? Có thể bị phát hiện.`)) { act('muachuoc', { target: id }); closeModal(); } }; g.parentNode.appendChild(cb); });
@@ -1552,7 +1552,7 @@ socket.on('fishGot', d => { const st = $('fishSt'); if (st) st.innerHTML = d.gol
 // =====================================================================
 function inviteSis(id) {
   if (me.group) return socket.emit('sis', { op: 'invite', who: id });
-  const name = prompt('Đặt tên cho nhóm tỷ muội (ví dụ: Kim Lan, Đào Viên, Tam Hoa):', 'Kim Lan'); if (name === null) return;
+  const name = prompt('Đặt tên cho nhóm tỷ muội (không trùng nhóm khác, ví dụ: Đào Viên, Tam Hoa, Ngọc Lan):', ''); if (name === null) return; if (!name.trim()) return toast('Hãy đặt tên cho nhóm tỷ muội.');
   socket.emit('sis', { op: 'invite', who: id, name });
 }
 socket.on('sisInvite', d => {
@@ -1563,7 +1563,7 @@ socket.on('sisInvite', d => {
 const LOCN = { hoavien: 'Ngự hoa viên', tuninh: 'Từ Ninh cung', duongtam: 'Dưỡng Tâm điện', phong: 'phòng riêng', tamcung: 'tẩm cung', lanhcung: 'lãnh cung', yentiec: 'yến tiệc' };
 function openSis() {
   const g = me.group;
-  if (!g) { modal(`<button class="close" onclick="window._close()">✕</button><h3>💞 Tỷ muội</h3><div style="line-height:1.6;color:var(--muted)">Chưa kết nghĩa với ai. Mở <b>Danh sách hậu cung</b>, bấm <b>💞 Kết nghĩa</b> cạnh người muốn kết thân (họ cần đang online). Nhóm tối đa 4 người.</div><div class="btns"><button class="gold" id="sisRoster">Mở danh sách hậu cung</button></div>`); $('sisRoster').onclick = () => { closeModal(); openRoster(); }; return; }
+  if (!g) { modal(`<button class="close" onclick="window._close()">✕</button><h3>💞 Tỷ muội</h3><div style="line-height:1.6;color:var(--muted)">Chưa kết nghĩa với ai. Mở <b>Danh sách hậu cung</b>, bấm <b>💞 Kết nghĩa</b> cạnh người muốn kết thân (họ cần đang online). Nhóm tối đa 10 người, tên nhóm không được trùng nhóm khác.</div><div class="btns"><button class="gold" id="sisRoster">Mở danh sách hậu cung</button></div>`); $('sisRoster').onclick = () => { closeModal(); openRoster(); }; return; }
   modal(`<button class="close" onclick="window._close()">✕</button><h3>💞 Tỷ muội "${esc(g.name)}"</h3>
   <table>${g.members.map(m => `<tr><td>${m.online ? '🟢' : '⚪'} ${esc(m.name)}${m.id === me.id ? ' (bổn cung)' : ''}</td><td>${esc(m.rankName)}</td><td style="color:var(--muted)">${m.lanh ? '⛓ lãnh cung' : m.camTuc ? '🔒 cấm túc' : m.online ? 'ở ' + (LOCN[m.loc] || '') : ''}</td></tr>`).join('')}</table>
   <div style="margin-top:8px"><b>🧵 Quỹ may áo dâng Thái hậu</b> <small style="color:var(--muted)">đủ quỹ thì cả nhóm được Thái hậu hài lòng +10, công trạng +30</small>
@@ -1700,7 +1700,7 @@ const CAMNANG = [
   ['📜 Đại án (cả cung cùng tra)', 'Mỗi tuần một vụ án lớn cho cả cung. Mỗi ngày tra 2 lần ở Ngự hoa viên, Từ Ninh cung, Dưỡng Tâm điện: mỗi người nhận <b>manh mối khác nhau, chỉ mình thấy</b>. Công bố cho cả cung hoặc kể trong chat (người khác có thể nói dối!). Tin đồn ⚠️ có thể sai. Cuối hạn người bị nhiều phiếu nhất bị xử: đúng thì ai góp sức cũng được 100 bạc, 40 công trạng (bỏ phiếu đúng thêm 20).'],
   ['🏮 Đại lễ (cả cung góp sức)', '2 tuần một lần, 5 ngày. Góp bạc, thêu gấm ở phòng, chép kinh ở Từ Ninh cung, câu cá, dâng tiết mục ở yến tiệc đều cộng vào thanh tiến độ chung. Đạt 25%, 50%, 75%, 100% thì cả cung có quà (người đã góp nhận đủ, chưa góp nhận một nửa). Đủ 100% Hoàng thượng mở đại yến.'],
   ['🤰 Long thai', 'Được lật thẻ có thể mang thai. Nhờ Thái y bắt mạch, uống thuốc an thai mỗi ngày. 3 ngày sau sinh hoàng tự: lên bậc, mỗi ngày thêm 1 lượt. Kẻ khác có thể hại thai: tìm đúng hung thủ trước hạn thì giữ được.'],
-  ['💞 Tỷ muội', 'Kết nghĩa tối đa 4 người: kênh chat riêng (nút 💞 ở ô chat), góp bạc may áo dâng Thái hậu, cầu tình khi tỷ muội bị phạt, cùng diễn yến tiệc được cộng điểm. Tỷ muội không được ra tay với nhau.'],
+  ['💞 Tỷ muội', 'Kết nghĩa tối đa 10 người, tên nhóm không trùng nhóm khác: kênh chat riêng (nút 💞 ở ô chat), góp bạc may áo dâng Thái hậu, cầu tình khi tỷ muội bị phạt, cùng diễn yến tiệc được cộng điểm. Tỷ muội không được ra tay với nhau.'],
   ['✉️ Thư từ', 'Gửi thư, quà, lời mời kết nghĩa cho cả người đang offline. Thư nặc danh tốn 30 bạc. <b>🕵️ Mua chuộc</b> cung nữ nhà người khác (80 bạc/ngày) để dò bí mật: họ từng hại ai, tiến cử ai, có điều gì giấu giếm.'],
   ['👑 Ngôi Hoàng hậu', 'Từ Tần trở lên được ứng cử. Định kỳ 14 ngày cả cung tiến cử ở Từ Ninh cung trong 24 giờ. Hoàng hậu mỗi ngày được ân xá, phạt cấm túc, thiết yến. Bị giáng cấp là mất phượng ấn.'],
   ['🐟 Khi hết lượt', 'Câu cá ở hồ (miễn phí, 15 con đầu bán được bạc, cá chép vàng dâng Hoàng thượng), trò chuyện và biếu quà NPC để thân thiết, tra án, sự kiện tuần, gửi thư, ngồi đình tán gẫu.'],
