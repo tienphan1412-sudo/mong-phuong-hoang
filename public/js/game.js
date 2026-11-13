@@ -290,7 +290,7 @@ socket.on('pmoves', L => { for (const d of L) if (d.id !== me?.id) onPmove(d); }
 socket.on('poutfit', async d => { const o = others.get(d.id); if (!o) return; o.p.outfit = d.outfit; const p = { ...o.p, x: o.tx, z: o.tz, ry: o.try }; removeOther(d.id); addOther(p); });
 socket.on('chat', m => {
   const log = $('chatlog'); const div = document.createElement('div'); if (m.ch === 'tm') div.className = 'tm'; div.innerHTML = `${m.ch === 'tm' ? '<i>[Tỷ muội]</i> ' : ''}<b>${esc(m.name)}:</b> ${esc(m.text)}`; log.appendChild(div); log.scrollTop = 1e6;
-  if (m.ch === 'tm' && m.id !== me?.id) return;
+  if (m.ch === 'tm') return; // chat tỷ muội là chuyện riêng: chỉ hiện trong khung chat, không nổi bong bóng trên đầu
   const who = m.id === me?.id ? selfC : others.get(m.id)?.c; if (who?.label) bubble(who.label, m.text);
 });
 let chatCh = 'all';
