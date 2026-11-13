@@ -261,8 +261,9 @@ function npcDaily() {
 const RP = (p, r) => p?.moc?.[r] ?? C.RANKS[r].pts;
 // 4 tài khoản của chủ game: mốc riêng Tần 500, Phi 900, Quý phi 2.000, Hoàng quý phi 3.000
 const MOC_RIENG = { names: ['An An', 'Nhược Hy', 'Tạ Nguyệt Khanh', 'Tiểu Mỹ An'], moc: { 5: 500, 6: 900, 7: 2000, 8: 3000 } };
-// 4 tài khoản của chủ game: vẫn lên chức theo mốc riêng nhưng không chiếm ghế, không ứng cử Hoàng hậu, để người chơi có cửa
-const isOwnerAcc = p => !!p && MOC_RIENG.names.includes(p.name);
+// tài khoản riêng của chủ game (An An): không chiếm ghế, không ứng cử Hoàng hậu. 3 acc còn lại là của bạn bè, chơi như người thường
+const OWNER_ACCS = ['An An'];
+const isOwnerAcc = p => !!p && OWNER_ACCS.includes(p.name);
 function applyMocRieng() { for (const p of Object.values(DB.players)) if (MOC_RIENG.names.includes(p.name) && JSON.stringify(p.moc) !== JSON.stringify(MOC_RIENG.moc)) { p.moc = { ...MOC_RIENG.moc }; console.log('mốc riêng:', p.name); } }
 function tryPromote(p) {
   if (p.lanh) return;
