@@ -2565,6 +2565,7 @@ loadDB().then(() => {
   { const seen = {}; for (const g of Object.values(DB.state.groups || {}).sort((a, b) => (a.created || 0) - (b.created || 0))) { const k = gNorm(g.name); if (!seen[k]) { seen[k] = 1; continue; } const base = String(g.name).trim().replace(/\s+/g, ' '); let n = 2; while (gNameTaken(base + ' ' + n, g.id)) n++; console.log('đổi tên nhóm trùng:', g.name, '->', base + ' ' + n); g.name = base + ' ' + n; } }
   // nhóm bị đổi tên vì trùng (thêm số phía sau): gửi thư cho chủ nhóm, cho 24 giờ tự đổi tên
   if (DB.state.maint && now() >= DB.state.maint.at) { console.log('bảo trì xong'); DB.state.maint = null; }
+  if (!DB.state.maintOff1113) { DB.state.maintOff1113 = 1; DB.state.maint1113 = 1; DB.state.maint = null; } // đã triển khai sớm lúc 19h30, huỷ lịch bảo trì 23h30
   if (!DB.state.maint1113) { DB.state.maint1113 = 1; const at = Date.UTC(2026, 10, 13, 16, 30); if (now() < at) DB.state.maint = { at }; }
   // cấp nhóm: nhóm cũ đã đông người giữ đủ chỗ hiện có
   for (const g of Object.values(DB.state.groups || {})) { if (g.lv == null) g.lv = g.members.length > 6 ? 2 : g.members.length > 4 ? 1 : 0; g.bank = (g.bank || 0) + (g.fund || 0); g.fund = 0; }
