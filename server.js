@@ -138,17 +138,18 @@ const G_LV = [{ max: 4 }, { max: 6, cost: 300 }, { max: 10, cost: 700 }];
 const gMax = g => G_LV[g.lv || 0].max;
 // nhiệm vụ nhóm mỗi ngày: cả nhóm cùng làm, xong thì triều đình thưởng bạc vào ngân khố
 const G_TASKS = [
-  { k: 'thinhan', t: 'Tỷ muội thỉnh an Thái hậu', need: 3, r: 40 },
+  { k: 'thinhan', t: 'Tỷ muội thỉnh an Thái hậu', need: 3, r: 40, per: 1 }, // mỗi người 1 lần/ngày nên nhóm nhỏ chỉ cần đủ số người
   { k: 'fish', t: 'Câu cá ở Ngự hoa viên', need: 10, r: 30 },
   { k: 'cook', t: 'Nấu món ở Ngự thiện phòng', need: 3, r: 30 },
   { k: 'det', t: 'Phá án giúp Quế ma ma', need: 1, r: 40 },
   { k: 'feast', t: 'Dâng tiết mục ở yến tiệc', need: 2, r: 40 },
 ];
+const gNeed = (T, g) => T.per ? Math.min(T.need, g.members.length) : T.need;
 function gDay(g) { if (g.day?.k !== dayKey()) g.day = { k: dayKey(), c: {}, done: {} }; return g.day; }
 function gTask(p, k, n) {
   const T = G_TASKS.find(x => x.k === k); if (!T) return; const g = DB.state.groups?.[p.sis]; if (!g) return; const D = gDay(g);
   if (D.done[k]) return; D.c[k] = (D.c[k] || 0) + n;
-  if (D.c[k] >= T.need) { D.done[k] = 1; g.bank = (g.bank || 0) + T.r;
+  if (D.c[k] >= gNeed(T, g)) { D.done[k] = 1; g.bank = (g.bank || 0) + T.r;
     for (const id of g.members) { const q = P(id); if (q) toast(q, `🏮 Nhiệm vụ nhóm xong: ${T.t}. Ngân khố tỷ muội +${T.r} bạc (${g.bank}).`, 'good'); } }
   setTimeout(() => pushGroup(g), 0);
 }
@@ -164,7 +165,7 @@ function gRenameTick() { for (const g of Object.values(DB.state.groups || {})) i
   for (const id of g.members) { const q = P(id); if (q) { addMail(q, { kind: 'he', fromName: '🌸 Nội vụ phủ', text: `Quá hạn 24 giờ nhóm chưa đổi tên, Nội vụ phủ đặt tên mới cho nhóm tỷ muội (trước là "${old}"): "${g.name}".` }); push(q); } } save(); } }
 const grp = p => p.sis && DB.state.groups?.[p.sis];
 const sisters = (a, b) => a.sis && a.sis === b.sis;
-function groupView(g) { if (!g) return null; return { id: g.id, name: g.name, founder: g.members[0], renameUntil: (g.renameUntil || 0) > now() ? g.renameUntil : 0, fund: g.fund, goal: gGoal(g), lv: g.lv || 0, max: gMax(g), bank: g.bank || 0, next: G_LV[(g.lv || 0) + 1] || null, tasks: (D => G_TASKS.map(T => ({ t: T.t, need: T.need, r: T.r, cur: Math.min(T.need, D.c[T.k] || 0), done: !!D.done[T.k] })))(gDay(g)), members: g.members.map(id => { const q = P(id); return q && { id, name: q.name, rankName: C.RANKS[q.rank].name, online: seenOn(id), loc: q.loc, lanh: !!q.lanh, camTuc: (q.camTucUntil || 0) > now() }; }).filter(Boolean) }; }
+function groupView(g) { if (!g) return null; return { id: g.id, name: g.name, founder: g.members[0], renameUntil: (g.renameUntil || 0) > now() ? g.renameUntil : 0, fund: g.fund, goal: gGoal(g), lv: g.lv || 0, max: gMax(g), bank: g.bank || 0, next: G_LV[(g.lv || 0) + 1] || null, tasks: (D => G_TASKS.map(T => ({ t: T.t, need: gNeed(T, g), r: T.r, cur: Math.min(gNeed(T, g), D.c[T.k] || 0), done: !!D.done[T.k] })))(gDay(g)), members: g.members.map(id => { const q = P(id); return q && { id, name: q.name, rankName: C.RANKS[q.rank].name, online: seenOn(id), loc: q.loc, lanh: !!q.lanh, camTuc: (q.camTucUntil || 0) > now() }; }).filter(Boolean) }; }
 function pushGroup(g) { if (!g) return; for (const id of g.members) { const q = P(id); if (q) push(q); } }
 function freshDay(p) {
   const k = dayKey();
