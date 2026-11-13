@@ -53,9 +53,9 @@ function makeLabel(name, rank, npc, onClick, tt) {
 }
 function myTitle() { return me?.ach?.find(a => a.id === me.titleSel && a.got)?.name || ''; }
 socket.on('ptitle', d => { const o = others.get(d.id); const el = o?.c?.label?.element.querySelector('.tt'); if (el) el.textContent = d.tt ? '「' + d.tt + '」' : ''; });
-function bubble(label, text) {
+function bubble(label, text, cls = '') {
   const b = label.element.querySelector('.bbl'); if (!b) return;
-  b.className = 'bbl bubble'; b.textContent = text; clearTimeout(b._t); b._t = setTimeout(() => { b.className = 'bbl'; b.textContent = ''; }, 5000);
+  b.className = 'bbl bubble' + (cls ? ' ' + cls : ''); b.textContent = text; clearTimeout(b._t); b._t = setTimeout(() => { b.className = 'bbl'; b.textContent = ''; }, 5000);
 }
 
 function clearWorld() {
@@ -290,8 +290,8 @@ socket.on('pmoves', L => { for (const d of L) if (d.id !== me?.id) onPmove(d); }
 socket.on('poutfit', async d => { const o = others.get(d.id); if (!o) return; o.p.outfit = d.outfit; const p = { ...o.p, x: o.tx, z: o.tz, ry: o.try }; removeOther(d.id); addOther(p); });
 socket.on('chat', m => {
   const log = $('chatlog'); const div = document.createElement('div'); if (m.ch === 'tm') div.className = 'tm'; div.innerHTML = `${m.ch === 'tm' ? '<i>[Tỷ muội]</i> ' : ''}<b>${esc(m.name)}:</b> ${esc(m.text)}`; log.appendChild(div); log.scrollTop = 1e6;
-  if (m.ch === 'tm') return; // chat tỷ muội là chuyện riêng: chỉ hiện trong khung chat, không nổi bong bóng trên đầu
-  const who = m.id === me?.id ? selfC : others.get(m.id)?.c; if (who?.label) bubble(who.label, m.text);
+  // chat tỷ muội: chỉ chị em trong nhóm nhận được tin, bong bóng màu hồng để biết là chuyện riêng
+  const who = m.id === me?.id ? selfC : others.get(m.id)?.c; if (who?.label) bubble(who.label, m.text, m.ch === 'tm' ? 'tm' : '');
 });
 let chatCh = 'all';
 $('chatin').addEventListener('keydown', e => { if (e.isComposing || e.keyCode === 229) return; if (e.key === 'Enter' && e.target.value.trim()) { const v = e.target.value; socket.emit('chat', chatCh === 'tm' && !v.startsWith('/') ? { text: v, ch: 'tm' } : v); e.target.value = ''; } e.stopPropagation(); });
