@@ -315,7 +315,7 @@ function freeSeatCheck() {
   const waiting = Object.values(DB.players).filter(p => p.waiting && !p.lanh).sort((a, b) => b.pts - a.pts);
   for (const p of waiting) tryPromote(p);
 }
-function addPts(p, n) { if (n > 0 && !p.lanh && p.rank <= C.CATCHUP_RANK) n = Math.round(n * 1.3); if (n > 0 && (p.rebornUntil || 0) > now()) n = Math.round(n * 1.5); if (n > 0 && p.rank >= 6) n = Math.max(1, Math.round(n * C.HIGH_RANK_SLOW)); p.pts += n; tryPromote(p); }
+function addPts(p, n) { if (n > 0 && !p.lanh && p.rank <= C.CATCHUP_RANK) n = Math.round(n * 1.3); if (n > 0 && (p.rebornUntil || 0) > now()) n = Math.round(n * 1.5); if (n > 0 && p.rank >= 6) n = Math.max(1, Math.round(n * C.HIGH_RANK_SLOW)); p.pts += n; if (n) { (p.ptLog = p.ptLog || []).push([now(), n, p._ev || '?']); if (p.ptLog.length > 120) p.ptLog.splice(0, p.ptLog.length - 120); } tryPromote(p); }
 
 function demote(p, steps, reason) {
   if (isHH(p)) loseHH(p, reason);
@@ -390,6 +390,28 @@ function track(p, key, n = 1) {
   if (key === 'on' || key === 's') r[key] += n; else r.a[key] = (r.a[key] || 0) + n;
 }
 setInterval(() => { for (const id of online.keys()) track(P(id), 'on'); const S = DB.state.stats; if (S) for (const k of Object.keys(S).sort().slice(0, -30)) delete S[k]; }, 60e3);
+function soiReport(q) {
+  const S = DB.state.stats || {}, days = Object.keys(S).sort(), mine = days.filter(k => S[k][q.id]);
+  const onMin = mine.reduce((t, k) => t + (S[k][q.id].on || 0), 0), acts = {}; for (const k of mine) for (const [a, n] of Object.entries(S[k][q.id].a || {})) acts[a] = (acts[a] || 0) + n;
+  // so với mặt bằng: công trạng trên mỗi giờ online của người chơi khác
+  const rate = x => { const m = days.reduce((t, k) => t + (S[k][x.id]?.on || 0), 0); return m >= 30 ? x.pts / (m / 60) : null; };
+  const others = Object.values(DB.players).filter(x => !x.admin && x.id !== q.id).map(rate).filter(v => v != null).sort((a, b) => a - b);
+  const med = others.length ? others[Math.floor(others.length / 2)] : null, p90 = others.length ? others[Math.floor(others.length * .9)] : null, myRate = rate(q);
+  // nhịp bấm: bot thường bấm đều tăm tắp, nhanh hơn người
+  const A = ACT_T.get(q.id) || [], gaps = []; for (let i = 1; i < A.length; i++) gaps.push((A[i][0] - A[i - 1][0]) / 1000);
+  const sg = [...gaps].sort((a, b) => a - b), mean = gaps.length ? gaps.reduce((a, b) => a + b, 0) / gaps.length : 0, sd = gaps.length ? Math.sqrt(gaps.reduce((a, b) => a + (b - mean) ** 2, 0) / gaps.length) : 0;
+  let perMin = 0; for (let i = 0, j = 0; i < A.length; i++) { while (A[i][0] - A[j][0] > 60e3) j++; perMin = Math.max(perMin, i - j + 1); }
+  // cùng địa chỉ mạng với acc khác (nghi nhiều acc nuôi nhau)
+  const myIps = new Set((q.ips || []).map(x => x[0])), share = Object.values(DB.players).filter(x => x.id !== q.id && (x.ips || []).some(i => myIps.has(i[0]))).map(x => x.name);
+  // bạc/quà nhận từ người khác
+  const gifts = (q.mail || []).filter(m => m.silver > 0 && m.fromName).map(m => `${m.fromName}: ${m.silver}`).slice(0, 8);
+  const cs = Object.values(DB.state.cases).filter(c => c.det && c.victim === q.id || c.investigator === q.id);
+  const ptSrc = {}; for (const [, n, ev] of q.ptLog || []) ptSrc[ev] = (ptSrc[ev] || 0) + n;
+  return { name: q.name, user: q.user, rank: rankName(q), pts: q.pts, silver: q.silver, sung: q.sung, created: q.created, days: mine.length, onMin, myRate, med, p90,
+    acts: Object.entries(acts).sort((a, b) => b[1] - a[1]).slice(0, 14), cnt: q.cnt || {}, gaps: gaps.length, minGap: sg[0] ?? null, medGap: sg.length ? sg[Math.floor(sg.length / 2)] : null, fast: gaps.filter(g => g < 1).length, cv: mean ? sd / mean : null, perMin,
+    ips: (q.ips || []).map(x => ({ ip: x[0].replace(/(\d+\.\d+)\.\d+\.\d+/, '$1.*.*'), t: x[1], ua: /iPhone|iPad/.test(x[2]) ? 'iPhone' : /Android/.test(x[2]) ? 'Android' : /Mac/.test(x[2]) ? 'Mac' : /Windows/.test(x[2]) ? 'Windows' : /HeadlessChrome|python|node|curl|axios|socket\.io-client/i.test(x[2]) ? '⚠️ ' + x[2].slice(0, 40) : 'khác' })),
+    share, gifts, ptSrc: Object.entries(ptSrc).sort((a, b) => b[1] - a[1]).slice(0, 10), ptN: (q.ptLog || []).length, cases: cs.length, acc: (q.accLog || []).slice(-15) };
+}
 function statsReport() {
   const S = DB.state.stats || {}, days = Object.keys(S).sort().slice(-14), last7 = days.slice(-7);
   const daily = days.map(k => { const d = S[k]; const ids = Object.keys(d); const acts = {}; let mins = 0; for (const id of ids) { mins += d[id].on; for (const [a, n] of Object.entries(d[id].a)) acts[a] = (acts[a] || 0) + n; } return { day: k, players: ids.length, minutes: mins, sessions: ids.reduce((t, id) => t + d[id].s, 0), acts }; });
@@ -600,11 +622,9 @@ const BIG_NPC = ['Lệ Tần', 'Hân Quý nhân', 'Mai Đáp ứng', 'Uyển Qu�
 function bigModel(n) { return /Cung nữ|Tú nữ|Nhạc công/.test(n) ? 'cungnu' : /Thái giám/.test(n) ? 'thaigiam' : /Thị vệ/.test(n) ? 'thive' : /Ma ma/.test(n) ? 'mama' : /Tần/.test(n) ? 'tan' : /Quý nhân/.test(n) ? 'quynhan' : 'thuongtai'; }
 function startBigCase(hours = C.BIG_HOURS) {
   const theme = pick(C.BIG_CASES), keys = Object.keys(BIG_TRAITS);
-  const tr = () => Object.fromEntries(keys.map(k => [k, rnd(BIG_TRAITS[k].length)]));
-  const g = tr(), names = [...BIG_NPC].sort(() => Math.random() - .5).slice(0, 6);
+  const names = [...BIG_NPC].sort(() => Math.random() - .5).slice(0, 6), TT = suspectTraits(6, Object.fromEntries(keys.map(k => [k, BIG_TRAITS[k].length])));
   const sus = names.map((n, i) => {
-    let t = { ...g };
-    if (i > 0) { const diff = [...keys].sort(() => Math.random() - .5).slice(0, Math.random() < .7 ? 1 : 2); for (const k of diff) t[k] = (g[k] + 1 + rnd(BIG_TRAITS[k].length - 1)) % BIG_TRAITS[k].length; }
+    const t = TT[i];
     return { id: 's' + i, name: n, model: bigModel(n), t, guilty: i === 0 };
   }).sort(() => Math.random() - .5);
   DB.state.bigCase = { id: 'da' + now(), title: theme.title, intro: theme.intro, start: now(), end: now() + hours * 3600e3, sus, clues: {}, board: [], votes: {}, inv: {}, done: false };
@@ -805,6 +825,22 @@ async function restore(k) {
 
 // ---------------- vụ án ----------------
 const NPC_SUSPECTS = ['Lệ Tần', 'Hân Quý nhân', 'Cung nữ Xuân Đào', 'Thái giám Tiểu Lộ Tử', 'Mai Đáp ứng', 'Cung nữ Thu Cúc', 'Uyển Quý nhân'];
+// sinh đặc điểm nghi phạm: thủ phạm không được là người "giống số đông nhất" hay "lạc loài nhất",
+// để không thể đoán chỉ bằng cách nhìn bảng mà phải tìm manh mối. Phần tử 0 là thủ phạm.
+function suspectTraits(n, sizes) {
+  const keys = Object.keys(sizes); let best = null;
+  for (let tries = 0; tries < 400; tries++) {
+    const g = Object.fromEntries(keys.map(k => [k, rnd(sizes[k])])), arr = [g];
+    for (let i = 1; i < n; i++) { const t = {}; for (const k of keys) t[k] = Math.random() < .45 ? g[k] : (g[k] + 1 + rnd(sizes[k] - 1)) % sizes[k]; arr.push(t); }
+    const key = t => keys.map(k => t[k]).join(','); if (new Set(arr.map(key)).size < n) continue; // ai cũng phân biệt được khi đủ manh mối
+    if (keys.some(k => arr.every(t => t[k] === g[k]))) continue; // manh mối nào cũng loại được ít nhất 1 người
+    const score = arr.map((t, i) => keys.reduce((a, k) => a + arr.filter((u, j) => j !== i && u[k] === t[k]).length, 0));
+    const mx = Math.max(...score), mn = Math.min(...score);
+    const uniqMax = score[0] === mx && score.filter(v => v === mx).length === 1, uniqMin = score[0] === mn && score.filter(v => v === mn).length === 1;
+    best = arr; if (!uniqMax && !uniqMin) return arr;
+  }
+  return best;
+}
 function makeTraits() { return { cung: rnd(C.TRAITS.cung.length), gio: rnd(C.TRAITS.gio.length), dau: rnd(C.TRAITS.dau.length) }; }
 function createCase(victim, culprit /* player or null for NPC */, opts = {}) {
   const id = 'vu' + (DB.state.seq++);
@@ -816,13 +852,9 @@ function createCase(victim, culprit /* player or null for NPC */, opts = {}) {
   const others = Object.values(DB.players).filter(q => q.id !== victim.id && (!culprit || q.id !== culprit.id) && !q.lanh && q.rank >= 2).map(q => ({ id: q.id, name: title(q) }));
   const pool = [...(opts.det ? [] : others.sort(() => Math.random() - 0.5)), ...NPC_SUSPECTS.sort(() => Math.random() - 0.5).map(n => ({ id: 'npc:' + n, name: n }))];
   const culpritEntry = culprit ? { id: culprit.id, name: title(culprit) } : opts.fei ? { id: 'fei:' + opts.fei.id, name: opts.fei.name } : (pool.splice(pool.findIndex(x => x.id.startsWith('npc:')), 1)[0]);
+  const TT = suspectTraits(4, { cung: C.TRAITS.cung.length, gio: C.TRAITS.gio.length, dau: C.TRAITS.dau.length }); Object.assign(t, TT[0]);
   const suspects = [{ ...culpritEntry, traits: t, guilty: true }];
-  for (let i = 0; i < 3; i++) {
-    const who = pool.shift(); if (!who) break;
-    const tr = { ...t }; const k = keys[i];
-    const n = C.TRAITS[k].length; tr[k] = (t[k] + 1 + rnd(n - 1)) % n;
-    suspects.push({ ...who, traits: tr, guilty: false });
-  }
+  for (let i = 1; i < 4; i++) { const who = pool.shift(); if (!who) break; suspects.push({ ...who, traits: TT[i], guilty: false }); }
   suspects.sort(() => Math.random() - 0.5);
   const c = {
     id, victim: victim.id, victimName: title(victim), culprit: culpritEntry.id, culpritName: culpritEntry.name,
@@ -940,6 +972,7 @@ function caseOp(p, data) {
     news(`${p.name} nhận tội trong vụ ${c.methodName}, được Thái hậu giảm nhẹ hình phạt.`, 'phat');
   } else if (op === 'accuse') {
     const s = c.suspects.find(x => x.id === data.who); if (!s) return;
+    (p.accLog = p.accLog || []).push([now(), s.guilty ? 1 : 0, (c.found || []).length, Math.round((now() - (c.created || now())) / 60e3)]); if (p.accLog.length > 40) p.accLog.shift();
     if (c.det) {
       if (s.guilty) {
         const R = C.DET_REWARD; closeCase(c, 'latan', `Phá án thành công! Thủ phạm là ${s.name}. Thưởng ${R.pts} công trạng, ${R.silver} bạc.`);
@@ -1619,9 +1652,14 @@ function enter(p, loc, sock) {
 }
 
 // ---------------- kết nối ----------------
+const ACT_T = new Map(); // nhịp thao tác gần nhất của từng người (chỉ trong bộ nhớ), để soi máy/bot
 io.on('connection', sock => {
   let me = null;
+  const sockIp = String(sock.handshake.headers['x-forwarded-for'] || sock.handshake.address || '').split(',')[0].trim();
+  const sockUa = String(sock.handshake.headers['user-agent'] || '').slice(0, 160);
+  sock.onAny(ev => { if (!me || ev === 'move' || ev === 'ping' || ev === 'typing') return; me._ev = ev; let a = ACT_T.get(me.id); if (!a) ACT_T.set(me.id, a = []); a.push([now(), ev]); if (a.length > 300) a.splice(0, a.length - 300); });
   const ok = p => {
+    if (sockIp) { p.ips = (p.ips || []).filter(x => x[0] !== sockIp); p.ips.push([sockIp, now(), sockUa]); if (p.ips.length > 6) p.ips.shift(); }
     setTimeout(() => { for (const c of Object.values(DB.state.cases)) if (c.witnessReq?.who === p.id) askWitness(c); }, 3000);
     if (online.has(p.id)) { try { online.get(p.id).emit('kicked'); online.get(p.id).disconnect(); } catch (e) {} }
     me = p; online.set(p.id, sock); p.lastSeen = now(); freshDay(p); track(p, 's'); p.visit = null; if (p.sickUntil && now() > p.sickUntil) { p.sick = false; p.sickUntil = 0; p.lying = false; }
@@ -2507,6 +2545,9 @@ function adminRaw(p, text) {
   else if (cmd === '/daian') { const B = DB.state.bigCase; if (B && !B.done) { B.end = now(); endBigCase(); } else startBigCase(+arg || C.BIG_HOURS); }
   else if (cmd === '/daile') { const F = DB.state.fest; if (F && !F.done) festFinish(F.pts >= F.goal); else startFest(+arg || C.FEST_HOURS); }
   else if (cmd === '/dailediem') { if (!DB.state.fest || DB.state.fest.done) return toast(p, 'Chưa có đại lễ.'); festAdd(p, +arg || 100, 'quản trị'); }
+  else if (cmd === '/soi') { // quản trị: soi một người có dấu hiệu gian lận không
+    const who = [arg, ...rest].filter(Boolean).join(' ').toLowerCase(); const q = who ? findP(who) : null; if (!q) return toast(p, 'Gõ /soi tên nhân vật.', 'bad');
+    sockOf(p.id)?.emit('soi', soiReport(q)); return; }
   else if (cmd === '/dem') { // quản trị: xem thử Ngự hoa viên ban đêm / ban ngày, chỉ máy mình thấy
     const v = arg === 'tat' || arg === 'ngay' ? false : arg === 'tudong' ? null : true; sockOf(p.id)?.emit('demTest', v);
     return toast(p, v === null ? 'Ngự hoa viên: theo giờ thật (19h–6h tối).' : v ? 'Ngự hoa viên: thử ban đêm (chỉ máy mình).' : 'Ngự hoa viên: thử ban ngày (chỉ máy mình).', 'good'); }

@@ -3279,3 +3279,29 @@ socket.on('demTest', v => { window.__forceNight = v ?? undefined; gardenTime(tru
 function nbPlace() { const r = $('rotbtn'); if (!nbEl.classList.contains('min') || !document.body.classList.contains('mob') || !r || !r.getBoundingClientRect().width) { nbEl.style.top = nbEl.style.right = ''; return; }
   const b = r.getBoundingClientRect(); nbEl.style.top = Math.round(b.bottom + 8) + 'px'; nbEl.style.right = Math.round(innerWidth - b.right) + 'px'; }
 addEventListener('resize', () => setTimeout(nbPlace, 150));
+// quản trị: bảng soi nghi gian lận
+socket.on('soi', r => {
+  const d = t => t ? new Date(t + 7 * 3600e3).toISOString().slice(5, 16).replace('T', ' ') : '?';
+  const hrs = (r.onMin / 60).toFixed(1), rate = r.myRate != null ? Math.round(r.myRate) : null;
+  const flag = [];
+  if (rate != null && r.p90 != null && rate > r.p90 * 1.5) flag.push(`Công trạng mỗi giờ online (${rate}) cao gấp ${(rate / Math.max(1, r.med)).toFixed(1)} lần mức giữa (${Math.round(r.med)})`);
+  if (r.gaps >= 40 && r.cv != null && r.cv < .35) flag.push('Nhịp bấm đều tăm tắp như máy');
+  if (r.perMin > 40) flag.push(`Có phút bấm tới ${r.perMin} thao tác`);
+  if (r.share.length) flag.push('Chung mạng với: ' + r.share.join(', '));
+  if (r.ips.some(x => x.ua.startsWith('⚠️'))) flag.push('Vào game bằng công cụ/script, không phải trình duyệt thường');
+  const acc = r.acc || [], accOk = acc.filter(a => a[1]).length, fastOk = acc.filter(a => a[1] && a[2] <= 1).length;
+  if (acc.length >= 4 && fastOk >= Math.max(3, acc.length * .6)) flag.push(`Chỉ đúng thủ phạm khi gần như chưa có manh mối (${fastOk}/${acc.length} lần)`);
+  modal(`<button class="close" onclick="window._close()">✕</button><h3>🔎 Soi: ${esc(r.name)} <small style="color:var(--muted)">(${esc(r.user)})</small></h3>
+  <div style="font-size:13px;line-height:1.6">
+  <div style="padding:8px 10px;border-radius:8px;margin-bottom:8px;background:${flag.length ? 'rgba(200,50,40,.18);border:1px solid #c0503a' : 'rgba(80,160,80,.15);border:1px solid #5a9a5a'}">${flag.length ? '<b>⚠️ Dấu hiệu đáng ngờ</b><br>• ' + flag.map(esc).join('<br>• ') : '<b>✓ Chưa thấy dấu hiệu bất thường rõ ràng</b>'}</div>
+  <b>${esc(r.rank)}</b> · công trạng ${r.pts} · bạc ${r.silver} · sủng ${r.sung}<br>
+  Tạo acc: ${d(r.created)} · chơi ${r.days} ngày · online ${hrs} giờ<br>
+  Công trạng/giờ online: <b>${rate ?? '–'}</b> (mức giữa cả cung ${r.med != null ? Math.round(r.med) : '–'}, top 10% ${r.p90 != null ? Math.round(r.p90) : '–'})<br>
+  <b>Chỉ thủ phạm</b> (gần nhất): ${acc.length ? `${accOk}/${acc.length} đúng · ` + acc.map(a => `${a[1] ? '✓' : '✗'}${a[2]}mm`).join(' ') : 'chưa có dữ liệu (ghi từ hôm nay)'}<br>
+  <b>Nhịp bấm</b> (phiên này): ${r.gaps ? `${r.gaps} lần · nhanh nhất ${r.minGap.toFixed(2)}s · thường ${r.medGap.toFixed(1)}s · độ đều ${r.cv.toFixed(2)} (người thật thường > 0.6) · tối đa ${r.perMin}/phút` : 'chưa có (người này cần online sau bản cập nhật)'}<br>
+  <b>Thiết bị</b>: ${r.ips.length ? r.ips.map(x => `${esc(x.ua)} ${esc(x.ip)} (${d(x.t)})`).join(' · ') : 'chưa có'}<br>
+  <b>Làm nhiều nhất</b>: ${r.acts.map(([a, n]) => `${esc(a)} ${n}`).join(' · ') || '–'}<br>
+  <b>Công trạng đến từ</b>: ${r.ptSrc.map(([a, n]) => `${esc(a)} +${n}`).join(' · ') || 'chưa có (ghi từ hôm nay)'}<br>
+  <b>Bạc nhận qua thư</b>: ${r.gifts.map(esc).join(' · ') || 'không'}
+  </div><div style="color:var(--muted);font-size:11.5px;margin-top:6px">mm = số manh mối đã có lúc chỉ thủ phạm. Đúng mà 0–1 manh mối nhiều lần là đáng ngờ.</div>`);
+});
