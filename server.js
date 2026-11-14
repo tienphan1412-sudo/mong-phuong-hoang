@@ -206,7 +206,7 @@ function selfView(p) {
   const open = Object.values(DB.state.cases).filter(c => c.victim === p.id && c.status === 'open').map(c => caseView(c, p));
   return {
     ...publicView(p), path: p.path, pathName: C.PATHS[p.path].name, origin: C.ORIGINS[p.origin].name,
-    mailUnread: (p.mail || []).filter(m => !m.read).length, pushOn: !!p.pushSubs?.length,
+    mailUnread: (p.mail || []).filter(m => !m.read).length, pushOn: !!p.pushSubs?.length, remPref: Object.fromEntries(Object.keys(REM_KINDS).map(k => [k, remOn(p, k)])), remKinds: REM_KINDS,
     created: p.created || 0, items: p.items || {}, pts: p.pts, nextPts: p.rank + 1 < C.RANKS.length ? RP(p, p.rank + 1) : null, silver: p.silver, turns: (regen(p), p.turns), turnCap: C.TURN_CAP, nextTurn: p.turns >= C.TURN_CAP ? null : p.turnAt + C.TURN_REGEN_MIN * 60e3, sung: p.sung, haiLong: p.haiLong,
     stats: p.stats, tasks: p.tasks, thinhAn: p.thinhAn, waiting: p.waiting || false, lanh: p.lanh || null, reborn: (p.rebornUntil || 0) > now() ? p.rebornUntil : 0, hhPhat: p.hhPhat && !p.hhPhat.used ? { kind: p.hhPhat.kind, by: P(p.hhPhat.by)?.name || '' } : null, hhStrike: p.hhStrike || 0, lanhVisit: p.lanhVisit === dayKey(),
     outfits: allowedOutfits(p), decor: p.decor || [], hasPalace: p.rank >= C.PALACE_RANK, cases: open,
@@ -368,6 +368,34 @@ function sendPush(p, title, body, tag) {
   const msg = JSON.stringify({ title, body, tag });
   for (const sub of [...p.pushSubs]) webpush.sendNotification(sub, msg, { TTL: 6 * 3600 }).catch(e => { if (e.statusCode === 404 || e.statusCode === 410) { p.pushSubs = p.pushSubs.filter(x => x.endpoint !== sub.endpoint); save(); } });
 }
+// ---------------- nhắc lịch trước 15 phút (đẩy lên điện thoại/máy tính người đang offline) ----------------
+const REM_LEAD = 15;
+const REM_KINDS = { feast: 'Yến tiệc', den: 'Lễ hoa đăng 20:30', walk: 'Hoàng thượng dạo Ngự hoa viên', khao: 'Hoàng thượng kiểm tra bài', latthe: 'Lật thẻ bài (mỗi 2 giờ)' };
+const REM_DEF = { feast: 1, den: 1, walk: 1, khao: 1, latthe: 0 };
+const remOn = (p, k) => (p.remPref?.[k] ?? REM_DEF[k]) ? true : false;
+function remSlots() {
+  const L = [];
+  for (const [h, m, v] of C.FEAST_SLOTS) L.push({ k: 'feast', h, m, title: '🎎 Sắp có yến tiệc', body: `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')} yến tiệc ${v === 'in' ? 'trong điện' : 'ngoài trời'}. Vào chuẩn bị tiết mục đàn, múa, thơ để được Hoàng thượng để mắt.` });
+  { const [h, m] = C.VUA.DEN_SLOT; L.push({ k: 'den', h, m, title: '🏮 Lễ hoa đăng sắp bắt đầu', body: `${h}:${String(m).padStart(2, '0')} Hoàng thượng ra cầu hồ Ngự hoa viên. Vào thả hoa đăng ước nguyện, may mắn được người nhặt đọc to.` }); }
+  for (const [h, m] of C.VUA.WALK_SLOTS) L.push({ k: 'walk', h, m, title: '🌸 Hoàng thượng sắp dạo vườn', body: `${h}:${String(m).padStart(2, '0')} Hoàng thượng dạo Ngự hoa viên. Tới theo hầu, đáp hợp ý người để được sủng ái.` });
+  for (const [h, m] of C.VUA.KHAO_SLOTS || []) L.push({ k: 'khao', h, m, title: '📜 Hoàng thượng sắp kiểm tra bài', body: `${h}:${String(m).padStart(2, '0')} ở Thượng thư phòng. Dắt hoàng tử, công chúa tới trả bài.`, kid: true });
+  for (const [h, m, w] of C.LAT_THE_SLOTS) L.push({ k: 'latthe', h, m, title: '🏮 Sắp lật thẻ bài', body: `${String(h).padStart(2, '0')}:00 ${w.toLowerCase()} Hoàng thượng lật thẻ bài. Vào thay áo đúng màu người thích.` });
+  return L;
+}
+function remTick() {
+  const v = vnNow(), mins = v.getUTCHours() * 60 + v.getUTCMinutes(), dk = dayKey(), R = (DB.state.remSent = DB.state.remSent?.d === dk ? DB.state.remSent : { d: dk, s: {} });
+  for (const sl of remSlots()) {
+    const at = sl.h * 60 + sl.m - REM_LEAD, key = sl.k + sl.h + ':' + sl.m; if (mins < at || mins > at + 3 || R.s[key]) continue; R.s[key] = 1;
+    let n = 0; for (const p of Object.values(DB.players)) {
+      if (!p.pushSubs?.length || online.has(p.id) || !remOn(p, sl.k) || p.lanh && sl.k !== 'latthe') continue;
+      if (sl.kid && !(p.children || []).some(k => k.stage === 'hoc')) continue;
+      if (now() - (p.lastSeen || 0) > 14 * 864e5) continue; // bỏ người đã lâu không chơi
+      sendPush(p, sl.title, sl.body, 'rem-' + sl.k); n++;
+    }
+    if (n) console.log('nhắc lịch', key, n, 'người'); save();
+  }
+}
+setInterval(remTick, 30e3);
 // báo cho người chơi: đang online thì thôi (đã có thông báo trong game), offline thì gửi thư hệ thống + đẩy lên điện thoại
 function notify(p, title, body, tag) {
   if (!p || online.has(p.id) || MUTE) return;
@@ -2336,6 +2364,7 @@ io.on('connection', sock => {
   });
   sock.on('pushKey', () => sock.emit('pushKey', vapid()));
   sock.on('pushSub', sub => { if (!me || !sub?.endpoint) return; me.pushSubs = (me.pushSubs || []).filter(x => x.endpoint !== sub.endpoint).concat([{ endpoint: String(sub.endpoint), keys: sub.keys }]).slice(-3); save(); push(me); sendPush(me, 'Đã bật thông báo', 'Khi bổn cung offline mà có chuyện trong cung, thông báo sẽ hiện ở đây.'); });
+  sock.on('remPref', d => { if (!me || !d || !(d.k in REM_KINDS)) return; me.remPref = { ...(me.remPref || {}), [d.k]: d.on ? 1 : 0 }; push(me); save(); });
   sock.on('pushOff', () => { if (!me) return; me.pushSubs = []; save(); push(me); });
   sock.on('mail', d => {
     if (!me || !d) return; freshDay(me); const op = d.op;
@@ -2548,6 +2577,7 @@ function adminRaw(p, text) {
   else if (cmd === '/soi') { // quản trị: soi một người có dấu hiệu gian lận không
     const who = [arg, ...rest].filter(Boolean).join(' ').toLowerCase(); const q = who ? findP(who) : null; if (!q) return toast(p, 'Gõ /soi tên nhân vật.', 'bad');
     sockOf(p.id)?.emit('soi', soiReport(q)); return; }
+  else if (cmd === '/thunhac') { const sl = remSlots().find(x => x.k === (arg || 'den')) || remSlots()[0]; if (!p.pushSubs?.length) return toast(p, 'Acc này chưa bật 🔔 Thông báo.', 'bad'); sendPush(p, sl.title, sl.body, 'rem-test'); return toast(p, 'Đã gửi thử 1 thông báo nhắc lịch về máy (thoát game hoặc khoá máy để thấy).', 'good'); }
   else if (cmd === '/dem') { // quản trị: xem thử Ngự hoa viên ban đêm / ban ngày, chỉ máy mình thấy
     const v = arg === 'tat' || arg === 'ngay' ? false : arg === 'tudong' ? null : true; sockOf(p.id)?.emit('demTest', v);
     return toast(p, v === null ? 'Ngự hoa viên: theo giờ thật (19h–6h tối).' : v ? 'Ngự hoa viên: thử ban đêm (chỉ máy mình).' : 'Ngự hoa viên: thử ban ngày (chỉ máy mình).', 'good'); }

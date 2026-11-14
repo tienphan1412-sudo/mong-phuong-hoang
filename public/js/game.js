@@ -1705,7 +1705,8 @@ async function openPush() {
   const ok = 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window;
   const ios = /iPhone|iPad/.test(navigator.userAgent), standalone = matchMedia('(display-mode: standalone)').matches || navigator.standalone;
   modal(`<button class="close" onclick="window._close()">✕</button><h3>🔔 Thông báo</h3>
-  <div style="font-size:13.5px;line-height:1.5">Khi không mở game, bổn cung vẫn được báo lúc: <b>bị phát giác tang vật</b>, <b>long thai lâm nguy</b>, <b>được lật thẻ</b>, <b>có thư mới</b>, <b>bầu phượng ấn</b>, bị giáng cấp.</div>
+  <div style="font-size:13.5px;line-height:1.5">Khi không mở game, điện thoại/máy tính vẫn báo:<br>• <b>Nhắc lịch trước 15 phút</b>: yến tiệc, lễ hoa đăng, Hoàng thượng dạo vườn… để canh giờ vào.<br>• Việc gấp: bị phát giác tang vật, long thai lâm nguy, được lật thẻ, có thư mới, bầu phượng ấn, bị giáng cấp.</div>
+  ${me.pushOn && me.remKinds ? `<div class="today" style="margin-top:10px"><b>⏰ Nhắc trước 15 phút</b>${Object.entries(me.remKinds).map(([k, n]) => `<label style="display:flex;gap:8px;align-items:center;margin-top:4px;cursor:pointer"><input type="checkbox" data-rem="${k}" ${me.remPref?.[k] ? 'checked' : ''}> ${esc(n)}</label>`).join('')}</div>` : ''}
   ${!ok ? (ios && !standalone ? `<div class="today" style="margin-top:10px"><b>Trên iPhone</b><div>Bấm nút <b>Chia sẻ</b> của Safari, chọn <b>Thêm vào Màn hình chính</b>, rồi mở game từ biểu tượng 鳳 ngoài màn hình và bật thông báo ở đây.</div></div>` : '<div class="today" style="margin-top:10px">Trình duyệt này không hỗ trợ thông báo.</div>')
     : me.pushOn ? '<div class="btns"><button id="pTest">Đã bật ✓</button><button id="pOff">Tắt thông báo</button></div>' : '<div class="btns"><button class="gold" id="pOn">Bật thông báo</button></div>'}`);
   const on = $('pOn'); if (on) on.onclick = async () => {
@@ -1718,6 +1719,7 @@ async function openPush() {
       socket.emit('pushSub', sub.toJSON()); closeModal(); toast('Đã bật thông báo.', 'good');
     } catch (e) { toast('Không bật được thông báo: ' + e.message, 'bad'); }
   };
+  $('mcard').querySelectorAll('[data-rem]').forEach(c => c.onchange = () => socket.emit('remPref', { k: c.dataset.rem, on: c.checked }));
   const off = $('pOff'); if (off) off.onclick = async () => { try { const reg = await navigator.serviceWorker.getRegistration(); const sub = await reg?.pushManager.getSubscription(); await sub?.unsubscribe(); } catch {} socket.emit('pushOff'); closeModal(); };
 }
 
@@ -3305,3 +3307,11 @@ socket.on('soi', r => {
   <b>Bạc nhận qua thư</b>: ${r.gifts.map(esc).join(' · ') || 'không'}
   </div><div style="color:var(--muted);font-size:11.5px;margin-top:6px">mm = số manh mối đã có lúc chỉ thủ phạm. Đúng mà 0–1 manh mối nhiều lần là đáng ngờ.</div>`);
 });
+
+// gợi ý bật nhắc lịch: chơi được 2 phút mà chưa bật thì mời một lần (3 ngày hỏi lại một lần)
+setTimeout(() => { try {
+  if (!me || me.pushOn || me.admin) return; const k = 'mph_pushAsk', last = +localStorage.getItem(k) || 0; if (Date.now() - last < 3 * 864e5) return;
+  if (!$('modal')?.classList.contains('hidden')) return; localStorage.setItem(k, Date.now());
+  modal(`<button class="close" onclick="window._close()">✕</button><h3>⏰ Đừng lỡ yến tiệc, lễ hoa đăng</h3><div style="font-size:13.5px;line-height:1.6">Bật thông báo để được <b>nhắc trước 15 phút</b> mỗi khi sắp có yến tiệc, lễ hoa đăng, Hoàng thượng dạo vườn… kể cả khi không mở game.</div><div class="btns"><button id="paNo">Để sau</button><button class="gold" id="paYes">🔔 Bật nhắc lịch</button></div>`);
+  $('paNo').onclick = closeModal; $('paYes').onclick = () => { closeModal(); openPush(); };
+} catch {} }, 120e3);
