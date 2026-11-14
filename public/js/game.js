@@ -1488,7 +1488,7 @@ function tickNotice() {
   for (const [h, m, venue] of sched.feast) ev.push({ t: dayStart + (h * 60 + m) * 60e3, icon: '🎎', text: `Yến tiệc ${venue === 'in' ? 'trong điện' : 'ngoài trời'}`, hint: 'Chuẩn bị tiết mục đàn, múa hoặc thơ' });
   if (sched.vua && !me.lanh) { for (const [h, m] of sched.vua.WALK_SLOTS) ev.push({ t: dayStart + (h * 60 + m) * 60e3, icon: '🌸', text: 'Hoàng thượng dạo Ngự hoa viên', hint: 'Tới Ngự hoa viên theo hầu, đáp hợp tâm trạng người' });
     if ((me.children || []).some(k => k.stage === 'hoc')) for (const [h, m] of sched.vua.KHAO_SLOTS || []) ev.push({ t: dayStart + (h * 60 + m) * 60e3, icon: '📜', text: 'Hoàng thượng kiểm tra bài ở Thượng thư phòng', hint: 'Dắt con đi học tới trình bài' });
-    if (me.event?.id === 'hoadang') { const [dh, dm] = sched.vua.DEN_SLOT; ev.push({ t: dayStart + (dh * 60 + dm) * 60e3, icon: '🏮', text: 'Lễ hoa đăng cùng Hoàng thượng', hint: 'Ra cầu hồ lớn Ngự hoa viên, bấm vào Hoàng thượng để thả' }); } }
+    { const [dh, dm] = sched.vua.DEN_SLOT; ev.push({ t: dayStart + (dh * 60 + dm) * 60e3, icon: '🏮', text: 'Lễ hoa đăng cùng Hoàng thượng', hint: 'Ra cầu hồ lớn Ngự hoa viên, bấm vào Hoàng thượng để thả' }); } }
   const lead = (sched.lead || 15) * 60e3;
   const up = ev.filter(e => e.t > nowVN && e.t - nowVN <= lead).sort((a, b) => a.t - b.t);
   if (!up.length || stage) { noticeEl.classList.add('hidden'); return; }

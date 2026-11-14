@@ -159,9 +159,9 @@ const gNameTaken = (n, exceptId) => Object.values(DB.state.groups || {}).some(g 
 // quỹ may áo tăng theo số người trong nhóm (mốc gốc tính cho 4 người)
 const gGoal = g => Math.round(g.goal * Math.max(1, g.members.length / 4));
 // tên mặc định khi nhóm bị trùng tên mà quá 24 giờ không đổi
-const G_NAMES = ['Đào Viên', 'Tam Hoa', 'Ngọc Lan', 'Mẫu Đơn', 'Thanh Liên', 'Tử Đằng', 'Hải Đường', 'Thủy Tiên', 'Lan Đình', 'Nguyệt Quế', 'Hàm Tiếu', 'Bích Ngọc', 'Tuyết Mai', 'Phù Dung', 'Thược Dược', 'Uyên Ương', 'Hồng Nhạn', 'Lưu Ly', 'Cẩm Tú', 'Kim Phượng'];
-const gDefaultName = () => G_NAMES.find(n => !gNameTaken(n)) || ('Đồng Tâm ' + (Object.keys(DB.state.groups || {}).length + 1));
-function gRenameTick() { for (const g of Object.values(DB.state.groups || {})) if (g.renameUntil && now() > g.renameUntil) { const old = g.name; g.name = gDefaultName(); g.renameUntil = 0;
+const G_NAMES = ['Đào Viên', 'Tam Hoa', 'Ngọc Lan', 'Mẫu Đơn', 'Thanh Liên', 'Tử Đằng', 'Hải Đường', 'Thủy Tiên', 'Lan Đình', 'Nguyệt Quế', 'Hàm Tiếu', 'Bích Ngọc', 'Tuyết Mai', 'Phù Dung', 'Thược Dược', 'Uyên Ương', 'Hồng Nhạn', 'Lưu Ly', 'Cẩm Tú', 'Kim Phượng', 'Xuân Hoa', 'Thu Nguyệt', 'Hạ Liên', 'Đông Mai', 'Vọng Nguyệt', 'Tịnh Tâm', 'Bạch Lộ', 'Thanh Phong', 'Tử Vi', 'Lạc Mai', 'Ngọc Hành', 'Hương Lan', 'Yên Chi', 'Lăng Ba', 'Tố Tâm', 'Như Ý', 'Cát Tường', 'Bình An', 'Hòa Nguyệt', 'Thanh Trúc', 'Phỉ Thúy', 'Minh Châu', 'Ngọc Trâm', 'Kim Thoa', 'Lưu Vân', 'Tuyết Liên', 'Mộng Điệp', 'Họa Mi', 'Thải Vân', 'Song Hỷ'];
+const gDefaultName = () => { const free = G_NAMES.filter(n => !gNameTaken(n)); if (free.length) return free[rnd(free.length)]; let k = 2; while (gNameTaken('Đồng Tâm ' + k)) k++; return 'Đồng Tâm ' + k; };
+function gRenameTick() { for (const g of Object.values(DB.state.groups || {})) if (g.renameUntil && now() > g.renameUntil) { if (g.autoNamed) { g.renameUntil = 0; g.autoNamed = 0; continue; } const old = g.name; g.name = gDefaultName(); g.renameUntil = 0;
   for (const id of g.members) { const q = P(id); if (q) { addMail(q, { kind: 'he', fromName: '🌸 Nội vụ phủ', text: `Quá hạn 24 giờ nhóm chưa đổi tên, Nội vụ phủ đặt tên mới cho nhóm tỷ muội (trước là "${old}"): "${g.name}".` }); push(q); } } save(); } }
 const grp = p => p.sis && DB.state.groups?.[p.sis];
 const sisters = (a, b) => a.sis && a.sis === b.sis;
@@ -1440,7 +1440,7 @@ function vuaTick(mins, k) {
     v.walk = null; ch = true;
   });
   const [dh, dm] = U.DEN_SLOT, dst = dh * 60 + dm, dkey = k + ':den';
-  if (mins >= dst && mins < dst + U.DEN_MIN && !v.done[dkey] && !v.den && curEvent().id === 'hoadang') { v.done[dkey] = 1; v.den = { start: now(), end: now() + (U.DEN_MIN - (mins - dst)) * 60e3, list: [] }; ch = true;
+  if (mins >= dst && mins < dst + U.DEN_MIN && !v.done[dkey] && !v.den ) { v.done[dkey] = 1; v.den = { start: now(), end: now() + (U.DEN_MIN - (mins - dst)) * 60e3, list: [] }; ch = true;
     news('🏮 Lễ hoa đăng: trăng lên, Hoàng thượng đứng trên cầu hồ Ngự hoa viên. Ai thả hoa đăng, người sẽ nhặt một chiếc đọc lời ước.', 'vua');
     for (const q of Object.values(DB.players)) if (!q.lanh) notify(q, '🏮 Thả hoa đăng cùng Hoàng thượng', 'Ra hồ Ngự hoa viên thả hoa đăng ước nguyện.', 'vuaden'); }
   if (v.den && now() > v.den.end) quiet(v.den.test, () => { const L = v.den.list; v.den = null; ch = true;
@@ -1885,7 +1885,7 @@ io.on('connection', sock => {
       const e = curEvent(); if (!e.loc) return;
       if (me.loc !== e.loc) return toast(me, 'Không đúng chỗ cho sự kiện này.');
       if (e.id === 'hoadang') {
-        if (VS().den && !VS().den.test || (VS().den && me.admin)) return sockOf(me.id)?.emit('denGo'); // đang lễ: ra cầu gặp Hoàng thượng
+        if (VS().den && (!VS().den.test || me.admin)) return sockOf(me.id)?.emit('denGo'); // đang lễ: ra cầu gặp Hoàng thượng
         return toast(me, 'Lễ hoa đăng diễn ra lúc 20:30 mỗi tối. Hoàng thượng sẽ đứng trên cầu hồ lớn, tới bấm vào người để thả hoa đăng.');
       }
       if (me.evDay === dayKey()) return toast(me, 'Hôm nay đã tham gia rồi, mai quay lại nhé.');
@@ -2111,7 +2111,7 @@ io.on('connection', sock => {
       if (op === 'decline') { toast(f, `${me.name} khéo léo từ chối lời kết nghĩa.`); return; }
       if (me.sis) return toast(me, 'Đã ở nhóm khác.');
       let g = grp(f);
-      if (!g) { DB.state.groups = DB.state.groups || {}; const id = 'g' + now().toString(36); let nm = inv.name || 'Kim Lan'; if (gNameTaken(nm)) { let k = 2; while (gNameTaken(nm + ' ' + k)) k++; nm = nm + ' ' + k; } g = DB.state.groups[id] = { id, name: nm, members: [f.id], fund: 0, goal: 300, lv: 0, bank: 0, created: now() }; f.sis = id; }
+      if (!g) { DB.state.groups = DB.state.groups || {}; const id = 'g' + now().toString(36); let nm = inv.name || gDefaultName(); if (gNameTaken(nm)) nm = gDefaultName(); g = DB.state.groups[id] = { id, name: nm, members: [f.id], fund: 0, goal: 300, lv: 0, bank: 0, created: now() }; f.sis = id; }
       if (g.members.length >= gMax(g)) return toast(me, 'Nhóm đã đủ người.', 'bad');
       g.members.push(me.id); me.sis = g.id; cnt(me, 'sis'); if (f.cnt?.sis == null) cnt(f, 'sis');
       news(`🌸 ${g.members.map(id => P(id)?.name).join(', ')} thắp hương kết nghĩa tỷ muội: "${g.name}".`);
@@ -2121,7 +2121,7 @@ io.on('connection', sock => {
       if (!((g.renameUntil || 0) > now())) return toast(me, 'Hiện không được đổi tên nhóm.');
       const nm = String(d.name || '').trim().replace(/\s+/g, ' ').slice(0, 20); if (!nm) return toast(me, 'Hãy nhập tên mới.', 'bad');
       if (gNameTaken(nm, g.id)) return toast(me, `Tên "${nm}" đã có nhóm khác dùng, chọn tên khác nhé.`, 'bad');
-      g.name = nm; g.renameUntil = 0; for (const id of g.members) { const q = P(id); if (q && q.id !== me.id) toast(q, `🌸 Chủ nhóm đổi tên nhóm tỷ muội thành "${nm}".`, 'good'); }
+      g.name = nm; g.renameUntil = 0; g.autoNamed = 0; for (const id of g.members) { const q = P(id); if (q && q.id !== me.id) toast(q, `🌸 Chủ nhóm đổi tên nhóm tỷ muội thành "${nm}".`, 'good'); }
       toast(me, `Đã đổi tên nhóm thành "${nm}".`, 'good'); pushGroup(g); save();
     } else if (op === 'leave') {
       const g = grp(me); if (!g) return; g.members = g.members.filter(x => x !== me.id); me.sis = null;
@@ -2627,6 +2627,10 @@ loadDB().then(() => {
   if (!DB.state.maint1113) { DB.state.maint1113 = 1; const at = Date.UTC(2026, 10, 13, 16, 30); if (now() < at) DB.state.maint = { at }; }
   // cấp nhóm: nhóm cũ đã đông người giữ đủ chỗ hiện có
   for (const g of Object.values(DB.state.groups || {})) { if (g.lv == null) g.lv = g.members.length > 6 ? 2 : g.members.length > 4 ? 1 : 0; g.bank = (g.bank || 0) + (g.fund || 0); g.fund = 0; }
+  if (!DB.state.gRenameNum2) { DB.state.gRenameNum2 = 1; // nhóm mang tên kiểu "Kim Lan 12" (trùng tên rồi bị đánh số): đặt ngay tên hoa ngẫu nhiên
+    for (const g of Object.values(DB.state.groups || {})) { const m = String(g.name).match(/^(.*\S)\s+\d+$/); if (!m || !Object.values(DB.state.groups).some(o => o !== g && gNorm(o.name) === gNorm(m[1]))) continue;
+      const old = g.name; g.name = '\u0000'; g.name = gDefaultName(); g.renameUntil = now() + 24 * 3600e3; g.autoNamed = 1; console.log('đổi tên nhóm trùng:', old, '→', g.name);
+      for (const id of g.members) { const q = P(id); if (q) addMail(q, { kind: 'he', fromName: '🌸 Nội vụ phủ', text: `Nhóm tỷ muội "${old}" trùng tên nhóm khác, Nội vụ phủ đặt tên mới: "${g.name}". Trong 24 giờ, chủ nhóm có thể tự đặt tên khác (không trùng) ở 💞 Tỷ muội → Đổi tên nhóm.` }); } } }
   if (!DB.state.gRenameMail1) { DB.state.gRenameMail1 = 1; const G = Object.values(DB.state.groups || {});
     for (const g of G) { const m = String(g.name).match(/^(.*) (\d+)$/); if (!m || !G.some(x => x.id !== g.id && gNorm(x.name) === gNorm(m[1]))) continue;
       g.renameUntil = now() + 24 * 3600e3; const f = P(g.members[0]);
